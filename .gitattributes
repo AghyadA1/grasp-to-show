@@ -1,0 +1,5 @@
+# Keep LF line endings in the repo on every OS (Windows checkouts included).
+* text=auto eol=lf
+*.png binary
+*.gif binary
+*.mp4 binary

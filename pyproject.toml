@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grasp2show"
+version = "0.1.0"
+description = "Target-aware grasp selection: pick an object so a QR patch can be shown to a camera"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Aghyad Ali" }]
+dependencies = [
+  "mujoco>=3.3",
+  "mink>=1.0",
+  "numpy",
+  "scipy",
+  "opencv-python",
+  "qrcode[pil]",
+  "imageio",
+  "imageio-ffmpeg",
+  "trimesh",
+  "h5py",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+include = ["grasp2show*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: runs a full simulated episode (~10 s)"]
+
+[tool.ruff]
+line-length = 110
+extend-exclude = ["third_party"]

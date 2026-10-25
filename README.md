@@ -16,10 +16,11 @@ the object surface.
 *Left: fingers on the side faces, QR decoded by the scanner. Right: an equally stable grasp whose
 finger covers the QR, so decoding fails. A stability-only planner cannot tell these apart.*
 
-> **Status: day 3 of a 3-week plan.** Simulation scene and scripted pick → move → show with a
+> **Status: day 4 of a 3-week plan.** Simulation scene and scripted pick → move → show with a
 > ground-truth success test (days 1–2); 40 real scanned products with automatic QR placement, an
-> antipodal grasp sampler and simulated lift-stability labels (day 3).
-> Next: the analytic checks (stability at the target, reachability, QR visibility).
+> antipodal grasp sampler and 5,225 simulated lift labels (day 3); an analytic stability model
+> for checks 1–2, validated against those labels with no fitted parameters (day 4).
+> Next: reachability (checks 3–4) and QR visibility (check 5).
 
 ## Quickstart
 
@@ -36,7 +37,8 @@ python scripts/get_objects.py                 # 40 scanned products (~55 MB, no 
 python scripts/demo_pick_and_show.py          # runs both grasps, writes media/
 python scripts/demo_pick_and_show.py --viewer # interactive MuJoCo viewer
 python scripts/generate_grasps.py             # grasp candidates + lift labels -> data/grasps/
-pytest -q                                      # 15 tests, ~15 s
+python scripts/validate_stability.py          # analytic model vs simulated labels
+pytest -q                                      # 20 tests, ~15 s
 ```
 
 Windows (PowerShell):
@@ -49,6 +51,7 @@ python scripts\get_menagerie.py
 python scripts\get_objects.py
 python scripts\demo_pick_and_show.py
 python scripts\generate_grasps.py
+python scripts\validate_stability.py
 pytest -q
 ```
 
@@ -100,9 +103,9 @@ A grasp succeeds if both fingers still touch the object and it moved < 2 cm in t
 is ACRONYM's labelling recipe, rebuilt in MuJoCo so that labels and the final evaluation share
 one physics engine.
 
-**What the labels show.** On the first four objects: 206/361 grasps hold (57 %). Light
-packages hold almost everywhere (70 g crayon box: 90 %); heavier ones fail mostly by *rotating
-about the finger axis* (0.61 kg crayon box: 13 %). A controlled test confirms the mechanism
+**What the labels show.** 5,225 labelled grasps on 40 objects (3 min on an 11-worker laptop),
+75 % hold. Light packages hold almost everywhere (50–90 g items: ~80–90 %); heavier ones fail
+mostly by *rotating about the finger axis* (0.5–0.75 kg items: 10–23 %). A controlled test confirms the mechanism
 (0.8 kg bar, 20 N per finger, μ = 0.5, torsional coefficient 5 mm):
 
 | Grasp offset from centre of mass | Gravity torque about finger axis | Held? | Rotation in hand |
@@ -115,6 +118,21 @@ about the finger axis* (0.61 kg crayon box: 13 %). A controlled test confirms th
 The threshold sits at the soft-finger torsional limit 2·μ_t·F = 0.20 N·m. That limit is what
 check 2 evaluates analytically at the *target* pose, where gravity points in a different
 direction in the object frame.
+
+## Checks 1–2: analytic stability, validated against simulation
+
+The analytic model (`grasp2show/stability.py`, derivation in **[docs/physics.md](docs/physics.md)**)
+finds the friction utilisation `u` of a grasp: the fraction of the two soft-finger contacts'
+friction budget needed to cancel gravity (and, for the shake test, the d'Alembert inertial
+loads), with gravity expressed in the object frame. `u ≤ 1`: the grasp holds. Check 1 evaluates
+it at the start orientation, check 2 at the target orientation.
+
+![reliability](media/stability_validation.png)
+
+With **no fitted parameters** (the simulator's own μ = 0.5, μ_t = 5 mm, 20 N), the simulated
+success rate falls monotonically with `u` and crosses 50 % exactly at `u = 1`. On the 10 unseen
+objects the model ranks grasps with **AUC 0.79–0.82**. Its limit is a 6–11 % floor of
+geometric failures that friction cannot explain: the learned scorer's job.
 
 ## Design notes (and the bugs that motivated them)
 
@@ -147,9 +165,11 @@ grasp2show/
   qr_placement.py  flat-face search for the QR patch (bounding box + ray casting)
   grasp_sampler.py antipodal candidates -> 6-DoF grasps
   gripper_sim.py   floating-hand shake test (labels for check 1, ground truth for check 2)
+  stability.py     analytic soft-finger stability model (checks 1-2)
+docs/physics.md    derivation of the stability model and its validation
 scripts/
   demo_pick_and_show.py   get_menagerie.py   get_objects.py
-  select_objects.py       generate_grasps.py
+  select_objects.py       generate_grasps.py      validate_stability.py
 tests/
 ```
 
@@ -163,8 +183,9 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 
 - [x] Scene, QR object, scanner camera, scripted pick → move → show, ground-truth evaluation
 - [x] Real objects (40 scanned products), automatic QR placement, grasp sampler, simulated lift labels
-- [ ] Analytic checks: lift stability · stability at the target (rotated gravity, soft-finger
-      torque limit) · reachability at start and target · QR visibility by ray casting
+- [x] Analytic stability (checks 1–2): soft-finger model, validated on 5,225 simulated grasps
+- [ ] Reachability at start and target (checks 3–4) · QR visibility by ray casting (check 5)
+- [ ] C++ implementation of the stability model (Python bindings) and speed comparison
 - [ ] Target *set* (rotations about the viewing axis) and robust labels under pose noise
 - [ ] Baseline (most stable grasp) vs target-aware selection: success-rate table
 - [ ] Learned scorer (point cloud + grasp + target → feasibility); speed and unseen-object test

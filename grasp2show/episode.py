@@ -16,8 +16,8 @@ from .config import SceneConfig
 from .ik import IKResult, PandaIK
 from .motion import cartesian_line, path_trajectory
 from .qr import decode_qr
-from .scene import HOME_Q, PANDA_BODIES, reset_to_home
-from .task import Grasp, body_pose, flipped, site_pose, start_pose
+from .scene import HOME_Q, PANDA_BODIES, Scene, reset_to_home, start_pose
+from .task import Grasp, body_pose, flipped, site_pose
 from .transforms import inv_T, rotation_angle
 
 
@@ -54,23 +54,24 @@ class PickAndShow:
     SEGMENTS = (("approach", 25, 2.0), ("descend", 10, 1.2), ("lift", 10, 1.2),
                 ("transit", 30, 2.5), ("present", 8, 1.0))
 
-    def __init__(self, model: mujoco.MjModel, cfg: SceneConfig, ik: PandaIK | None = None,
+    def __init__(self, scene: Scene, cfg: SceneConfig, ik: PandaIK | None = None,
                  slip_tol_mm: float = 5.0, slip_tol_deg: float = 5.0):
-        self.model, self.cfg = model, cfg
+        model = scene.model
+        self.model, self.cfg, self.obj = model, cfg, scene.obj
         self.ik = ik or PandaIK(cfg)
         self.data = mujoco.MjData(model)
         self.slip_tol_mm, self.slip_tol_deg = slip_tol_mm, slip_tol_deg
         self.renderer = mujoco.Renderer(model, cfg.camera.height, cfg.camera.width)
         self._robot_bodies = {model.body(b).id for b in PANDA_BODIES}
         self._fingers = {model.body("left_finger").id, model.body("right_finger").id}
-        self._obj = model.body(cfg.obj.name).id
+        self._obj = model.body(scene.obj.name).id
 
     # -- planning ---------------------------------------------------------------------
     def key_poses(self, grasp: Grasp, T_target_obj: np.ndarray) -> dict[str, np.ndarray]:
         """TCP poses at the segment boundaries."""
         reset_to_home(self.model, self.data)
         T_home = site_pose(self.data, "tcp")
-        T_grasp = start_pose(self.cfg) @ grasp.T_obj_tcp
+        T_grasp = start_pose(self.cfg, self.obj) @ grasp.T_obj_tcp
         T_pre = T_grasp.copy()
         T_pre[:3, 3] -= 0.10 * T_grasp[:3, 2]              # 10 cm back along the approach
         T_lift = T_grasp.copy()
@@ -158,13 +159,13 @@ class PickAndShow:
         follow(path_trajectory(paths["lift"], seg["lift"], dt), 0.0)
         hold(paths["lift"][-1], 0.0, 0.3)
         state["holding"] = True                       # from here only finger contacts allowed
-        T_tcp_obj_ref = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.cfg.obj.name)
+        T_tcp_obj_ref = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
         follow(path_trajectory(paths["transit"], seg["transit"], dt), 0.0)
         follow(path_trajectory(paths["present"], seg["present"], dt), 0.0)
         hold(paths["present"][-1], 0.0, 1.0)
 
         # -- ground truth: slip in the hand, still held, QR decoded by the scanner ---------
-        T_tcp_obj = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.cfg.obj.name)
+        T_tcp_obj = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
         dT = inv_T(T_tcp_obj_ref) @ T_tcp_obj
         slip_mm = float(np.linalg.norm(dT[:3, 3]) * 1e3)
         slip_deg = float(np.degrees(rotation_angle(dT[:3, :3])))

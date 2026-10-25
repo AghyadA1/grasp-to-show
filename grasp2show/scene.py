@@ -1,6 +1,6 @@
 """Build the MuJoCo scene programmatically with MjSpec.
 
-Scene = Franka Panda (MuJoCo Menagerie) + table + box with a QR patch + scanner camera.
+Scene = Franka Panda (MuJoCo Menagerie) + table + object with a QR patch + scanner camera.
 The Menagerie files are used unchanged; everything we modify (gravity compensation,
 TCP site, gripper actuator) is done here in code, so the changes are visible and reviewed.
 """
@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import NamedTuple
 
 import mujoco
 import numpy as np
 
 from .config import SceneConfig
+from .objects import ObjectModel, object_from_config
 from .qr import make_qr_texture
 from .transforms import camera_xyaxes, mat_to_quat, rot_z
 
@@ -36,33 +38,31 @@ def menagerie_panda_dir() -> Path:
     return d
 
 
-def robot_spec(cfg: SceneConfig) -> mujoco.MjSpec:
-    """Panda + hand with our three modifications. Also used alone as the IK model."""
-    spec = mujoco.MjSpec.from_file(str(menagerie_panda_dir() / "panda.xml"))
+def set_contact_options(spec: mujoco.MjSpec, cfg: SceneConfig) -> None:
+    """MuJoCo contacts are soft: "static" friction still lets a held object creep slowly.
+    Elliptic friction cones with a high impratio (friction-to-normal impedance ratio) make the
+    friction constraint much stiffer; this is the setting MuJoCo recommends for grasping.
+    Without it a 0.15 kg box creeps ~1 mm/s in a 20 N grip."""
     spec.option.timestep = cfg.timestep
-    # MuJoCo contacts are soft: "static" friction still lets a held object creep slowly.
-    # Elliptic friction cones with a high impratio (friction-to-normal impedance ratio)
-    # make the friction constraint much stiffer; this is the setting MuJoCo recommends for
-    # grasping. Without it a 0.15 kg box creeps ~1 mm/s in a 20 N grip.
     spec.option.cone = mujoco.mjtCone.mjCONE_ELLIPTIC
     spec.option.impratio = cfg.impratio
 
-    # 1) Gravity compensation on the arm. The real Franka controller compensates the arm's
-    #    own weight; without it the position servos sag a few mm under gravity.
-    #    The held object's weight is NOT compensated, as on the real robot.
-    for name in PANDA_BODIES:
-        spec.body(name).gravcomp = 1.0
 
-    # 2) Tool centre point (TCP): midway between the fingertip pads, on the approach axis.
-    #    The grasp poses we plan (and ACRONYM's) are poses of this kind of gripper frame.
+def configure_hand(spec: mujoco.MjSpec, cfg: SceneConfig) -> None:
+    """Apply our two hand modifications. Shared by the arm scene and the floating-gripper sim,
+    so grasp labels and episodes use exactly the same gripper.
+
+    1) Tool centre point (TCP) site: midway between the fingertip pads, on the approach axis.
+       Grasp poses are poses of this frame.
+    2) Gripper actuator: replace Menagerie's 0..255 command with a force-limited servo on the
+       finger tendon. Tendon length L = 0.5*(q1 + q2) = gap/2, so a command in metres of
+       finger gap needs gain kp/2. Tendon force F gives each finger a force of 0.5*F, hence
+       forcerange = 2 * finger_force. While the fingers are blocked by an object the servo
+       saturates, so each finger pushes with exactly finger_force newtons.
+    """
     spec.body("hand").add_site(
         name="tcp", pos=[0, 0, cfg.tcp_offset], size=[0.006, 0, 0], rgba=[1, 0, 0, 0.6], group=4
     )
-
-    # 3) Gripper actuator: replace Menagerie's 0..255 command with a force-limited servo on
-    #    the finger tendon. Tendon length L = 0.5*(q1 + q2) = gap/2, so a command in metres
-    #    of finger gap needs gain kp/2. Tendon force F gives each finger a force of 0.5*F,
-    #    hence forcerange = 2 * finger_force.
     g = cfg.gripper
     act = spec.actuator("actuator8")
     act.name = "gripper"
@@ -71,17 +71,35 @@ def robot_spec(cfg: SceneConfig) -> mujoco.MjSpec:
     act.biasprm[:3] = [0.0, -g.kp, -g.kv]
     act.forcerange = [-2.0 * g.finger_force, 2.0 * g.finger_force]
 
+
+def robot_spec(cfg: SceneConfig) -> mujoco.MjSpec:
+    """Panda + hand with our modifications. Also used alone as the IK model."""
+    spec = mujoco.MjSpec.from_file(str(menagerie_panda_dir() / "panda.xml"))
+    set_contact_options(spec, cfg)
+    # Gravity compensation on the arm. The real Franka controller compensates the arm's own
+    # weight; without it the position servos sag a few mm under gravity. The held object's
+    # weight is NOT compensated, as on the real robot.
+    for name in PANDA_BODIES:
+        spec.body(name).gravcomp = 1.0
+    configure_hand(spec, cfg)
     # Keyframes refer to the original actuator count and qpos size; we set state ourselves.
     for key in list(spec.keys):
         spec.delete(key)
     return spec
 
 
-def build_scene(cfg: SceneConfig | None = None) -> tuple[mujoco.MjModel, mujoco.MjSpec]:
+class Scene(NamedTuple):
+    model: mujoco.MjModel
+    spec: mujoco.MjSpec
+    obj: ObjectModel
+
+
+def build_scene(cfg: SceneConfig | None = None, obj: ObjectModel | None = None) -> Scene:
     cfg = cfg or SceneConfig()
     spec = robot_spec(cfg)
     world = spec.worldbody
     o = cfg.obj
+    obj = obj or object_from_config(o)
 
     spec.visual.headlight.ambient = [0.35, 0.35, 0.35]
     spec.visual.headlight.diffuse = [0.5, 0.5, 0.5]
@@ -107,19 +125,10 @@ def build_scene(cfg: SceneConfig | None = None) -> tuple[mujoco.MjModel, mujoco.
     spec.add_texture(name="qr", type=mujoco.mjtTexture.mjTEXTURE_2D, file=str(tex_path))
     spec.add_material(name="qr", textures=["", "qr"], specular=0.0, shininess=0.0)
 
-    body = world.add_body(name=o.name, pos=list(o.start_pos), quat=mat_to_quat(rot_z(o.start_yaw)))
-    body.add_freejoint(name=f"{o.name}_free")
-    body.add_geom(name=f"{o.name}_geom", type=mujoco.mjtGeom.mjGEOM_BOX, size=list(o.half_size),
-                  mass=o.mass, friction=list(o.friction), condim=o.condim, rgba=list(o.rgba))
-    # Visual-only thin plate glued to the +x face. It is in its own geom group (1) so the
-    # visibility check can ray-cast against it separately from collision geometry.
-    hx = o.half_size[0]
-    s = o.qr_size / 2.0
-    body.add_geom(name=f"{o.name}_qr", type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.0005, s, s],
-                  pos=[hx + 0.0005, 0, o.qr_center_z], material="qr", contype=0, conaffinity=0,
-                  group=1)
-    body.add_site(name=f"{o.name}_qr_center", pos=[hx + 0.001, 0, o.qr_center_z],
-                  size=[0.003, 0, 0], group=4)
+    T0 = start_pose(cfg, obj)
+    body = world.add_body(name=obj.name, pos=T0[:3, 3], quat=mat_to_quat(T0[:3, :3]))
+    body.add_freejoint(name=f"{obj.name}_free")
+    obj.add_to_body(spec, body, qr_material="qr")
 
     # --- cameras ---------------------------------------------------------------------
     c = cfg.camera
@@ -139,7 +148,16 @@ def build_scene(cfg: SceneConfig | None = None) -> tuple[mujoco.MjModel, mujoco.
 
     model = spec.compile()
     _check_joint_layout(model)
-    return model, spec
+    return Scene(model, spec, obj)
+
+
+def start_pose(cfg: SceneConfig, obj: ObjectModel) -> np.ndarray:
+    """Object resting on the table at the configured (x, y, yaw); +1 mm to avoid initial overlap."""
+    x, y = cfg.obj.start_xy
+    T = np.eye(4)
+    T[:3, :3] = rot_z(cfg.obj.start_yaw)
+    T[:3, 3] = [x, y, obj.rest_z + 0.001]
+    return T
 
 
 def _cam_frame(pos, look_at) -> np.ndarray:

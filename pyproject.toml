@@ -20,6 +20,8 @@ dependencies = [
   "imageio",
   "imageio-ffmpeg",
   "trimesh",
+  "rtree",          # trimesh ray casting
+  "matplotlib",
   "h5py",
 ]
 

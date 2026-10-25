@@ -73,9 +73,9 @@ def write_comparison_gif(a: list, b: list, fps: int, path: Path, gif_fps: int = 
                  loop=0, optimize=True)
 
 
-def run_one(model, cfg, ep: PickAndShow, name: str, roll_deg: float, fps: int):
+def run_one(cfg, ep: PickAndShow, name: str, roll_deg: float, fps: int):
     grasp = scripted_grasps(cfg)[name]
-    target = show_pose(cfg, np.radians(roll_deg))
+    target = show_pose(cfg, ep.obj, np.radians(roll_deg))
     # Reuse the episode's renderer for both views. Several mujoco.Renderer objects (several
     # OpenGL contexts) in one process can render the wrong camera on some backends.
     r = ep.renderer
@@ -104,7 +104,8 @@ def main():
     args = p.parse_args()
 
     cfg = SceneConfig()
-    model, _ = build_scene(cfg)
+    scene = build_scene(cfg)
+    model = scene.model
 
     if args.viewer:
         import mujoco.viewer
@@ -115,12 +116,12 @@ def main():
         mujoco.viewer.launch(model, d)
         return
 
-    ep = PickAndShow(model, cfg)
+    ep = PickAndShow(scene, cfg)
     names = ["clear_qr", "covers_qr"] if args.grasp == "both" else [args.grasp]
     MEDIA.mkdir(exist_ok=True)
     all_frames = {}
     for name in names:
-        res, frames = run_one(model, cfg, ep, name, args.roll, args.fps)
+        res, frames = run_one(cfg, ep, name, args.roll, args.fps)
         print(res.summary())
         cv2.imwrite(str(MEDIA / f"scanner_{name}.png"), cv2.cvtColor(res.scanner_rgb, cv2.COLOR_RGB2BGR))
         if not args.no_video:

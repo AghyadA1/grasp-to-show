@@ -12,18 +12,23 @@ import numpy as np
 
 @dataclass
 class ObjectConfig:
-    """A box with a QR patch on its +x face (the 'QR face')."""
+    """The object to pick. asset=None: the primitive box (QR on its +x face).
+    asset="<Google Scanned Objects name>": a scanned mesh (see grasp2show/object_set.json);
+    its QR face is found automatically and its mass comes from the mesh volume x density."""
 
-    name: str = "box"
+    asset: str | None = None
+    density: float = 300.0  # kg/m^3, scanned objects only
+    name: str = "obj"  # MuJoCo body name
     half_size: tuple[float, float, float] = (0.025, 0.025, 0.06)  # 5 x 5 x 12 cm
     mass: float = 0.15
     # MuJoCo friction = (sliding mu, torsional [m], rolling [m]).
     # The torsional coefficient is an effective contact-patch radius; it is what lets
     # a two-finger grasp resist torque about the finger axis (the soft-finger model
     # used later in check 2). With condim=3 that torque could not be resisted at all.
-    friction: tuple[float, float, float] = (1.0, 0.005, 0.0001)
+    # mu = 0.5: plastic fingertips on cardboard / printed packaging.
+    friction: tuple[float, float, float] = (0.5, 0.005, 0.0001)
     condim: int = 4
-    start_pos: tuple[float, float, float] = (0.50, -0.15, 0.06)  # resting on the table
+    start_xy: tuple[float, float] = (0.50, -0.15)  # on the table; height from the mesh
     start_yaw: float = 0.0
     qr_payload: str = "G2S-0001"
     qr_size: float = 0.045  # side length of the printed QR patch (incl. quiet zone)

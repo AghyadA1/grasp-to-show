@@ -16,7 +16,7 @@ def cfg():
 
 
 def test_scene_compiles(cfg):
-    model, _ = build_scene(cfg)
+    model = build_scene(cfg).model
     assert model.nu == 8
     assert model.actuator("gripper").ctrlrange[1] == pytest.approx(cfg.gripper.max_width)
     assert model.opt.impratio == pytest.approx(cfg.impratio)
@@ -53,7 +53,8 @@ def test_flipped_grasp_touches_same_points(cfg):
 
 @pytest.mark.parametrize("roll_deg", [0, 45, -90])
 def test_show_pose_faces_camera(cfg, roll_deg):
-    T = show_pose(cfg, np.radians(roll_deg))
+    obj = build_scene(cfg).obj
+    T = show_pose(cfg, obj, np.radians(roll_deg))
     qr_world = T[:3, :3] @ [cfg.obj.half_size[0], 0, cfg.obj.qr_center_z] + T[:3, 3]
     np.testing.assert_allclose(qr_world, cfg.camera.look_at, atol=1e-9)
     to_cam = np.subtract(cfg.camera.pos, cfg.camera.look_at)
@@ -66,10 +67,10 @@ def test_episode_clear_succeeds_covering_fails(cfg):
     """The day 1-2 result: two equally stable grasps, only one shows the QR."""
     from grasp2show.episode import PickAndShow
 
-    model, _ = build_scene(cfg)
-    ep = PickAndShow(model, cfg)
+    scene = build_scene(cfg)
+    ep = PickAndShow(scene, cfg)
     grasps = scripted_grasps(cfg)
-    clear = ep.run(grasps["clear_qr"], show_pose(cfg))
-    cover = ep.run(grasps["covers_qr"], show_pose(cfg))
+    clear = ep.run(grasps["clear_qr"], show_pose(cfg, scene.obj))
+    cover = ep.run(grasps["covers_qr"], show_pose(cfg, scene.obj))
     assert clear.success, clear.summary()
     assert cover.held and not cover.qr_ok, cover.summary()

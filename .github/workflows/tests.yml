@@ -22,6 +22,8 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Fetch the Franka Panda model
         run: python scripts/get_menagerie.py
+      - name: Fetch one scanned object (for the scanned-object test)
+        run: python scripts/get_objects.py --only 1
       - name: Lint
         run: ruff check .
       - name: Tests

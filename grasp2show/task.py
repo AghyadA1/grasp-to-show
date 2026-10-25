@@ -2,7 +2,8 @@
 
 Frames used throughout:
   world  - z up, robot base at origin.
-  obj    - object body frame (box centre); the QR face is the +x face.
+  obj    - object body frame (box centre, or the scanned mesh frame: z up, base at z=0).
+  qr     - QR patch frame: x = outward normal, origin at the patch centre.
   tcp    - gripper tool frame: z = approach direction (out of the palm),
            y = finger closing axis, origin midway between the fingertip pads.
 A grasp is the constant transform T_obj_tcp. At any object pose T_world_obj, the
@@ -17,7 +18,9 @@ import mujoco
 import numpy as np
 
 from .config import SceneConfig
-from .transforms import frame_from_axes, make_T, rot_z
+from .objects import ObjectModel
+from .scene import start_pose  # noqa: F401  (re-exported)
+from .transforms import frame_from_axes, make_T
 
 
 @dataclass
@@ -58,25 +61,23 @@ def scripted_grasps(cfg: SceneConfig) -> dict[str, Grasp]:
     }
 
 
-def show_pose(cfg: SceneConfig, roll_about_view: float = 0.0) -> np.ndarray:
+def show_pose(cfg: SceneConfig, obj: ObjectModel, roll_about_view: float = 0.0) -> np.ndarray:
     """Target object pose T_world_obj: QR centre at the camera's look-at point, facing it.
 
-    The QR normal (+x_obj) points from the look-at point back to the camera. The remaining
-    freedom is a rotation about that viewing axis; roll_about_view = 0 keeps the object's
-    long axis as close to vertical as possible. Sampling roll gives the 'target set'.
+    The QR normal (x of the QR frame) points from the look-at point back to the camera. The
+    remaining freedom is a rotation about that viewing axis; roll_about_view = 0 keeps the
+    QR frame's z axis as close to vertical as possible. Sampling roll gives the 'target set'.
+    Derivation: we want T_world_qr = T_world_obj @ T_obj_qr, so T_world_obj = T_world_qr @ inv(T_obj_qr).
     """
     cam, at = np.asarray(cfg.camera.pos), np.asarray(cfg.camera.look_at)
     n = (cam - at) / np.linalg.norm(cam - at)
     R0 = frame_from_axes(x=n, z=[0, 0, 1])
     c, s = np.cos(roll_about_view), np.sin(roll_about_view)
-    R_roll = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])  # rotation about obj x (= n)
-    R = R0 @ R_roll
-    qr_local = np.array([cfg.obj.half_size[0], 0.0, cfg.obj.qr_center_z])
-    return make_T(R, at - R @ qr_local)
-
-
-def start_pose(cfg: SceneConfig) -> np.ndarray:
-    return make_T(rot_z(cfg.obj.start_yaw), cfg.obj.start_pos)
+    R_roll = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])  # rotation about the QR normal
+    T_world_qr = make_T(R0 @ R_roll, at)
+    T_obj_qr = obj.T_obj_qr
+    R_world_obj = T_world_qr[:3, :3] @ T_obj_qr[:3, :3].T
+    return make_T(R_world_obj, at - R_world_obj @ T_obj_qr[:3, 3])
 
 
 def body_pose(model: mujoco.MjModel, data: mujoco.MjData, body: str) -> np.ndarray:

@@ -110,44 +110,49 @@ def render(asset: str, yaw: float, res: dict, radius: float, out_gif: Path, fps:
     qr_corners = np.array([[0, sy, sz] for sy, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1), (-1, -1))]) * obj.qr.side / 2
     qr_world = (T_qr[:3, :3] @ qr_corners.T).T + T_qr[:3, 3] + 0.002 * n_qr
     c0 = mesh.bounds.mean(0)
-    L = 0.6 * np.ptp(mesh.bounds, axis=0).max()
+    L = 0.5 * np.ptp(mesh.bounds, axis=0).max()
+    side = np.cross([0, 0, 1.0], n_qr)                   # where the gravity arrow is drawn
+    side /= np.linalg.norm(side)
 
     frames = []
     for j, roll in enumerate(res["rolls"]):
         R_t = show_pose(cfg, obj, roll)[:3, :3]
         g_obj = R_t.T @ np.array([0, 0, -1.0])           # gravity at the target, object frame
-        fig = plt.figure(figsize=(8.4, 7.2), dpi=90)
+        fig = plt.figure(figsize=(8.4, 8.0), dpi=90)
         for r, vd in enumerate(view_dirs):
-            az = np.degrees(np.arctan2(vd[1], vd[0]))
+            az = np.degrees(np.arctan2(vd[1], vd[0])) + 35       # three-quarter view
             light = vd / np.linalg.norm(vd) + np.array([0, 0, 0.6])
             light /= np.linalg.norm(light)
             for k, (h, title) in enumerate(((H_stab, "stability only (target-blind)"),
                                             (H_aware[:, j], "target-aware (this target)"))):
-                ax = fig.add_subplot(2, 2, 2 * r + k + 1, projection="3d")
-                ax.add_collection3d(Poly3DCollection(tri, facecolors=colours(h, light), edgecolors="none"))
-                ax.plot(*qr_world.T, c="#d62728", lw=1.6)
-                if k == 1:
-                    a = c0 - 1.0 * L * g_obj
-                    ax.quiver(*a, *(0.9 * L * g_obj), color="#111111", lw=2, arrow_length_ratio=0.25)
+                ax = fig.add_subplot(2, 2, 2 * r + k + 1, projection="3d", computed_zorder=False)
+                ax.add_collection3d(Poly3DCollection(tri, facecolors=colours(h, light), edgecolors="none",
+                                                     linewidths=0, antialiased=False, zorder=1))
+                if r == 0:                                    # the QR outline, on the visible side
+                    ax.plot(*qr_world.T, c="#d62728", lw=1.8, zorder=5)
+                if k == 1:                                    # gravity at the target, beside the object
+                    a = c0 + 0.95 * L * side - 0.45 * L * g_obj
+                    ax.quiver(*a, *(0.9 * L * g_obj), color="#111111", lw=2.2, arrow_length_ratio=0.3,
+                              zorder=6)
                 ax.set_xlim(c0[0] - L, c0[0] + L)
                 ax.set_ylim(c0[1] - L, c0[1] + L)
                 ax.set_zlim(c0[2] - L, c0[2] + L)
-                ax.set_box_aspect((1, 1, 1))
+                ax.set_box_aspect((1, 1, 1), zoom=1.45)
                 ax.view_init(elev=20, azim=az)
                 ax.set_axis_off()
                 if r == 0:
-                    ax.set_title(title, fontsize=11)
-        fig.text(0.02, 0.965, f"target: QR facing the scanner, rolled {np.degrees(roll):3.0f}° about the viewing axis",
+                    ax.set_title(title, fontsize=11, pad=0)
+        fig.text(0.03, 0.97, f"target: QR facing the scanner, rolled {np.degrees(roll):3.0f}° about the viewing axis",
                  fontsize=11)
-        fig.text(0.02, 0.5, "QR side", rotation=90, fontsize=10, va="center")
-        fig.text(0.02, 0.06, "opposite side", rotation=90, fontsize=10)
+        fig.text(0.015, 0.72, "QR side", rotation=90, fontsize=10, va="center")
+        fig.text(0.015, 0.30, "opposite side", rotation=90, fontsize=10, va="center")
         fig.text(0.52, 0.02, "arrow: gravity at the target   red: QR patch   grey: no grasp touches here",
                  fontsize=8.5, color="0.3")
         cax = fig.add_axes([0.08, 0.025, 0.3, 0.015])
         cb = fig.colorbar(plt.cm.ScalarMappable(cmap=cmap), cax=cax, orientation="horizontal")
         cb.set_label("best grasp score touching here (0 = fails a check)", fontsize=8)
         cb.ax.tick_params(labelsize=7)
-        fig.subplots_adjust(0.03, 0.06, 0.99, 0.94, 0.0, 0.02)
+        fig.subplots_adjust(0.03, 0.07, 0.99, 0.93, 0.0, 0.0)
         fig.canvas.draw()
         frames.append(np.asarray(fig.canvas.buffer_rgba())[..., :3].copy())
         plt.close(fig)

@@ -23,6 +23,12 @@ the gain.
 full pick-and-show episodes (vs the checks: 18 scenarios won, 2 lost, p = 4e-4). It mostly fixes
 what the static checks cannot see: slip during the motion.
 
+**Week 3: a goal-conditioned heatmap network** (way B) predicts, from the object's point cloud
+and the task, a grasp score and a grasp at every surface point in 7 ms on a laptop GPU. Its
+grasps succeed in **89 %** of 80 full episodes on unseen objects (baseline 55 %, analytic checks
+64 %; paired vs the checks: 27 won, 7 lost, p = 8e-4). Caveat and a surprise below: it beats
+the slow dense search it was trained to imitate (52 %).
+
 **One-page summary:** [docs/grasp-to-show-summary.pdf](docs/grasp-to-show-summary.pdf)
 
 ![baseline vs ours](media/baseline_vs_ours.gif)
@@ -45,11 +51,12 @@ the same scanner; insets: what the scanner sees. (`scripts/demo_overlay.py`)*
 *Left: fingers on the side faces, QR decoded by the scanner. Right: an equally stable grasp whose
 finger covers the QR, so decoding fails. A stability-only planner cannot tell these apart.*
 
-> **Status: week 2 of a 3-week plan.** Week 1: scene and scripted pick-and-show, 40 scanned
+> **Status: week 3 of a 3-week plan.** Week 1: scene and scripted pick-and-show, 40 scanned
 > products, grasp sampler and simulated lift labels, five analytic checks, C++ kernels, validation
-> against 865 full episodes and the policy comparison. Week 2 so far: a 20,902-sample dataset of
+> against 865 full episodes and the policy comparison. Week 2: a 20,902-sample dataset of
 > full-episode outcomes, a learned scorer and its evaluation as a policy on unseen objects, and
-> goal-conditioned heatmaps (way A), robustness to pose error. One-page summary. Next (week 3): way B.
+> goal-conditioned heatmaps (way A), robustness to pose error, one-page summary. Week 3: way B,
+> the heatmap network (done, results below).
 
 ## Quickstart
 
@@ -397,8 +404,61 @@ the matching spot on the opposite face, which is only reachable by a pinch throu
 the checks for both twins and 24 target poses, and paints the scores onto the mesh: 19 s on 2
 cores, no training (lift stability from the analytic model). The map answers "where can I grasp
 this object *for this task*?", which a stability map cannot: on the 10 unseen objects, 2–48 %
-of the collision-free candidates are feasible for at least one target pose. Way B (week 3) learns
-this map directly.
+of the collision-free candidates are feasible for at least one target pose. Way B learns this map
+directly.
+
+## Way B: a network that predicts the heatmap
+
+**Labels** (`scripts/generate_dense_labels.py`, 7 min on 11 cores): way A for every object
+(40) × start pose (4) × target pose (12): ~1,000 dense candidates each, scored by all the checks
+(both twins). A surface point's label is the best candidate whose finger touches within 8 mm, plus
+that candidate's approach direction, closing direction, TCP offset and width.
+
+**Network** (`grasp2show/learn/dense.py`, 256k parameters). Per point: an edge convolution over the
+16 nearest neighbours (local shape, as in DGCNN), then a PointNet with a global max-pool. The task
+enters every point's features: gravity, the world x axis and the robot base position in the object
+frame at the start and at the target, the camera direction at the target, mass and centre of mass.
+Per-point outputs: P(feasible), score, approach, closing axis (sign-free: the two twins are one
+grasp for the fingers), TCP offset, width, in the style of Contact-GraspNet. Loss on labelled
+points only; the grasp terms only where a feasible grasp exists. Split by object, as everywhere.
+
+**Offline, unseen objects** (480 object × start × target cases, `scripts/train_heatmap_net.py`,
+5 min on an RTX 3050): point AUC **0.94**; on feasible points the predicted grasp is a median
+22° (approach), 8 mm (TCP) and 4.5 mm (width) from the best label grasp. One forward pass (1,024
+points, one target): **7 ms on the GPU**, 20 ms on the CPU, vs ~20–30 s for way A. A "is there a
+feasible grasp at the top point" score is not informative here (half the labelled points have
+one: the target-blind stability map scores as high as the network), so the test that counts is
+the network's *own* grasp in a full episode:
+
+![way B policy](media/way_b_policy.png)
+
+**In full episodes** (`scripts/eval_way_b.py`; 10 unseen objects × 8 start poses, half of them
+never in training). The network's best (point, target) pairs become grasps; the first 10 whose
+open gripper clears the object (the filter every sampled candidate gets) go through the exact
+start/target reach checks and the usual planning fallback, then a complete episode.
+
+| Policy (80 scenarios, unseen objects) | Success [95 % CI] | slip | QR | collision | no grasp | way B wins / losses |
+|---|---|---|---|---|---|---|
+| stability only (baseline) | 55 % [44, 65] | 22 | 4 | 2 | 8 | 29 / 2 |
+| analytic checks (labelled candidates) | 64 % [53, 73] | 19 | 1 | 1 | 8 | 27 / 7 |
+| way A: all checks, ~1,000 dense candidates | 52 % [42, 63] | 23 | 8 | 7 | 0 | 30 / 1 |
+| **way B: heatmap network** | **89 % [80, 94]** | 8 | 1 | 0 | 0 | |
+
+**Why does the student beat its teacher?** Way B was trained to imitate way A, yet way A is the
+worst policy here. Two observations, not yet proven explanations:
+- *Way A takes the maximum of an imperfect score over ~1,000 candidates* (lift stability from the
+  analytic model, not simulation). The argmax of many noisy estimates favours candidates whose
+  score is overestimated (the "winner's curse"); its grasps slip a median 12 mm.
+- *The network averages*: its score and its grasp at a point are smoothed over the neighbouring
+  candidates, so it prefers regions where many grasps work and proposes the central grasp of such a
+  region. Its grasps slip a median 3.9 mm. It also escapes the labelled set: on the one test object
+  where none of the 69 labelled candidates both holds when lifted (14 do) and is reachable (8
+  scenarios, "no grasp" for the labelled-set policies), way B succeeds 8/8.
+
+Caveats: one training seed; labels from the analytic checks only (the simulator judges the
+episodes); 80 scenarios. Testing the explanation (way A with a neighbourhood-smoothed score) is
+the next experiment.
+
 
 ## C++ kernels
 
@@ -461,7 +521,8 @@ grasp2show/
   experiment.py    grasp-selection policies, scenario setup, episode execution and judging
   heatmap.py       goal-conditioned heatmaps (way A): per-target grasp scores painted on the surface
   learn/           learned scorer: dataset loading and features (data.py), PointNet model
-                   (model.py), the scorer as a grasp-selection policy (policy.py)
+                   (model.py), the scorer as a grasp-selection policy (policy.py), the heatmap
+                   network of way B (dense.py)
 cpp/               optional C++17 kernels + nanobind bindings (stability, IK)
 docs/physics.md    derivation of the stability model and its validation
 scripts/
@@ -470,6 +531,7 @@ scripts/
   evaluate_targets.py     bench_cpp.py            run_experiments.py      demo_comparison.py
   generate_dataset.py     train_scorer.py         eval_learned_policy.py
   heatmap_way_a.py        demo_overlay.py         robustness.py
+  generate_dense_labels.py  train_heatmap_net.py    eval_way_b.py
 tests/
 ```
 
@@ -493,7 +555,7 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Baseline (most stable grasp) vs target-aware selection, ablations: success-rate table
 - [x] Learned scorer (point cloud + grasp + target → success), trained on full-episode outcomes; speed and unseen-object test
 - [x] Goal-conditioned grasp heatmaps on the object surface (way A: checks painted on the mesh)
-- [ ] Way B: dense goal-conditioned heatmap network
+- [x] Way B: dense goal-conditioned heatmap network, tested in full episodes on unseen objects
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 
 ## Related work

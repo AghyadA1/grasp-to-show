@@ -108,9 +108,9 @@ its centre of mass already reaches that limit (0.8 × 9.81 × 0.025 = 0.20 N·m)
 | d | gravity torque about finger axis | analytic margin | MuJoCo |
 |---|---|---|---|
 | 0 cm | 0.00 N·m | +0.61 | holds |
-| 2.5 cm | 0.20 N·m | −0.06 | holds, rotates 10° |
-| 5 cm | 0.39 N·m | −1.00 | fails, rotates 46° |
-| 10 cm | 0.78 N·m | −2.94 | fails, rotates 54° |
+| 2.5 cm | 0.20 N·m | −0.06 | holds, rotates 6° |
+| 5 cm | 0.39 N·m | −1.00 | fails, rotates 40° |
+| 10 cm | 0.78 N·m | −2.94 | fails, rotates 53° |
 
 The model puts the threshold at the right place; at the boundary it is slightly conservative,
 because MuJoCo's contacts are patches of several points.
@@ -124,23 +124,33 @@ object, `−(I α + ω × I ω)`, with `a_com = α × r + ω × (ω × r)` and `
 
 | Model (no fitted parameters) | AUC (unseen objects) | Balanced accuracy at u ≤ 1 |
 |---|---|---|
-| static (weight only) | 0.82 | 0.65 |
-| dynamic (shake loads) | 0.79 | 0.72 |
+| static (weight only) | 0.94 | 0.74 |
+| dynamic (shake loads) | 0.92 | 0.85 |
 
 ![reliability](../media/stability_validation.png)
 
 What this shows:
 
-1. **The threshold is right without tuning.** The simulated success rate falls monotonically
-   with `u` and crosses 50 % exactly at `u = 1`.
-2. **The friction model ranks grasps well (AUC ≈ 0.8)** but has a floor: 6–11 % of grasps
-   fail even when friction has plenty of reserve. Those are geometric failures (a finger
-   catching an edge, the object pushed while the fingers close) that a friction model cannot
-   see. Learning them from data is the job of the learned scorer.
-3. **A first attempt to fix the static model with a fitted load factor was misleading**: the
+1. **The threshold is right without tuning.** The simulated success rate is ~99 % when the
+   contacts use less than 20 % of their friction, falls steadily as `u` grows, and crosses 50 %
+   just below `u = 1`, where the theory puts the limit.
+2. **The static model ranks grasps best (AUC 0.94); the dynamic one classifies best** (balanced
+   accuracy 0.85), because it accounts for the inertial loads the shake test adds.
+3. **The simulator had to be validated first.** With MuJoCo's default contact softness (time
+   constant 20 ms) there was a floor of 6–11 % failures even at very low `u`, and the AUC was only
+   0.79–0.82. Tracing those episodes showed *creep*: MuJoCo's friction is regularised, so a loaded
+   contact slides slowly (13 mm in a 2.5 s transit at 0.12 g, inversely proportional to the
+   motion time). With a 5 ms time constant on the finger and object contacts the creep fell
+   about 5× and the floor disappeared. The "unexplained" failures were simulator artefacts.
+4. **A first attempt to fix the static model with a fitted load factor was misleading**: the
    best factor was 3.0, far above anything the motion justifies. The cause was structural
    (inertial torque about the finger axis grows with the object's inertia, not its weight),
    which no constant factor captures.
+5. **Remaining discrepancy:** some heavier packages (~0.35 kg and up) rotate slowly in the hand
+   (about 1.5°/s) during long holds even at `u` ≈ 0.65, which the static model calls safe.
+   Stiffer contacts, a larger `impratio`, MuJoCo's no-slip solver and computing the contacts on
+   the collision geometry instead of the visual mesh all left it unchanged; it is reported as a
+   limitation rather than tuned away.
 
 ## 6. Check 2 in the pipeline
 

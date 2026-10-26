@@ -174,14 +174,21 @@ class FeasibilityChecker:
         return bad
 
     # -- checks ----------------------------------------------------------------------------
-    def _reach(self, sols: np.ndarray, finger_gap: float, T_world_obj: np.ndarray, holding: bool) -> PoseCheck:
-        """sols (K, 4, 7) IK candidates for one pose."""
+    def _reach(self, sols: np.ndarray, finger_gap: float, T_world_obj: np.ndarray, holding: bool,
+               q_ref: np.ndarray | None = None, min_margin: float = 0.1) -> PoseCheck:
+        """sols (K, 4, 7) IK candidates for one pose. Candidates are tried in order of joint-limit
+        margin, or, if q_ref is given, of closeness to q_ref among those with margin >= min_margin
+        (so the arm does not, e.g., unwind its wrist by a full turn between start and target)."""
         q = sols.reshape(-1, 7)
         q = q[~np.isnan(q[:, 0])]
         if len(q) == 0:
             return PoseCheck(False, False)
         lm = limit_margin(q)
-        order = np.argsort(-lm)[: self.max_tries]
+        if q_ref is None:
+            order = np.argsort(-lm)[: self.max_tries]
+        else:
+            dist = np.abs(q - q_ref).max(axis=1) + np.where(lm >= min_margin, 0.0, 100.0)
+            order = np.argsort(dist)[: self.max_tries]
         first_contacts = []
         for i in order:
             self._set(q[i], finger_gap, T_world_obj)
@@ -227,12 +234,13 @@ class FeasibilityChecker:
             poses = [T_grasp, T_pre] + [To @ Tg for To in targets_obj]
             S = ik(np.stack(poses), self.q7)                               # (P, K, 4, 7)
             start = self._reach(S[0], open_gap, self.T_start, holding=False)
-            pre = self._reach(S[1], open_gap, self.T_start, holding=False)
+            pre = self._reach(S[1], open_gap, self.T_start, holding=False,
+                              q_ref=start.q if start.ok else None)
             tcs = []
             if start.ok and pre.ok:                                        # no point otherwise
                 margins = check_margin(self.obj, Tg, np.stack(R_targets), self.stab, self.target_load_factor)[0]
                 for j, (r, To) in enumerate(zip(rolls, targets_obj)):
-                    reach = self._reach(S[2 + j], width, To, holding=True)
+                    reach = self._reach(S[2 + j], width, To, holding=True, q_ref=start.q)
                     vis = self.visibility(reach.q, width, To) if reach.ok else None
                     tcs.append(TargetCheck(r, reach, float(margins[j]), vis))
             twins.append(TwinReport(k, start, pre, tcs))

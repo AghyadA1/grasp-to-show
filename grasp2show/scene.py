@@ -63,6 +63,9 @@ def configure_hand(spec: mujoco.MjSpec, cfg: SceneConfig) -> None:
     spec.body("hand").add_site(
         name="tcp", pos=[0, 0, cfg.tcp_offset], size=[0.006, 0, 0], rgba=[1, 0, 0, 0.6], group=4
     )
+    for b in ("left_finger", "right_finger"):
+        for geom in spec.body(b).geoms:
+            geom.solref = [cfg.grasp_solref, 1.0]
     g = cfg.gripper
     act = spec.actuator("actuator8")
     act.name = "gripper"
@@ -128,7 +131,7 @@ def build_scene(cfg: SceneConfig | None = None, obj: ObjectModel | None = None) 
     T0 = start_pose(cfg, obj)
     body = world.add_body(name=obj.name, pos=T0[:3, 3], quat=mat_to_quat(T0[:3, :3]))
     body.add_freejoint(name=f"{obj.name}_free")
-    obj.add_to_body(spec, body, qr_material="qr")
+    obj.add_to_body(spec, body, qr_material="qr", solref=cfg.grasp_solref)
 
     # --- cameras ---------------------------------------------------------------------
     c = cfg.camera

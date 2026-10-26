@@ -70,6 +70,11 @@ class SceneConfig:
     tcp_offset: float = 0.1034  # hand frame -> point between the fingertip pads (m)
     timestep: float = 0.002
     impratio: float = 10.0
+    # Contact time constant (s) for fingers and the object (MuJoCo default 0.02). MuJoCo's soft
+    # friction lets a loaded contact creep; the creep distance grows with the impulse carried,
+    # so a held box slid 13 mm in a 2.5 s transit at only 0.12 g. A 5 ms time constant (still
+    # >= 2 x timestep, as MuJoCo requires for stability) cuts the creep about 5x.
+    grasp_solref: float = 0.005
     table_half_size: tuple[float, float, float] = (0.45, 0.6, 0.02)
     table_center_xy: tuple[float, float] = (0.45, 0.0)
 

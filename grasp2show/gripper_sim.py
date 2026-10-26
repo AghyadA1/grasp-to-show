@@ -72,7 +72,7 @@ class GripperSim:
                            data=[0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0])
         body = world.worldbody.add_body(name=obj.name)
         body.add_freejoint(name="obj_free")
-        obj.add_to_body(world, body, qr_material=None)
+        obj.add_to_body(world, body, qr_material=None, solref=cfg.grasp_solref)
         self.model = world.compile()
         self.data = mujoco.MjData(self.model)
         m = self.model

@@ -65,8 +65,10 @@ class ObjectModel:
         return self.qr.T_obj_qr
 
     # -- MuJoCo -------------------------------------------------------------------------
-    def add_to_body(self, spec: mujoco.MjSpec, body: mujoco.MjsBody, qr_material: str | None) -> None:
-        """Add inertia, visual and collision geoms, and (if qr_material) the QR plate to `body`."""
+    def add_to_body(self, spec: mujoco.MjSpec, body: mujoco.MjsBody, qr_material: str | None,
+                    solref: float | None = None) -> None:
+        """Add inertia, visual and collision geoms, and (if qr_material) the QR plate to `body`.
+        solref: contact time constant for the collision geoms (None: MuJoCo default)."""
         body.explicitinertial = True
         body.mass = self.mass
         body.ipos = self.com
@@ -93,6 +95,10 @@ class ObjectModel:
                 body.add_geom(name=f"{n}_col{i}", type=mujoco.mjtGeom.mjGEOM_MESH, meshname=f"{n}_col{i}",
                               friction=list(self.friction), condim=self.condim, group=3,
                               rgba=[0.5, 0.5, 0.5, 1])
+        if solref is not None:
+            for g in body.geoms:
+                if g.contype or g.conaffinity:
+                    g.solref = [solref, 1.0]
         if qr_material is None:
             return
         # QR: visual-only thin plate, own geom group (1) so visibility rays can target it.

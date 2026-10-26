@@ -11,18 +11,22 @@ rotate in the hand once gravity acts in a new direction. This project scores gra
 **whether the whole task succeeds**, and visualises the result as a goal-conditioned heatmap on
 the object surface.
 
+**Result: in 160 simulated pick-and-show scenarios (40 scanned products x 4 start poses),
+target-aware grasp selection raises task success from 51 % to 70 %** over a stability-plus-motion-
+planning baseline (paired: 42 scenarios won, 12 lost, sign test p = 5e-5). Removing the
+QR-visibility check removes almost all of the gain.
+
+![policy comparison](media/policy_comparison.png)
+
 ![clear vs covering grasp](media/clear_vs_covering.gif)
 
 *Left: fingers on the side faces, QR decoded by the scanner. Right: an equally stable grasp whose
 finger covers the QR, so decoding fails. A stability-only planner cannot tell these apart.*
 
-> **Status: day 4 of a 3-week plan.** Simulation scene and scripted pick → move → show with a
-> ground-truth success test (days 1–2); 40 real scanned products, automatic QR placement, an
-> antipodal grasp sampler and 5,225 simulated lift labels (day 3); all five analytic checks
-> (stability validated against simulation with no fitted parameters, analytic IK, collision,
-> QR visibility) and C++ kernels with Python bindings (day 4). **First result: 18 % of the grasps
-> a stability-only planner would accept fail the task, nearly all because a finger hides the QR.**
-> Next: validate the checks against full pick-and-show episodes, and the baseline comparison.
+> **Status: day 5 of a 3-week plan (week 1 complete).** Scene and scripted pick-and-show (days
+> 1–2); 40 scanned products, grasp sampler, simulated lift labels (day 3); five analytic checks
+> and C++ kernels (day 4); validation against 865 full episodes and the policy comparison above
+> (day 5). Next: a learned scorer trained on full-episode outcomes, and goal-conditioned heatmaps.
 
 ## Quickstart
 
@@ -41,8 +45,10 @@ python scripts/demo_pick_and_show.py --viewer # interactive MuJoCo viewer
 python scripts/generate_grasps.py             # grasp candidates + lift labels -> data/grasps/
 python scripts/validate_stability.py          # analytic model vs simulated labels
 python scripts/evaluate_targets.py            # checks 2-5 on every labelled grasp -> data/feasibility/
+python scripts/run_experiments.py             # full episodes: validation + policy comparison
+python scripts/demo_comparison.py             # side-by-side video: baseline vs target-aware
 pip install ./cpp                             # optional C++ kernels (needs a C++17 compiler)
-pytest -q                                      # 27 tests, ~15 s
+pytest -q                                      # 30 tests, ~20 s
 ```
 
 Windows (PowerShell):
@@ -57,6 +63,8 @@ python scripts\demo_pick_and_show.py
 python scripts\generate_grasps.py
 python scripts\validate_stability.py
 python scripts\evaluate_targets.py
+python scripts\run_experiments.py
+python scripts\demo_comparison.py
 pip install .\cpp                             # optional; needs Visual Studio Build Tools (C++)
 pytest -q
 ```
@@ -66,8 +74,8 @@ On a headless Linux machine set `MUJOCO_GL=egl` (GPU) or `MUJOCO_GL=osmesa` (CPU
 Expected output:
 
 ```
-[SUCCESS] grasp=clear_qr_flipped: decoded 'G2S-0001', held=True, slip=2.3 mm / 1.1 deg
-[FAIL] grasp=covers_qr_flipped: QR NOT decoded, held=True, slip=1.1 mm / 0.5 deg
+[SUCCESS] grasp=clear_qr_flipped: decoded 'G2S-0001', held=True, slip=0.7 mm / 0.3 deg
+[FAIL] grasp=covers_qr_flipped: QR NOT decoded, held=True, slip=0.2 mm / 0.0 deg
 ```
 
 ## How a grasp is judged (ground truth, "check 6")
@@ -76,7 +84,8 @@ An episode is a **success** only if, after pick → transit → hold at the targ
 
 1. the scanner camera image decodes to the right QR payload (OpenCV),
 2. both fingers still touch the object,
-3. the object moved less than 5 mm / 5° *relative to the gripper* since the lift,
+3. the object moved less than 20 mm / 15° *relative to the gripper* since the lift (gross slip; see
+   the design notes for why not tighter),
 4. no unexpected contact occurred (robot–table, or the held object touching anything but the fingers).
 
 The analytic checks 1–5 (to come) predict this outcome much faster. This simulation is the
@@ -110,8 +119,8 @@ is ACRONYM's labelling recipe, rebuilt in MuJoCo so that labels and the final ev
 one physics engine.
 
 **What the labels show.** 5,225 labelled grasps on 40 objects (3 min on an 11-worker laptop),
-75 % hold. Light packages hold almost everywhere (50–90 g items: ~80–90 %); heavier ones fail
-mostly by *rotating about the finger axis* (0.5–0.75 kg items: 10–23 %). A controlled test confirms the mechanism
+80 % hold. Light packages hold almost everywhere; heavier ones fail mostly by *rotating about the
+finger axis* (a 0.6 kg box: 13 %). A controlled test confirms the mechanism
 (0.8 kg bar, 20 N per finger, μ = 0.5, torsional coefficient 5 mm):
 
 | Grasp offset from centre of mass | Gravity torque about finger axis | Held? | Rotation in hand |
@@ -136,9 +145,11 @@ it at the start orientation, check 2 at the target orientation.
 ![reliability](media/stability_validation.png)
 
 With **no fitted parameters** (the simulator's own μ = 0.5, μ_t = 5 mm, 20 N), the simulated
-success rate falls monotonically with `u` and crosses 50 % exactly at `u = 1`. On the 10 unseen
-objects the model ranks grasps with **AUC 0.79–0.82**. Its limit is a 6–11 % floor of
-geometric failures that friction cannot explain: the learned scorer's job.
+success rate is ~99 % at low `u`, falls steadily, and crosses 50 % just below `u = 1`. On the 10
+unseen objects the model ranks grasps with **AUC 0.92–0.94**. Getting there required validating
+the simulator first: with MuJoCo's default contact softness, held objects *crept* (a 150 g box
+slid 13 mm in a gentle 2.5 s transit) and the model's AUC was only 0.79–0.82; see
+[docs/physics.md](docs/physics.md).
 
 ## Checks 3–5 and the first result
 
@@ -164,19 +175,59 @@ verified by forward kinematics (max error 3e-12). Known limit: the almost-straig
 (q4 > −0.47 rad) is not covered, which makes reachability slightly conservative at the edge of
 the workspace. Collision: MuJoCo kinematics + collision, 7 µs per query.
 
-**Result on 40 objects, 5,225 grasps** (`scripts/evaluate_targets.py`, 34 s):
+**Result on 40 objects, 5,225 grasps** (`scripts/evaluate_targets.py`, 40 s):
 
 | | grasps |
 |---|---|
-| hold when lifted (check 1, simulated) | 3,934 |
-| …and reachable at the start (what a stability-only planner accepts) | 1,299 |
-| …and pass checks 2, 4, 5 for some target pose: **feasible** | 1,069 |
+| hold when lifted (check 1, simulated) | 4,194 |
+| …and reachable at the start (what a stability-only planner accepts) | 1,401 |
+| …and pass checks 2, 4, 5 for some target pose: **feasible** | 1,139 |
 
-**18 % of the grasps a stability-only planner would accept fail the task** (22 % with a single
-target pose instead of 12). The first failing check is QR visibility for 224 of them and target
-stability for 6; target reachability never decides alone. Small packages suffer most (cosmetics,
-pill boxes: 27–40 %), where a fingertip covers a large share of the face. These are analytic
-predictions; validating them against full pick-and-show episodes is next.
+**19 % of the grasps a stability-only planner would accept fail the task** (21 % with a single
+target pose instead of 12). The first failing check is QR visibility for 237 of them and target
+stability for 25; target reachability never decides alone. Small packages suffer most (cosmetics,
+pill boxes), where a fingertip covers a large share of the face. The full episodes below test
+these predictions.
+
+## Results: full pick-and-show episodes
+
+Every number here comes from complete simulated episodes: approach, grasp, lift, transit, present
+to the scanner, hold, then OpenCV decodes the scanner image. **Success** = QR decoded, both
+fingers still on the object, no gross slip in the hand (< 20 mm, < 15°), no collision.
+`scripts/run_experiments.py` reproduces all of it (~13 min on 2 CPU cores).
+
+**Policies.** Each policy ranks its choices; the first one whose motion can be planned is
+executed (a real system also falls back to its next grasp when motion planning fails).
+
+| Policy | What it knows | Success (160 scenarios) |
+|---|---|---|
+| stability only (baseline) | most stable grasp (analytic lift margin) that is reachable at start *and* target | 51 % [44, 59] |
+| **target-aware (ours)** | all checks; best smallest normalised margin | **70 % [62, 77]** |
+| ours without check 5 | no QR visibility | 52 % |
+| ours without check 2 | no stability at the target orientation | 59 % |
+| ours with one target pose | no target set (roll 0 only) | 62 % |
+
+[95 % Wilson intervals.] The baseline already checks kinematics, so the gap isolates the two new
+checks: **where ours won, the baseline failed by an unreadable QR (20) or by slipping once the
+object was turned (21)**. In 8 scenarios (2 heavy objects) no grasp survives the lift test, which
+counts as a failure for every policy.
+
+**Validation of the checks** (865 episodes on random grasps that a stability-only planner would
+accept, executed with the checks' best twin and target):
+
+| | |
+|---|---|
+| success rate when the checks say *feasible* | **73 %** |
+| success rate when they say *infeasible* | **21 %** |
+| successes the checks find (recall) | 95 % |
+| check 5 vs the decoder (episodes where the object stayed in hand) | 92 % agreement |
+| success vs target stability margin 0.3–0.6 / 0.6–0.8 / 0.8–1 | 51 % / 65 % / 79 % |
+
+152 of the 865 episodes could not be executed because the simple motion planner found no path
+between two feasible end configurations; they are excluded above. **What the checks miss**, in
+the 166 predicted-feasible failures: slip during the motion (92: the checks are static),
+collisions along the path (41: they check end configurations only) and decoding failures (33).
+These are the targets for the learned scorer, which will be trained on full-episode outcomes.
 
 ## C++ kernels
 
@@ -188,7 +239,7 @@ answers, and CI runs the suite both ways.
 | Kernel | numpy | C++ | speed-up |
 |---|---|---|---|
 | stability, per evaluation (100k batch) | 1.08 µs | 0.44 µs | 2.4× |
-| IK, per pose (16 q7 × 4 branches, 5k batch) | 91 µs | 14 µs | 6.7× |
+| IK, per pose (16 q7 × 4 branches, 5k batch) | 91 µs | 14 µs | 6.7× (2.7× with MSVC on Windows) |
 | IK, one grasp's 28 poses (per call) | 2.24 ms | 0.31 ms | 7.2× |
 | whole check 2–5 pipeline, 6 objects | 10.1 s | 8.8 s | 1.15× |
 
@@ -210,6 +261,11 @@ in a robot: a dependency-free C++ core that can run inside a controller.
 | **QR patch as a separate visual geom (group 1)** | Lets the visibility check ray-cast against the label alone. |
 | **Labelling hand welded to a mocap target** (not a mocap body itself) | A mocap body teleports with zero velocity, so MuJoCo's velocity-level friction cannot drag the held object along: the first version dropped every object. Welding a dynamic hand to the mocap target gives it a real velocity. |
 | **Friction μ = 0.5** | Plastic fingertips on cardboard. With μ = 1 almost every candidate held, which made the labels uninformative. |
+| **Stiffer finger/object contacts (5 ms instead of 20 ms)** | MuJoCo's regularised friction made held objects creep: 13 mm in a gentle 2.5 s transit, inversely proportional to its duration. 5 ms (still ≥ 2 × timestep) cut it 5× and lifted the stability model's AUC from 0.8 to 0.92–0.94. |
+| **Two QR decoders** | OpenCV's classic detector missed a fully visible 90-px code on busy packaging; its ArUco-based detector read it. Real scanners are robust, so the judge tries both. |
+| **Gross-slip threshold 20 mm / 15°** | A 70 g box with 96 % friction reserve still creeps a few mm; a 5 mm limit would score the simulator, not the grasp. Exact slip is always recorded. |
+| **Target configuration closest to the start one** | The checker first picked the target configuration with the most joint-limit margin; the arm then spun its wrist 265° while carrying the object. |
+| **Collision-checked joint-space segments with detours** | The transit swung held objects into the table; the planner now checks the path and detours via a raised pose. |
 
 ## Repository layout
 
@@ -231,12 +287,13 @@ grasp2show/
   franka_ik.py     analytic Franka IK, vectorised (port of He & Liu / frantik)
   feasibility.py   checks 2-5: target stability, reachability + collision, QR visibility
   _accel.py        uses the C++ kernels when installed
+  experiment.py    grasp-selection policies, scenario setup, episode execution and judging
 cpp/               optional C++17 kernels + nanobind bindings (stability, IK)
 docs/physics.md    derivation of the stability model and its validation
 scripts/
   demo_pick_and_show.py   get_menagerie.py   get_objects.py
   select_objects.py       generate_grasps.py      validate_stability.py
-  evaluate_targets.py     bench_cpp.py
+  evaluate_targets.py     bench_cpp.py            run_experiments.py      demo_comparison.py
 tests/
 ```
 
@@ -253,10 +310,10 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Analytic stability (checks 1–2): soft-finger model, validated on 5,225 simulated grasps
 - [x] Reachability at start and target (checks 3–4) · QR visibility by ray casting (check 5)
 - [x] C++ kernels (stability, analytic IK) with Python bindings and speed comparison
-- [ ] Validate checks 1–5 against full pick-and-show episodes (QR decoded by OpenCV)
+- [x] Validate checks 1–5 against full pick-and-show episodes (QR decoded by OpenCV)
 - [ ] Target *set* (rotations about the viewing axis) and robust labels under pose noise
-- [ ] Baseline (most stable grasp) vs target-aware selection: success-rate table
-- [ ] Learned scorer (point cloud + grasp + target → feasibility); speed and unseen-object test
+- [x] Baseline (most stable grasp) vs target-aware selection, ablations: success-rate table
+- [ ] Learned scorer (point cloud + grasp + target → success), trained on full-episode outcomes; speed and unseen-object test
 - [ ] Goal-conditioned grasp heatmaps on the object surface
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 

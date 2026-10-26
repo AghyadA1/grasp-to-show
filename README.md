@@ -12,9 +12,15 @@ rotate in the hand once gravity acts in a new direction. This project scores gra
 the object surface.
 
 **Result: in 160 simulated pick-and-show scenarios (40 scanned products x 4 start poses),
-target-aware grasp selection raises task success from 51 % to 70 %** over a stability-plus-motion-
-planning baseline (paired: 42 scenarios won, 12 lost, sign test p = 5e-5). Removing the
-QR-visibility check removes almost all of the gain.
+target-aware grasp selection raises task success from 51–52 % to 68–70 %** over a
+stability-plus-motion-planning baseline, reproduced on two machines (paired: 41–42 scenarios
+won vs 12–16 lost, sign test p ≤ 0.001). Removing the QR-visibility check removes almost all of
+the gain.
+
+![baseline vs ours](media/baseline_vs_ours.gif)
+
+*Same box, same start pose. Left: the most stable grasp holds the box near one end; turned towards
+the scanner, gravity twists it 19° in the hand. Right: the target-aware grasp, QR decoded.*
 
 ![policy comparison](media/policy_comparison.png)
 
@@ -194,7 +200,21 @@ these predictions.
 Every number here comes from complete simulated episodes: approach, grasp, lift, transit, present
 to the scanner, hold, then OpenCV decodes the scanner image. **Success** = QR decoded, both
 fingers still on the object, no gross slip in the hand (< 20 mm, < 15°), no collision.
-`scripts/run_experiments.py` reproduces all of it (~13 min on 2 CPU cores).
+`scripts/run_experiments.py` reproduces all of it (13 min on 2 CPU cores, 4.5 min on an
+11-core laptop).
+
+**Reproducibility.** The whole pipeline (labels, checks, episodes) was run independently on Linux
+(GCC) and Windows (MSVC). Contact simulation amplifies floating-point differences in borderline
+grasps (1 of 5,225 lift labels differs), so the numbers move slightly:
+
+| | Linux | Windows |
+|---|---|---|
+| baseline / target-aware success | 51.2 % / 70.0 % | 51.9 % / 67.5 % |
+| paired wins (ours / baseline), p | 42 / 12, 5e-5 | 41 / 16, 1.3e-3 |
+| success if predicted feasible / infeasible | 72.7 % / 20.8 % | 72.2 % / 21.7 % |
+| check 5 vs decoder | 92.4 % | 91.3 % |
+
+The tables below are from the Linux run.
 
 **Policies.** Each policy ranks its choices; the first one whose motion can be planned is
 executed (a real system also falls back to its next grasp when motion planning fails).

@@ -1,6 +1,7 @@
 """QR texture generation and decoding (the camera-side success test, check 6)."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import cv2
@@ -13,7 +14,14 @@ def make_qr_texture(payload: str, path: Path, pixels: int = 512) -> Path:
 
     Version 1 (21x21 modules) with high error correction keeps modules large, so the
     code still decodes when it is small in the image or slightly tilted.
+
+    Safe with many processes building scenes at once: a complete existing file is reused, and a
+    new one is written to a per-process temporary file and swapped in atomically. (Writing the
+    file in place let one worker read it half-written: "empty PNG file" on Windows, 11 workers.)
     """
+    path = Path(path)
+    if path.exists() and cv2.imread(str(path)) is not None:
+        return path
     qr = qrcode.QRCode(
         version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=2
     )
@@ -21,9 +29,15 @@ def make_qr_texture(payload: str, path: Path, pixels: int = 512) -> Path:
     qr.make(fit=True)
     img = np.array(qr.make_image(fill_color="black", back_color="white").convert("RGB"))
     img = cv2.resize(img, (pixels, pixels), interpolation=cv2.INTER_NEAREST)
-    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(path), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    tmp = path.with_name(f"{path.stem}.{os.getpid()}.tmp.png")
+    cv2.imwrite(str(tmp), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    try:
+        os.replace(tmp, path)               # atomic: readers see the old file or the new one
+    except OSError:                         # Windows: target open in another process
+        tmp.unlink(missing_ok=True)
+        if cv2.imread(str(path)) is None:
+            raise
     return path
 
 

@@ -71,16 +71,35 @@ def inertial_load(T_world_obj: np.ndarray, dt: float, mass: float, com: np.ndarr
     return F, T
 
 
+def robust_utilisation(c1, c2, T_obj_tcp: np.ndarray, com: np.ndarray, F: np.ndarray, T: np.ndarray,
+                       prm: StabilityParams, com_margin: float = 0.005) -> np.ndarray:
+    """Worst utilisation over centre-of-mass errors of +-com_margin along each gripper axis.
+
+    The leverage term: any load with a lever arm to the contacts becomes a torque. The weakest
+    case is torque about the finger axis (torsional friction only), but loading the finger axis
+    (tilting the object) also unloads one finger, so that finger can resist less of any torque:
+    an object balanced exactly on the finger axis looks perfectly safe to the model (u = 0) yet
+    is an inverted pendulum on the lower finger. Requiring the grasp to hold with the centre of
+    mass a few millimetres off (the COM is never known exactly, and the object rocks a little in
+    soft fingers) removes those false safe states. com_margin = 0: the nominal utilisation.
+    """
+    n = len(F)
+    rep = lambda v: np.repeat(np.atleast_2d(v), n, axis=0)
+    y = T_obj_tcp[:3, 1]
+    shifts = [np.zeros(3)] + ([s * com_margin * T_obj_tcp[:3, k] for k in range(3) for s in (-1, 1)]
+                              if com_margin > 0 else [])
+    return np.max([utilisation_wrench(rep(c1), rep(c2), rep(y), com + dc, F, T, prm) for dc in shifts], axis=0)
+
+
 def utilisation_series(obj, T_obj_tcp: np.ndarray, T_world_obj: np.ndarray, dt: float,
-                       prm: StabilityParams) -> np.ndarray:
-    """Friction utilisation u(t) of a grasp along a pose trajectory of the carried object."""
+                       prm: StabilityParams, com_margin: float = 0.0) -> np.ndarray:
+    """Friction utilisation u(t) of a grasp along a pose trajectory of the carried object
+    (com_margin > 0: the robust version, see robust_utilisation)."""
     c1, c2, ok = finger_contacts(obj.mesh, T_obj_tcp)
     if not ok[0]:
         return np.full(len(T_world_obj), np.inf)
     F, T = inertial_load(T_world_obj, dt, obj.mass, obj.com, obj.inertia)
-    n = len(F)
-    rep = lambda v: np.repeat(np.atleast_2d(v), n, axis=0)
-    return utilisation_wrench(rep(c1[0]), rep(c2[0]), rep(T_obj_tcp[:3, 1]), obj.com, F, T, prm)
+    return robust_utilisation(c1[0], c2[0], T_obj_tcp, obj.com, F, T, prm, com_margin)
 
 
 def sparc(speed: np.ndarray, fs: float, fc: float = 10.0, amp_th: float = 0.05, pad: int = 4) -> float:
@@ -127,6 +146,7 @@ def motion_metrics(log: TransportLog, obj, T_obj_tcp: np.ndarray, prm: Stability
     (TCP pose x grasp), i.e. the load the grasp is asked to hold."""
     T_rigid = log.T_world_tcp @ np.linalg.inv(T_obj_tcp)
     u = utilisation_series(obj, T_obj_tcp, T_rigid, log.dt, prm)
+    u_rob = utilisation_series(obj, T_obj_tcp, T_rigid, log.dt, prm, com_margin=0.005)
     speed = np.linalg.norm(_derivative(log.T_world_tcp[:, :3, 3], log.dt), axis=1)
     fs = 1.0 / log.dt
     return {
@@ -138,7 +158,7 @@ def motion_metrics(log: TransportLog, obj, T_obj_tcp: np.ndarray, prm: Stability
         # Accelerations by differentiating the velocity: MuJoCo's qacc also holds solver spikes.
         "qd_ratio": float(np.max(np.abs(log.qd) / QD_MAX)),
         "qdd_ratio": float(np.max(np.abs(_derivative(log.qd, log.dt)) / QDD_MAX)),
-        "u_end": float(u[-1]),
+        "u_end": float(u[-1]), "u_max_robust": float(np.max(u_rob)),
         "tau_ratio": float(np.max(np.abs(log.tau) / TAU_MAX)),
         "effort": float(np.sum((log.tau / TAU_MAX) ** 2) * log.dt),
     }

@@ -14,7 +14,8 @@ are exact.
 
 Problem (defaults from the plan: friction utilisation <= 0.7, <= 60 % of the Franka limits):
     minimise   T * (1 + w_s * extra_jerk)                    (fast, and no needless wiggles)
-    subject to u(t) <= u_lim                                 (grasp: soft-finger model + d'Alembert)
+    subject to u(t) <= u_lim                                 (grasp: soft-finger model + d'Alembert,
+                                                              worst case over +-5 mm COM errors: leverage)
                |qd| <= r QD_MAX,  |qdd| <= r QDD_MAX,  joint limits
                no collision (arm and object vs table, robot)
 Two solvers:
@@ -31,8 +32,8 @@ import numpy as np
 from numpy.polynomial import Chebyshev, Polynomial
 
 from .franka_ik import Q_MAX, Q_MIN, fk
-from .stability import StabilityParams, finger_contacts, utilisation_wrench
-from .transport import QD_MAX, QDD_MAX, inertial_load
+from .stability import StabilityParams, finger_contacts
+from .transport import QD_MAX, QDD_MAX, inertial_load, robust_utilisation
 
 S_MINJERK = Polynomial([0, 0, 0, 10, -15, 6])
 
@@ -54,10 +55,17 @@ class Solution:
 class TransportProblem:
     def __init__(self, obj, T_obj_tcp: np.ndarray, width: float, q0: np.ndarray, q1: np.ndarray,
                  prm: StabilityParams, checker=None, u_lim: float = 0.7, limit_ratio: float = 0.6,
-                 K: int = 4, n: int = 80, w_smooth: float = 0.05):
+                 K: int = 4, n: int = 80, w_smooth: float = 0.05, com_margin: float = 0.005,
+                 axial_frac: float = 0.35):
         self.obj, self.T_obj_tcp, self.width = obj, np.asarray(T_obj_tcp, float), float(width)
         self.q0, self.q1, self.prm = np.asarray(q0, float), np.asarray(q1, float), prm
         self.checker, self.u_lim, self.r, self.K, self.n, self.w_smooth = checker, u_lim, limit_ratio, K, n, w_smooth
+        self.com_margin = com_margin   # leverage robustness: the grasp must hold with the COM this far off
+        # Load along the finger axis is capped at axial_frac x 2F. The ideal model allows up to 2F,
+        # but in simulation a box balanced on the lower finger tips over (an inverted pendulum with
+        # lever = half the grasp width): a 1.5 kg box (14.7 N axial) held with 9 mm slip, 2 kg was
+        # lost (scripts/hold_tilt_test.py). 0.35 x 40 N = 14 N matches that.
+        self.axial_cap = axial_frac * 2 * prm.finger_force
         self.tau = np.linspace(0.0, 1.0, n)
         self.dq = self.q1 - self.q0
         polys = _basis(K)
@@ -74,7 +82,7 @@ class TransportProblem:
         rest = self.evaluate(np.zeros((K, 7)), 1e3, collisions=False)["u"]
         self.u_static = float(max(rest[0], rest[-1]))
         self.static_ok = self.u_static < 0.95
-        self.u_lim = max(u_lim, self.u_static + 0.05)
+        self.u_lim = max(u_lim, self.u_static + 0.05)   # never ask more of the motion than of the ends
 
     # -- trajectory --------------------------------------------------------------------------
     def derivs(self, c: np.ndarray, T: float):
@@ -106,9 +114,9 @@ class TransportProblem:
             u = np.full(self.n, np.inf)
         else:
             F, Tq = inertial_load(T_obj, T / (self.n - 1), self.obj.mass, self.obj.com, self.obj.inertia)
-            rep = lambda v: np.repeat(v[None], self.n, axis=0)
-            u = utilisation_wrench(rep(self.contacts[0]), rep(self.contacts[1]), rep(self.T_obj_tcp[:3, 1]),
-                                   self.obj.com, F, Tq, self.prm)
+            u = robust_utilisation(self.contacts[0], self.contacts[1], self.T_obj_tcp, self.obj.com, F, Tq,
+                                   self.prm, self.com_margin)
+            u = np.maximum(u, np.abs(F @ self.T_obj_tcp[:3, 1]) / self.axial_cap)
         lim = max(float(np.max(np.abs(qd) / (self.r * QD_MAX))), float(np.max(np.abs(qdd) / (self.r * QDD_MAX))))
         jl = float(np.max(np.maximum(Q_MIN - q, q - Q_MAX)))
         hits = 0

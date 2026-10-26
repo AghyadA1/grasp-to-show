@@ -538,7 +538,7 @@ end poses at rest exceed the 0.7 limit under the robust model, and the limit is 
 need.
 
 **A network that imitates the optimiser** (`grasp2show/learn/transport_net.py`, as
-[DJ-GOMP](https://arxiv.org/pdf/2003.01938) learns GOMP's solutions). Data
+[DJ-GOMP](https://goldberg.berkeley.edu/pubs/SR-DJ-GOMP-Nov-2020.pdf) learns GOMP's solutions). Data
 (`scripts/generate_transport_data.py`): 400 optimised motions on training objects and 100 on the
 unseen test objects, each with a random start place and rotation, friction μ ∈ [0.15, 0.6] and way B's
 grasp; every motion was also run in simulation (94 % / 98 % success). An MLP maps start and end

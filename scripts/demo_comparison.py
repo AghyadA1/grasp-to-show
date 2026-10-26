@@ -49,7 +49,8 @@ def find_scenario() -> tuple[str, float]:
     raise SystemExit("no scenario where the baseline fails and target-aware succeeds")
 
 
-def film(sc: Scenario, policy: str, fps: int):
+def plan(sc: Scenario, policy: str) -> tuple[Grasp, dict]:
+    """The policy's first choice whose motion can be planned (as in the experiments)."""
     for c in choose(policy, sc.reports, sc.lift_margin):
         tw = sc.reports[c.grasp].twins[c.twin]
         t = tw.targets[c.roll_idx]
@@ -57,9 +58,20 @@ def film(sc: Scenario, policy: str, fps: int):
         paths, _ = sc.ep.plan_analytic(T, show_pose(sc.cfg, sc.obj, sc.rolls[c.roll_idx]), tw.start.q,
                                        t.reach.q, checker=sc.fc, width=float(sc.W[c.grasp]))
         if paths is not None:
-            break
-    else:
-        raise SystemExit(f"{policy}: no plannable grasp")
+            return Grasp(policy, T, float(sc.W[c.grasp])), paths
+    raise SystemExit(f"{policy}: no plannable grasp")
+
+
+def outcome_text(res) -> tuple[str, bool]:
+    if res.success:
+        return f"QR decoded, slip {res.slip_mm:.0f} mm", True
+    if not res.qr_ok and res.held:
+        return "QR not readable", False
+    return f"object slipped {res.slip_mm:.0f} mm / {res.slip_deg:.0f} deg", False
+
+
+def film(sc: Scenario, policy: str, fps: int):
+    grasp, paths = plan(sc, policy)
     r = sc.ep.renderer
     frames = []
 
@@ -69,13 +81,8 @@ def film(sc: Scenario, policy: str, fps: int):
         r.update_scene(d, camera="scanner")
         frames.append(compose(ov, r.render(), LABEL[policy], d.time))
 
-    res = sc.ep.execute(Grasp(policy, T, float(sc.W[c.grasp])), paths, on_frame=on_frame, fps=fps)
-    if res.success:
-        text, ok = f"QR decoded, slip {res.slip_mm:.0f} mm", True
-    elif not res.qr_ok and res.held:
-        text, ok = "QR not readable", False
-    else:
-        text, ok = f"object slipped {res.slip_mm:.0f} mm / {res.slip_deg:.0f} deg", False
+    res = sc.ep.execute(grasp, paths, on_frame=on_frame, fps=fps)
+    text, ok = outcome_text(res)
     frames += [banner(frames[-1], text, ok)] * int(1.5 * fps)
     print(f"{policy}: {res.summary()}")
     return frames

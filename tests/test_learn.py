@@ -31,3 +31,15 @@ def test_scorer_shapes_and_frame():
     assert logit.shape == (2,) and reason.shape == (2, N_REASONS)
     pf = m.point_features(obj[:1], R[:1], t[:1])
     torch.testing.assert_close(pf[0, :3].T, (clouds[0, :, :3] - t[0]) * 10)
+
+
+def test_heatmap_paint_takes_best_nearby_grasp():
+    from grasp2show.heatmap import paint
+
+    pts = np.array([[0.0, 0, 0], [0.1, 0, 0], [0.5, 0, 0]])
+    c1 = np.array([[0.001, 0, 0], [0.099, 0, 0]])
+    c2 = np.array([[0.002, 0, 0], [np.nan, np.nan, np.nan]])
+    h = paint(pts, c1, c2, np.array([0.3, 0.8]), radius=0.01)
+    assert h[0] == 0.3 and h[1] == 0.8 and np.isnan(h[2])
+    h2 = paint(pts, c1, c2, np.array([[0.3, 0.0], [0.8, 0.1]]), radius=0.01)
+    assert h2.shape == (3, 2) and h2[1, 1] == 0.1

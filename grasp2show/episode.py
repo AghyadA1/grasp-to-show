@@ -304,6 +304,10 @@ class PickAndShow:
         held = len(finger_contacts) == 2
         self.renderer.update_scene(d, camera="scanner")
         rgb = self.renderer.render().copy()
+        # Guard: a broken offscreen GL context returns noise, which would silently count as an
+        # unreadable QR. A real scanner image is smooth (mean neighbour difference ~2-3 levels).
+        if np.abs(np.diff(rgb.astype(np.int16), axis=1)).mean() > 25:
+            raise RuntimeError("scanner image is noise: the offscreen renderer is broken in this process")
         text, _ = decode_qr(rgb)
         qr_ok = text == self.cfg.obj.qr_payload
         ok = (qr_ok and held and slip_mm < self.slip_tol_mm and slip_deg < self.slip_tol_deg

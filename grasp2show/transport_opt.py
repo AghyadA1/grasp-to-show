@@ -171,4 +171,13 @@ class TransportProblem:
             std = np.maximum(0.7 * X[idx].std(0) + 0.3 * std, 1e-3)
         c, T = best_x[:-1].reshape(self.K, 7), float(np.exp(best_x[-1]))
         e = self.evaluate(c, T)
+        if not e["feasible"] and not e["hits"] and e["joint_limit"] <= 0:
+            # The search ended just outside the constraints: slow the same path down until it fits.
+            for T2 in T * 1.05 ** np.arange(1, 40):
+                e2 = self.evaluate(c, float(T2), collisions=False)
+                if e2["feasible"]:
+                    T, e = float(T2), self.evaluate(c, float(T2))
+                    break
+        if start.feasible and (not e["feasible"] or T >= start.T):
+            return start                       # shaping did not help: keep the retimed straight motion
         return Solution(T, c, e["feasible"], e)

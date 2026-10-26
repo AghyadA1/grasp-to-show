@@ -62,8 +62,9 @@ def run(job):
     for name, (model, names, with_checks) in _get_models(clouds_path).items():
         t = time.perf_counter()
         ch = learned_choices(sc, model, names, with_checks)
+        select_ms = (time.perf_counter() - t) * 1e3          # ranking only, not the episode
         r = asdict(sc.run(name, ch))
-        r["select_ms"] = round((time.perf_counter() - t) * 1e3, 1)
+        r["select_ms"] = round(select_ms, 1)
         recs.append(r)
     return recs
 

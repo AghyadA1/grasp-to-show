@@ -17,6 +17,12 @@ stability-plus-motion-planning baseline, reproduced on two machines (paired: 41�
 won vs 12–16 lost, sign test p ≤ 0.001). Removing the QR-visibility check removes almost all of
 the gain.
 
+**Week 2: a learned scorer** (PointNet over the object cloud in the gripper frame, trained on
+14,502 simulated episodes) picks grasps on **10 unseen objects** with **85 % task success**
+(76 % from geometry alone) vs 65 % for the analytic checks and 55 % for the baseline, in 80
+full pick-and-show episodes (vs the checks: 18 scenarios won, 2 lost, p = 4e-4). It mostly fixes
+what the static checks cannot see: slip during the motion.
+
 ![baseline vs ours](media/baseline_vs_ours.gif)
 
 *Same box, same start pose. Left: the most stable grasp holds the box near one end; turned towards
@@ -29,10 +35,11 @@ the scanner, gravity twists it 19° in the hand. Right: the target-aware grasp, 
 *Left: fingers on the side faces, QR decoded by the scanner. Right: an equally stable grasp whose
 finger covers the QR, so decoding fails. A stability-only planner cannot tell these apart.*
 
-> **Status: day 5 of a 3-week plan (week 1 complete).** Scene and scripted pick-and-show (days
-> 1–2); 40 scanned products, grasp sampler, simulated lift labels (day 3); five analytic checks
-> and C++ kernels (day 4); validation against 865 full episodes and the policy comparison above
-> (day 5). Next: a learned scorer trained on full-episode outcomes, and goal-conditioned heatmaps.
+> **Status: week 2 of a 3-week plan.** Week 1: scene and scripted pick-and-show, 40 scanned
+> products, grasp sampler and simulated lift labels, five analytic checks, C++ kernels, validation
+> against 865 full episodes and the policy comparison. Week 2 so far: a 20,902-sample dataset of
+> full-episode outcomes, a learned scorer, and its evaluation as a policy on unseen objects.
+> Next: goal-conditioned heatmaps on the object surface.
 
 ## Quickstart
 
@@ -54,7 +61,14 @@ python scripts/evaluate_targets.py            # checks 2-5 on every labelled gra
 python scripts/run_experiments.py             # full episodes: validation + policy comparison
 python scripts/demo_comparison.py             # side-by-side video: baseline vs target-aware
 pip install ./cpp                             # optional C++ kernels (needs a C++17 compiler)
-pytest -q                                      # 30 tests, ~20 s
+
+# learned scorer (week 2)
+pip install -e ".[learn]"                     # PyTorch (CPU); for a GPU build see pytorch.org
+python scripts/generate_dataset.py            # 20,902 samples, 14,502 simulated episodes (30 min, 11 cores)
+python scripts/train_scorer.py                # geometry only -> data/models/scorer.pt
+python scripts/train_scorer.py --with-checks --tag scorer_checks
+python scripts/eval_learned_policy.py         # the scorers as policies, 80 episodes per policy
+pytest -q                                      # ~20 s
 ```
 
 Windows (PowerShell):
@@ -72,6 +86,11 @@ python scripts\evaluate_targets.py
 python scripts\run_experiments.py
 python scripts\demo_comparison.py
 pip install .\cpp                             # optional; needs Visual Studio Build Tools (C++)
+pip install -e ".[learn]"
+python scripts\generate_dataset.py
+python scripts\train_scorer.py
+python scripts\train_scorer.py --with-checks --tag scorer_checks
+python scripts\eval_learned_policy.py
 pytest -q
 ```
 
@@ -94,7 +113,7 @@ An episode is a **success** only if, after pick → transit → hold at the targ
    the design notes for why not tighter),
 4. no unexpected contact occurred (robot–table, or the held object touching anything but the fingers).
 
-The analytic checks 1–5 (to come) predict this outcome much faster. This simulation is the
+The analytic checks 1–5 and the learned scorer predict this outcome much faster. This simulation is the
 reference they are validated against.
 
 ## Objects and grasp labels (check 1: lift stability)
@@ -255,7 +274,71 @@ accept, executed with the checks' best twin and target):
 between two feasible end configurations; they are excluded above. **What the checks miss**, in
 the 166 predicted-feasible failures: slip during the motion (92: the checks are static),
 collisions along the path (41: they check end configurations only) and decoding failures (33).
-These are the targets for the learned scorer, which will be trained on full-episode outcomes.
+These are the targets for the learned scorer, which is trained on full-episode outcomes (next).
+
+## Learned scorer: trained on full-episode outcomes
+
+**Question.** The analytic checks are static: they cannot see slip during the motion, which is
+their main miss. Can a network trained on what actually happens in complete episodes choose
+better grasps, on objects it has never seen?
+
+**Dataset** (`scripts/generate_dataset.py`, 30 min on 11 cores). For each of the 40 objects at 4
+start rotations, every lift-stable grasp goes through the checks (both twins, 12 target poses).
+Then 100 kinematically feasible (grasp, twin, target) tuples per scenario are drawn *uniformly*
+(not by the checks' ranking, so the labels are not biased towards what the checks like) and
+executed in the full simulation; cheap negatives (dropped in the lift test, unreachable) are
+added. **20,902 samples, 14,502 full episodes, 40 % success.** Each sample also stores the checks'
+outputs, so the network and the checks are compared on exactly the same cases.
+
+**Model** (`grasp2show/learn/`). A PointNet over 512 surface points of the object *expressed in
+the gripper frame* (position, normal, and a flag for points on the QR patch), plus 32 global
+features: gravity in the gripper frame at the start and at the target, the QR normal, the gripper
+pose at start and target, opening width, mass and centre of mass. Two heads: P(success), and the
+failure reason (8 classes) as an auxiliary loss. 161k parameters. A second variant also receives
+the 9 outputs of the analytic checks. Split **by object**: the 10 test objects are never seen in
+training; 5 training objects are held out for model selection.
+
+**Offline, on the 10 unseen objects** (`scripts/train_scorer.py`):
+
+| | analytic checks | learned (geometry) | learned + checks' outputs |
+|---|---|---|---|
+| AUC, simulated tuples (the hard cases) | 0.72 | 0.77 | **0.81** |
+| top-1: best-ranked tuple per scenario succeeds | 68 % | 86 % | **92 %** |
+
+(Random pick: 44 %. Oracle: 100 %.)
+
+![scorer evaluation](media/scorer_checks_eval.png)
+
+**As a policy, in full episodes** (`scripts/eval_learned_policy.py`). The 10 unseen objects × 8
+start rotations (4 of which never appear in the dataset). All policies keep the exact analytic
+IK/collision checks at the start and the target; they differ only in how they rank the
+kinematically feasible tuples. Each runs its choice (with the same fallback when the motion can't
+be planned) through a complete episode.
+
+![learned policy](media/learned_policy.png)
+
+| Policy (80 scenarios, unseen objects) | Success [95 % CI] | slip | QR | collision | no grasp holds |
+|---|---|---|---|---|---|
+| stability only (baseline) | 55 % [44, 65] | 23 | 3 | 2 | 8 |
+| analytic checks (ours, week 1) | 65 % [54, 75] | 18 | 1 | 1 | 8 |
+| learned, geometry only | 76 % [66, 84] | 10 | 1 | 0 | 8 |
+| **learned + checks' outputs** | **85 % [76, 91]** | **2** | 2 | 0 | 8 |
+
+Paired, vs the analytic checks: learned + checks wins 18 scenarios and loses 2 (sign test
+p = 4e-4); geometry only wins 14 and loses 5 (p = 0.06). Vs the baseline: 25/1 and 21/4. In 8
+scenarios no grasp survives the lift test, so 90 % is the ceiling. **The gain is almost all
+slip** (18 → 2): the network learned which grasps stay put while the arm swings the object, which
+the static friction margin cannot tell.
+
+**Speed.** Scoring costs about 1.2 ms per tuple on one CPU thread (1.4 s for the 1,206 feasible
+tuples of the largest scenario). It does not replace the exact IK/collision checks, which run
+first, so on a CPU the network buys accuracy, not speed.
+
+**Caveats.** The network is trained and tested in the same simulator, so part of what it learned
+is this simulator's contact behaviour; a real robot would need real or domain-randomised data.
+Test objects are unseen but come from the same filtered pool (box-like packages). One training
+seed; the two learned variants' intervals overlap. The training scenarios used yaws 0/90/180/270,
+so half of the evaluation poses are new for the start pose but not the object.
 
 ## C++ kernels
 
@@ -316,12 +399,15 @@ grasp2show/
   feasibility.py   checks 2-5: target stability, reachability + collision, QR visibility
   _accel.py        uses the C++ kernels when installed
   experiment.py    grasp-selection policies, scenario setup, episode execution and judging
+  learn/           learned scorer: dataset loading and features (data.py), PointNet model
+                   (model.py), the scorer as a grasp-selection policy (policy.py)
 cpp/               optional C++17 kernels + nanobind bindings (stability, IK)
 docs/physics.md    derivation of the stability model and its validation
 scripts/
   demo_pick_and_show.py   get_menagerie.py   get_objects.py
   select_objects.py       generate_grasps.py      validate_stability.py
   evaluate_targets.py     bench_cpp.py            run_experiments.py      demo_comparison.py
+  generate_dataset.py     train_scorer.py         eval_learned_policy.py
 tests/
 ```
 
@@ -339,9 +425,10 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Reachability at start and target (checks 3–4) · QR visibility by ray casting (check 5)
 - [x] C++ kernels (stability, analytic IK) with Python bindings and speed comparison
 - [x] Validate checks 1–5 against full pick-and-show episodes (QR decoded by OpenCV)
-- [ ] Target *set* (rotations about the viewing axis) and robust labels under pose noise
+- [x] Target *set* (12 rotations about the viewing axis)
+- [ ] Robust labels under object-pose noise
 - [x] Baseline (most stable grasp) vs target-aware selection, ablations: success-rate table
-- [ ] Learned scorer (point cloud + grasp + target → success), trained on full-episode outcomes; speed and unseen-object test
+- [x] Learned scorer (point cloud + grasp + target → success), trained on full-episode outcomes; speed and unseen-object test
 - [ ] Goal-conditioned grasp heatmaps on the object surface
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 

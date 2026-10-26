@@ -9,8 +9,12 @@ For each scenario (10 unseen objects x 8 start rotations):
   way_a          all checks on ~1,000 dense candidates (the label generator; slow), best score
   aware          analytic checks on the labelled candidate set (week 1)
   stability_only the baseline
+  way_a_smooth   (optional) way A ranking the same feasible candidates by the score averaged over
+                 their neighbours: tests why the network can beat the search it imitates
 Usage:  python scripts/eval_way_b.py [--workers 4]
-Outputs: data/episodes_way_b/records.jsonl, summary.json, media/way_b_policy.png
+        python scripts/eval_way_b.py --policies way_a way_a_smooth way_b --tag way_a_smooth
+        python scripts/eval_way_b.py --policies way_b --model data/models/heatmap_net_s1.pt --tag way_b_s1
+Outputs: data/episodes_<tag>/records.jsonl, summary.json, media/<tag>_policy.png
 """
 from __future__ import annotations
 
@@ -37,7 +41,7 @@ from grasp2show.experiment import Choice, Scenario, choose
 from grasp2show.objects import load_object_set
 from grasp2show.task import show_pose
 
-GRASPS, OUT = ROOT / "data" / "grasps", ROOT / "data" / "episodes_way_b"
+GRASPS = ROOT / "data" / "grasps"
 _net = {}
 
 
@@ -116,44 +120,69 @@ def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k:
 
 
 def run(job):
-    asset, yaw, model_path, clouds_path, k = job
+    asset, yaw, model_path, clouds_path, k, policies = job
     recs = []
-    z = np.load(GRASPS / f"{asset}.npz")
-    sc = Scenario(asset, yaw, {kk: z[kk] for kk in ("T_obj_tcp", "width", "success")})
-    for pol in ("stability_only", "aware"):
-        recs.append(asdict(sc.run(pol, choose(pol, sc.reports, sc.lift_margin))))
-    # way B: network grasps, exact kinematic checks, full episode
-    T, W, R, ms = way_b_grasps(asset, yaw, model_path, clouds_path, k)
-    if len(T) == 0:
-        recs.append({"object": asset, "yaw_deg": yaw, "policy": "way_b", "success": False, "reason": "no grasp",
-                     "net_ms": round(ms, 1)})
-        return recs + [way_a(asset, yaw, k)]
-    sb = Scenario(asset, yaw, {"T_obj_tcp": T, "width": W, "success": np.ones(len(T), bool)})
-    r = asdict(sb.run("way_b", kinematic_choices(sb, list(zip(range(len(T)), R.tolist())))))
-    r["net_ms"] = round(ms, 1)
-    recs.append(r)
-    return recs + [way_a(asset, yaw, k)]
+    if {"stability_only", "aware"} & set(policies):
+        z = np.load(GRASPS / f"{asset}.npz")
+        sc = Scenario(asset, yaw, {kk: z[kk] for kk in ("T_obj_tcp", "width", "success")})
+        for pol in ("stability_only", "aware"):
+            if pol in policies:
+                recs.append(asdict(sc.run(pol, choose(pol, sc.reports, sc.lift_margin))))
+    if "way_b" in policies:   # network grasps, exact kinematic checks, full episode
+        T, W, R, ms = way_b_grasps(asset, yaw, model_path, clouds_path, k)
+        if len(T) == 0:
+            r = {"object": asset, "yaw_deg": yaw, "policy": "way_b", "success": False, "reason": "no grasp"}
+        else:
+            sb = Scenario(asset, yaw, {"T_obj_tcp": T, "width": W, "success": np.ones(len(T), bool)})
+            r = asdict(sb.run("way_b", kinematic_choices(sb, list(zip(range(len(T)), R.tolist())))))
+        r["net_ms"] = round(ms, 1)
+        recs.append(r)
+    if {"way_a", "way_a_smooth"} & set(policies):
+        recs += way_a(asset, yaw, k, [p for p in ("way_a", "way_a_smooth") if p in policies])
+    return recs
 
 
-def way_a(asset: str, yaw: float, k: int) -> dict:
-    """All checks on dense candidates (what the network was trained to imitate), best first."""
+def smoothed(d: dict, radius: float = 0.01, max_deg: float = 30.0) -> np.ndarray:
+    """Each candidate's score averaged over its neighbours: TCP within `radius`, approach and
+    closing axes within `max_deg` (twins count as the same grasp). Tests the "averaging" explanation."""
+    from scipy.spatial import cKDTree
+
+    T, S = d["T_obj_tcp"].astype(float), d["S"]
+    z, y = T[:, :3, 2], T[:, :3, 1]
+    c = np.cos(np.radians(max_deg))
+    out = np.zeros_like(S)
+    for g, nb in enumerate(cKDTree(T[:, :3, 3]).query_ball_point(T[:, :3, 3], radius)):
+        nb = np.asarray(nb)
+        nb = nb[(z[nb] @ z[g] > c) & (np.abs(y[nb] @ y[g]) > c)]
+        out[g] = S[nb].mean(0)
+    return out
+
+
+def way_a(asset: str, yaw: float, k: int, variants: list[str]) -> list[dict]:
+    """All checks on dense candidates (what the network was trained to imitate), best first;
+    way_a_smooth ranks the same feasible candidates by their neighbourhood-averaged score."""
     t = time.perf_counter()
     with tempfile.TemporaryDirectory() as tmp:
         gdl.OUT = Path(tmp)
         gdl.process((asset, [yaw], 400, 12, 1000 + load_object_set()["objects"].index(asset)))
         d = dict(np.load(Path(tmp) / f"{asset}__yaw{int(yaw)}.npz"))
     secs = time.perf_counter() - t
-    S = d["S"]
-    flat = [(int(f) // S.shape[1], int(f) % S.shape[1]) for f in np.argsort(-S, axis=None)[:k] if S.flat[f] > 0]
-    gi = sorted({g for g, _ in flat})
-    if gi:
-        sa = Scenario(asset, yaw, {"T_obj_tcp": d["T_obj_tcp"][gi], "width": d["width"][gi],
-                                   "success": np.ones(len(gi), bool)})
-        ra = asdict(sa.run("way_a", kinematic_choices(sa, [(gi.index(g), j) for g, j in flat])))
-    else:
-        ra = {"object": asset, "yaw_deg": yaw, "policy": "way_a", "success": False, "reason": "no grasp"}
-    ra["select_s"] = round(secs, 1)
-    return ra
+    out = []
+    for name in variants:
+        S = d["S"]
+        rank = smoothed(d) * (S > 0) if name == "way_a_smooth" else S
+        flat = [(int(f) // S.shape[1], int(f) % S.shape[1]) for f in np.argsort(-rank, axis=None, kind="stable")[:k]
+                if rank.flat[f] > 0]
+        gi = sorted({g for g, _ in flat})
+        if gi:
+            sa = Scenario(asset, yaw, {"T_obj_tcp": d["T_obj_tcp"][gi], "width": d["width"][gi],
+                                       "success": np.ones(len(gi), bool)})
+            ra = asdict(sa.run(name, kinematic_choices(sa, [(gi.index(g), j) for g, j in flat])))
+        else:
+            ra = {"object": asset, "yaw_deg": yaw, "policy": name, "success": False, "reason": "no grasp"}
+        ra["select_s"] = round(secs, 1)
+        out.append(ra)
+    return out
 
 
 def main() -> int:
@@ -163,12 +192,16 @@ def main() -> int:
     p.add_argument("--clouds", type=Path, default=ROOT / "data" / "dataset" / "clouds.npz")
     p.add_argument("--objects", type=int, default=None, help="only the first N test objects")
     p.add_argument("--top", type=int, default=10, help="grasps proposed per scenario")
+    p.add_argument("--policies", nargs="+", default=["stability_only", "aware", "way_a", "way_b"],
+                   choices=["stability_only", "aware", "way_a", "way_a_smooth", "way_b"])
+    p.add_argument("--tag", default="way_b", help="output names: data/episodes_<tag>/, media/<tag>_policy.png")
     p.add_argument("--workers", type=int, default=min(4, max(1, (os.cpu_count() or 2) - 1)),
                    help="each worker loads PyTorch; more than ~4 can exhaust Windows' paging file")
     args = p.parse_args()
     test = [n for n in load_object_set()["test"] if (GRASPS / f"{n}.npz").exists()][: args.objects]
-    jobs = [(n, y, args.model, args.clouds, args.top) for n in test for y in args.yaws]
-    OUT.mkdir(parents=True, exist_ok=True)
+    jobs = [(n, y, args.model, args.clouds, args.top, args.policies) for n in test for y in args.yaws]
+    out_dir = ROOT / "data" / f"episodes_{args.tag}"
+    out_dir.mkdir(parents=True, exist_ok=True)
     print(f"{len(jobs)} scenarios on unseen objects, {args.workers} workers")
     recs = []
     with Pool(args.workers) as pool:
@@ -177,12 +210,12 @@ def main() -> int:
             print(f"[{kk}/{len(jobs)}] {rs[0]['object'][:34]:34s} yaw {rs[0]['yaw_deg']:3.0f}  " +
                   "  ".join(f"{r['policy']}: {'ok' if r['success'] else (r.get('reason') or 'fail').split(':')[0]}"
                             for r in rs), flush=True)
-    (OUT / "records.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+    (out_dir / "records.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
     summary = {"scenarios": len(jobs), "policies": {}}
     by = {}
     for r in recs:
         by.setdefault((r["object"], r["yaw_deg"]), {})[r["policy"]] = r["success"]
-    for pol in ("stability_only", "aware", "way_a", "way_b"):
+    for pol in args.policies:
         rs = [r for r in recs if r["policy"] == pol]
         kk = sum(r["success"] for r in rs)
         lo, hi = wilson(kk, len(rs))
@@ -192,15 +225,18 @@ def main() -> int:
                 key = (r.get("reason") or "fail").split(":")[0]
                 fails[key] = fails.get(key, 0) + 1
         row = {"success_rate": round(kk / len(rs), 3), "ci95": [round(lo, 3), round(hi, 3)], "failures": fails}
-        if pol != "way_b":
+        if pol != "way_b" and "way_b" in args.policies:
             row["way_b_wins_losses"] = [sum(v["way_b"] and not v[pol] for v in by.values()),
                                         sum(v[pol] and not v["way_b"] for v in by.values())]
         summary["policies"][pol] = row
-    summary["way_b_net_ms_median"] = float(np.median([r["net_ms"] for r in recs if r["policy"] == "way_b"]))
-    summary["way_a_seconds_median"] = float(np.median([r["select_s"] for r in recs if r["policy"] == "way_a"]))
-    (OUT / "summary.json").write_text(json.dumps(summary, indent=1))
+    for key, pol, f in (("way_b_net_ms_median", "way_b", "net_ms"), ("way_a_seconds_median", "way_a", "select_s"),
+                        ("way_a_seconds_median", "way_a_smooth", "select_s")):
+        v = [r[f] for r in recs if r["policy"] == pol and f in r]
+        if v:
+            summary[key] = float(np.median(v))
+    (out_dir / "summary.json").write_text(json.dumps(summary, indent=1))
     print(json.dumps(summary, indent=1))
-    plot(summary, ROOT / "media" / "way_b_policy.png")
+    plot(summary, ROOT / "media" / f"{args.tag}_policy.png")
     return 0
 
 
@@ -211,14 +247,16 @@ def plot(summary, path):
     import matplotlib.pyplot as plt
 
     lab = {"stability_only": "stability only\n(baseline)", "aware": "analytic checks\n(labelled set)",
-           "way_a": f"way A: checks on\ndense candidates\n({summary['way_a_seconds_median']:.0f} s)",
-           "way_b": f"way B: heatmap\nnetwork\n({summary['way_b_net_ms_median']:.0f} ms)"}
+           "way_a": "way A: checks on\ndense candidates", "way_a_smooth": "way A,\nneighbourhood-\naveraged score",
+           "way_b": "way B: heatmap\nnetwork"}
+    col = {"stability_only": "#9aa5b1", "aware": "#c1121f", "way_a": "#e07a2f", "way_a_smooth": "#f2b880",
+           "way_b": "#1d4e6e"}
     ps = list(summary["policies"])
     r = [summary["policies"][p]["success_rate"] for p in ps]
     err = np.array([[ri - summary["policies"][p]["ci95"][0] for ri, p in zip(r, ps)],
                     [summary["policies"][p]["ci95"][1] - ri for ri, p in zip(r, ps)]])
     fig, ax = plt.subplots(figsize=(6.4, 3.6))
-    ax.bar(range(len(ps)), r, 0.6, yerr=err, capsize=4, color=["#9aa5b1", "#c1121f", "#e07a2f", "#1d4e6e"],
+    ax.bar(range(len(ps)), r, 0.6, yerr=err, capsize=4, color=[col[p] for p in ps],
            error_kw={"lw": 1, "ecolor": "0.3"})
     for i, (ri, p) in enumerate(zip(r, ps)):
         ax.text(i, summary["policies"][p]["ci95"][1] + 0.02, f"{ri:.0%}", ha="center", fontsize=9)

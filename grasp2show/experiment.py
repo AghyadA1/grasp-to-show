@@ -165,7 +165,9 @@ class Scenario:
                 break
         return EpisodeRecord(**{**asdict(rec), **base})
 
-    def _execute(self, c: Choice) -> EpisodeRecord:
+    def _execute(self, c: Choice, obj_offset: tuple[float, float, float] | None = None) -> EpisodeRecord:
+        """Plan and run one choice; obj_offset: unknown error in the object's start pose (see
+        PickAndShow.execute)."""
         tw = self.reports[c.grasp].twins[c.twin]
         t = tw.targets[c.roll_idx]
         T_obj_tcp = self.T[c.grasp] if c.twin == 0 else twin_of(self.T[c.grasp])
@@ -178,7 +180,7 @@ class Scenario:
                                            checker=self.fc, width=float(self.W[c.grasp]))
         if paths is None:
             return EpisodeRecord(**common, success=False, reason=f"plan: {why}")
-        r = self.ep.execute(Grasp(f"g{c.grasp}", T_obj_tcp, float(self.W[c.grasp])), paths)
+        r = self.ep.execute(Grasp(f"g{c.grasp}", T_obj_tcp, float(self.W[c.grasp])), paths, obj_offset=obj_offset)
         if r.success:
             reason = ""
         elif r.collisions:

@@ -233,13 +233,29 @@ class PickAndShow:
         grasp, paths, ik_note, _ = self.plan(grasp, T_target_obj)
         return self.execute(grasp, paths, [ik_note] if ik_note else [], on_frame, fps)
 
+    def _displace_object(self, dx: float, dy: float, dyaw: float) -> None:
+        """Shift the object on the table and turn it about the vertical through its origin."""
+        m, d = self.model, self.data
+        adr = m.jnt_qposadr[m.body_jntadr[self._obj]]
+        d.qpos[adr:adr + 2] += (dx, dy)
+        q = d.qpos[adr + 3:adr + 7].copy()
+        rz = np.array([np.cos(dyaw / 2), 0.0, 0.0, np.sin(dyaw / 2)])
+        mujoco.mju_mulQuat(d.qpos[adr + 3:adr + 7], rz, q)
+        mujoco.mj_forward(m, d)
+
     def execute(self, grasp: Grasp, paths: dict, notes: list[str] | None = None, on_frame=None,
-                fps: int = 30) -> EpisodeResult:
+                fps: int = 30, obj_offset: tuple[float, float, float] | None = None) -> EpisodeResult:
         """Run joint paths (keys approach, descend, lift, transit, present) in the simulator and
-        judge the outcome: QR decoded, object held without slipping, no unexpected contact."""
+        judge the outcome: QR decoded, object held without slipping, no unexpected contact.
+
+        obj_offset = (dx, dy, dyaw) [m, m, rad]: the object actually lies this far from the pose
+        the paths were planned for (pose-estimation error); the robot does not know.
+        """
         m, d, dt = self.model, self.data, self.model.opt.timestep
         notes = notes or []
         reset_to_home(m, d)
+        if obj_offset is not None:
+            self._displace_object(*obj_offset)
         g_open = min(grasp.width + 0.025, self.cfg.gripper.max_width)
         render_every = max(round(1.0 / (fps * dt)), 1)
         state = {"step": 0, "holding": False, "collisions": []}

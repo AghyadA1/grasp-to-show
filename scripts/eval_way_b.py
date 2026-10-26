@@ -98,7 +98,7 @@ def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k:
         pr = split_outputs(net(torch.full((12,), o), torch.as_tensor(cond)))
     ms = (time.perf_counter() - t) * 1e3
     pr = {kk: v.numpy() for kk, v in pr.items()}
-    q = 1 / (1 + np.exp(-pr["logit"])) * pr["score"]                 # (12, P)
+    q = 1 / (1 + np.exp(-np.clip(pr["logit"], -50, 50))) * pr["score"]   # (12, P)
     pts = clouds.feats[o, :, :3]
     picks = []
     for flat in np.argsort(-q, axis=None):

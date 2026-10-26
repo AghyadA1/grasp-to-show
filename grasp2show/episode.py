@@ -58,6 +58,7 @@ class EpisodeResult:
     collisions: list[str] = field(default_factory=list)  # unexpected contacts, first time each
     notes: list[str] = field(default_factory=list)
     scanner_rgb: np.ndarray | None = field(default=None, repr=False)
+    transport: object | None = field(default=None, repr=False)   # transport.TransportLog
 
     def summary(self) -> str:
         verdict = "SUCCESS" if self.success else "FAIL"
@@ -89,6 +90,8 @@ class PickAndShow:
         self.data = mujoco.MjData(model)
         self.slip_tol_mm, self.slip_tol_deg = slip_tol_mm, slip_tol_deg
         self._render_token = object()
+        grip = self._fingers_and_object(model, scene.obj.name)
+        self._fric_geoms, self._fric_default = grip, model.geom_friction[grip].copy()
         self._robot_bodies = {model.body(b).id for b in PANDA_BODIES}
         self._fingers = {model.body("left_finger").id, model.body("right_finger").id}
         self._obj = model.body(scene.obj.name).id
@@ -261,6 +264,21 @@ class PickAndShow:
         grasp, paths, ik_note, _ = self.plan(grasp, T_target_obj)
         return self.execute(grasp, paths, [ik_note] if ik_note else [], on_frame, fps)
 
+    @staticmethod
+    def _fingers_and_object(model: mujoco.MjModel, obj_name: str) -> np.ndarray:
+        bodies = {model.body(b).id for b in ("left_finger", "right_finger", obj_name)}
+        return np.array([g for g in range(model.ngeom)
+                         if model.geom_bodyid[g] in bodies and model.geom_contype[g] | model.geom_conaffinity[g]])
+
+    def set_friction(self, mu: float | None) -> None:
+        """Friction between fingers and object (MuJoCo takes the max of the two geoms, so both
+        are set). Torsional coefficient = 1 cm x mu (5 mm at mu = 0.5). None: the defaults."""
+        m = self.model
+        m.geom_friction[self._fric_geoms] = self._fric_default
+        if mu is not None:
+            m.geom_friction[self._fric_geoms, 0] = mu
+            m.geom_friction[self._fric_geoms, 1] = 0.01 * mu
+
     def _displace_object(self, dx: float, dy: float, dyaw: float) -> None:
         """Shift the object on the table and turn it about the vertical through its origin."""
         m, d = self.model, self.data
@@ -272,21 +290,27 @@ class PickAndShow:
         mujoco.mj_forward(m, d)
 
     def execute(self, grasp: Grasp, paths: dict, notes: list[str] | None = None, on_frame=None,
-                fps: int = 30, obj_offset: tuple[float, float, float] | None = None) -> EpisodeResult:
+                fps: int = 30, obj_offset: tuple[float, float, float] | None = None, speed: float = 1.0,
+                mu: float | None = None, log_every: int = 0) -> EpisodeResult:
         """Run joint paths (keys approach, descend, lift, transit, present) in the simulator and
         judge the outcome: QR decoded, object held without slipping, no unexpected contact.
 
         obj_offset = (dx, dy, dyaw) [m, m, rad]: the object actually lies this far from the pose
         the paths were planned for (pose-estimation error); the robot does not know.
+        speed: the transport (lift, transit, present) runs `speed` times faster than planned.
+        mu: finger-object friction for this episode (None: the default 0.5).
+        log_every > 0: record the transport every log_every steps (result.transport).
         """
         m, d, dt = self.model, self.data, self.model.opt.timestep
         notes = notes or []
+        self.set_friction(mu)
         reset_to_home(m, d)
         if obj_offset is not None:
             self._displace_object(*obj_offset)
         g_open = min(grasp.width + 0.025, self.cfg.gripper.max_width)
         render_every = max(round(1.0 / (fps * dt)), 1)
-        state = {"step": 0, "holding": False, "collisions": []}
+        state = {"step": 0, "holding": False, "collisions": [], "log": None}
+        tcp_id, obj_id = m.site("tcp").id, self._obj
 
         def follow(q_traj, width):
             for q in q_traj:
@@ -298,6 +322,11 @@ class PickAndShow:
                         state["collisions"].append(c)
                 if on_frame is not None and state["step"] % render_every == 0:
                     on_frame(d)
+                if state["log"] is not None and state["step"] % log_every == 0:
+                    tau = d.qfrc_actuator[:7] + d.qfrc_gravcomp[:7]
+                    state["log"].append((d.qpos[:7].copy(), d.qvel[:7].copy(), d.qacc[:7].copy(), tau.copy(),
+                                         make_T(d.site_xmat[tcp_id].reshape(3, 3), d.site_xpos[tcp_id]),
+                                         make_T(d.xmat[obj_id].reshape(3, 3), d.xpos[obj_id])))
 
         def hold(q, width, T):
             follow(np.repeat(np.asarray(q)[None], max(int(T / dt), 1), axis=0), width)
@@ -311,12 +340,15 @@ class PickAndShow:
         follow(path_trajectory(paths["approach"], seg["approach"], dt), g_open)
         follow(path_trajectory(paths["descend"], seg["descend"], dt), g_open)
         hold(paths["descend"][-1], 0.0, 0.6)          # close: force-limited squeeze
-        follow(path_trajectory(paths["lift"], seg["lift"], dt), 0.0)
-        hold(paths["lift"][-1], 0.0, 0.3)
+        if log_every > 0:
+            state["log"] = []
+        follow(path_trajectory(paths["lift"], seg["lift"] / speed, dt), 0.0)
+        hold(paths["lift"][-1], 0.0, 0.3 / speed)
         state["holding"] = True                       # from here only finger contacts allowed
         T_tcp_obj_ref = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
-        follow(path_trajectory(paths["transit"], seg["transit"], dt), 0.0)
-        follow(path_trajectory(paths["present"], seg["present"], dt), 0.0)
+        follow(path_trajectory(paths["transit"], seg["transit"] / speed, dt), 0.0)
+        follow(path_trajectory(paths["present"], seg["present"] / speed, dt), 0.0)
+        log, state["log"] = state["log"], None
         hold(paths["present"][-1], 0.0, 1.0)
 
         # -- ground truth: slip in the hand, still held, QR decoded by the scanner ---------
@@ -340,5 +372,11 @@ class PickAndShow:
         qr_ok = text == self.cfg.obj.qr_payload
         ok = (qr_ok and held and slip_mm < self.slip_tol_mm and slip_deg < self.slip_tol_deg
               and not state["collisions"])
+        transport = None
+        if log:
+            from .transport import TransportLog
+
+            q, qd, qdd, tau, Tt, To = (np.array(x) for x in zip(*log))
+            transport = TransportLog(log_every * dt, q, qd, qdd, tau, Tt, To)
         return EpisodeResult(grasp.name, not notes, text, qr_ok, held, slip_mm, slip_deg,
-                             ok, state["collisions"], notes, rgb)
+                             ok, state["collisions"], notes, rgb, transport)

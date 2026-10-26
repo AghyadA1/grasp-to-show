@@ -1,0 +1,16 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "grasp2show-cpp"
+version = "0.1.0"
+description = "Optional C++ kernels for grasp2show (soft-finger stability, analytic Franka IK)"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Aghyad Ali" }]
+
+[tool.scikit-build]
+minimum-version = "0.10"
+build-dir = "build/{wheel_tag}"
+wheel.py-api = "cp312"   # nanobind stable ABI: one wheel for Python >= 3.12

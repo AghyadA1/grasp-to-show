@@ -35,6 +35,8 @@ from dataclasses import dataclass
 import numpy as np
 import trimesh
 
+from ._accel import HAVE_CPP, cpp
+
 G = np.array([0.0, 0.0, -9.81])
 
 
@@ -61,7 +63,8 @@ def finger_contacts(mesh: trimesh.Trimesh, T_obj_tcp: np.ndarray, max_half_width
         origins = p + sign * y * max_half_width
         locs, idx, _ = mesh.ray.intersects_location(origins, -sign * y, multiple_hits=False)
         c = np.full((len(T), 3), np.nan)
-        c[idx] = locs
+        if len(idx):
+            c[idx] = np.asarray(locs).reshape(-1, 3)
         out.append(c)
     c1, c2 = out
     ok = ~np.isnan(c1).any(1) & ~np.isnan(c2).any(1)
@@ -70,13 +73,19 @@ def finger_contacts(mesh: trimesh.Trimesh, T_obj_tcp: np.ndarray, max_half_width
     return c1, c2, ok
 
 
-def utilisation_wrench(c1, c2, y, com, F_ext, T_ext, prm: StabilityParams, iters: int = 40) -> np.ndarray:
+def utilisation_wrench(c1, c2, y, com, F_ext, T_ext, prm: StabilityParams, iters: int = 40,
+                       use_cpp: bool = True) -> np.ndarray:
     """Friction utilisation u (N,) for an arbitrary external load on the object.
 
     F_ext (N, 3): total external force on the object (gravity, inertial forces);
     T_ext (N, 3): external torque about the centre of mass (e.g. inertial torque);
     everything in the object frame. u <= 1: the contacts can cancel the load. inf: they cannot.
+    Runs the C++ kernel when it is installed (see _accel.py), numpy otherwise.
     """
+    if use_cpp and HAVE_CPP:
+        f64 = lambda a: np.ascontiguousarray(np.broadcast_to(a, np.shape(np.atleast_2d(c1))), np.float64)
+        return cpp.utilisation_wrench(f64(c1), f64(c2), f64(y), np.ascontiguousarray(com, np.float64),
+                                      f64(F_ext), f64(T_ext), prm.mu, prm.mu_t, prm.finger_force, iters)
     c1, c2, y = np.atleast_2d(c1), np.atleast_2d(c2), np.atleast_2d(y)
     c = 0.5 * (c1 + c2)
     w = np.linalg.norm(c2 - c1, axis=1)
@@ -115,7 +124,8 @@ def utilisation_wrench(c1, c2, y, com, F_ext, T_ext, prm: StabilityParams, iters
     return u
 
 
-def utilisation(c1, c2, y, com, mass, R_world_obj, prm: StabilityParams, iters: int = 40) -> np.ndarray:
+def utilisation(c1, c2, y, com, mass, R_world_obj, prm: StabilityParams, iters: int = 40,
+                use_cpp: bool = True) -> np.ndarray:
     """Static case: the load is the weight s*m*g, with the object at orientation R_world_obj.
 
     c1, c2, y: (N, 3) in the object frame; com (3,); R_world_obj (3, 3) or (N, 3, 3).
@@ -124,7 +134,7 @@ def utilisation(c1, c2, y, com, mass, R_world_obj, prm: StabilityParams, iters: 
     R = np.asarray(R_world_obj)
     g_obj = (R.T @ G) if R.ndim == 2 else np.einsum("nji,j->ni", R, G)
     W = prm.safety * mass * np.broadcast_to(g_obj, c1.shape)
-    return utilisation_wrench(c1, c2, y, com, W, np.zeros_like(W), prm, iters)
+    return utilisation_wrench(c1, c2, y, com, W, np.zeros_like(W), prm, iters, use_cpp)
 
 
 def _rot_about(axis: np.ndarray, angle: float) -> np.ndarray:
@@ -191,12 +201,26 @@ def stability_margin(mesh, T_obj_tcp, com, mass, R_world_obj, prm: StabilityPara
 
 def check_margin(obj, T_obj_tcp, R_world_obj, prm: StabilityParams | None = None,
                  load_factor: float = 1.0) -> np.ndarray:
-    """Checks 1 and 2: static margin with the object at orientation R_world_obj.
+    """Checks 1 and 2: static margin with the object at orientation(s) R_world_obj.
 
     check 1: R_world_obj = start orientation (load_factor 1.0, lifting slowly);
     check 2: R_world_obj = target orientation (load_factor 1.2 for the transit).
-    obj is an objects.ObjectModel. Returns margin = 1 - u (N,), -inf if no contact.
+    obj is an objects.ObjectModel. T_obj_tcp (N, 4, 4) or (4, 4); R_world_obj (3, 3) or
+    (M, 3, 3) for M orientations of the same grasp(s). Returns margin = 1 - u, shape (N,) or
+    (N, M); -inf where the fingers find no contact.
     """
     p = prm or StabilityParams()
     p = StabilityParams(p.mu, p.mu_t, p.finger_force, load_factor)
-    return stability_margin(obj.mesh, T_obj_tcp, obj.com, obj.mass, R_world_obj, p)
+    R = np.asarray(R_world_obj)
+    if R.ndim == 2:
+        return stability_margin(obj.mesh, T_obj_tcp, obj.com, obj.mass, R, p)
+    T = np.asarray(T_obj_tcp).reshape(-1, 4, 4)
+    N, M = len(T), len(R)
+    c1, c2, ok = finger_contacts(obj.mesh, T)
+    out = np.full((N, M), -np.inf)
+    if ok.any():
+        n = int(ok.sum())
+        rep = lambda a: np.repeat(a[ok], M, axis=0)
+        u = utilisation(rep(c1), rep(c2), rep(T[:, :3, 1]), obj.com, obj.mass, np.tile(R, (n, 1, 1)), p)
+        out[ok] = 1.0 - u.reshape(n, M)
+    return out

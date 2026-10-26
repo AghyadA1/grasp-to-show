@@ -17,10 +17,12 @@ the object surface.
 finger covers the QR, so decoding fails. A stability-only planner cannot tell these apart.*
 
 > **Status: day 4 of a 3-week plan.** Simulation scene and scripted pick → move → show with a
-> ground-truth success test (days 1–2); 40 real scanned products with automatic QR placement, an
-> antipodal grasp sampler and 5,225 simulated lift labels (day 3); an analytic stability model
-> for checks 1–2, validated against those labels with no fitted parameters (day 4).
-> Next: reachability (checks 3–4) and QR visibility (check 5).
+> ground-truth success test (days 1–2); 40 real scanned products, automatic QR placement, an
+> antipodal grasp sampler and 5,225 simulated lift labels (day 3); all five analytic checks
+> (stability validated against simulation with no fitted parameters, analytic IK, collision,
+> QR visibility) and C++ kernels with Python bindings (day 4). **First result: 18 % of the grasps
+> a stability-only planner would accept fail the task, nearly all because a finger hides the QR.**
+> Next: validate the checks against full pick-and-show episodes, and the baseline comparison.
 
 ## Quickstart
 
@@ -38,7 +40,9 @@ python scripts/demo_pick_and_show.py          # runs both grasps, writes media/
 python scripts/demo_pick_and_show.py --viewer # interactive MuJoCo viewer
 python scripts/generate_grasps.py             # grasp candidates + lift labels -> data/grasps/
 python scripts/validate_stability.py          # analytic model vs simulated labels
-pytest -q                                      # 20 tests, ~15 s
+python scripts/evaluate_targets.py            # checks 2-5 on every labelled grasp -> data/feasibility/
+pip install ./cpp                             # optional C++ kernels (needs a C++17 compiler)
+pytest -q                                      # 27 tests, ~15 s
 ```
 
 Windows (PowerShell):
@@ -52,6 +56,8 @@ python scripts\get_objects.py
 python scripts\demo_pick_and_show.py
 python scripts\generate_grasps.py
 python scripts\validate_stability.py
+python scripts\evaluate_targets.py
+pip install .\cpp                             # optional; needs Visual Studio Build Tools (C++)
 pytest -q
 ```
 
@@ -134,6 +140,62 @@ success rate falls monotonically with `u` and crosses 50 % exactly at `u = 1`. O
 objects the model ranks grasps with **AUC 0.79–0.82**. Its limit is a 6–11 % floor of
 geometric failures that friction cannot explain: the learned scorer's job.
 
+## Checks 3–5 and the first result
+
+For every grasp *and its 180° twin* (a different arm configuration; the robot cannot change
+twin between picking and showing):
+
+- **Check 3 (start)**: the grasp and the pre-grasp 10 cm back along the approach have an IK
+  solution within joint limits, with the open gripper and arm free of collision with the table
+  and the object.
+- **Check 4 (target)**: for each of 12 target poses (rotations about the camera's viewing axis),
+  an IK solution exists with the object in the hand and no contact except fingers–object.
+- **Check 2 (target)**: the friction margin with gravity in the target orientation.
+- **Check 5 (QR visible)**: rays from the camera to a 7×7 grid on the QR and its four corner
+  zones (where the finder patterns are) reach the QR before any finger, hand or arm link; plus
+  viewing angle ≤ 45° and ≥ 50 px. On the day-1 box this reproduces the simulation exactly: the
+  side grasp sees 100 % of the QR, the face grasp 76 % (blocked by the finger).
+
+IK is an **analytic solver** (He & Liu 2021), ported to vectorised numpy and to C++ from the
+Apache-2.0 [frantik](https://github.com/CoMMALab/frantik) implementation, with two fixes found
+by testing: the reference's shoulder-singularity shortcut returned poses up to metres off within
+2.6° of the singularity, so it now applies only at the exact singularity, and every solution is
+verified by forward kinematics (max error 3e-12). Known limit: the almost-straight elbow
+(q4 > −0.47 rad) is not covered, which makes reachability slightly conservative at the edge of
+the workspace. Collision: MuJoCo kinematics + collision, 7 µs per query.
+
+**Result on 40 objects, 5,225 grasps** (`scripts/evaluate_targets.py`, 34 s):
+
+| | grasps |
+|---|---|
+| hold when lifted (check 1, simulated) | 3,934 |
+| …and reachable at the start (what a stability-only planner accepts) | 1,299 |
+| …and pass checks 2, 4, 5 for some target pose: **feasible** | 1,069 |
+
+**18 % of the grasps a stability-only planner would accept fail the task** (22 % with a single
+target pose instead of 12). The first failing check is QR visibility for 224 of them and target
+stability for 6; target reachability never decides alone. Small packages suffer most (cosmetics,
+pill boxes: 27–40 %), where a fingertip covers a large share of the face. These are analytic
+predictions; validating them against full pick-and-show episodes is next.
+
+## C++ kernels
+
+`cpp/` is an optional C++17 package (nanobind bindings, no other dependencies) with the two hot
+loops: the soft-finger stability solver and the analytic IK. Python uses it automatically when
+installed (`pip install ./cpp`) and falls back to numpy otherwise; tests check both give the same
+answers, and CI runs the suite both ways.
+
+| Kernel | numpy | C++ | speed-up |
+|---|---|---|---|
+| stability, per evaluation (100k batch) | 1.08 µs | 0.44 µs | 2.4× |
+| IK, per pose (16 q7 × 4 branches, 5k batch) | 91 µs | 14 µs | 6.7× |
+| IK, one grasp's 28 poses (per call) | 2.24 ms | 0.31 ms | 7.2× |
+| whole check 2–5 pipeline, 6 objects | 10.1 s | 8.8 s | 1.15× |
+
+Honest reading: numpy was already vectorised, so the kernels are 2–7× faster, but the pipeline
+is dominated by MuJoCo collision queries and Python loops. The kernels matter where they would
+in a robot: a dependency-free C++ core that can run inside a controller.
+
 ## Design notes (and the bugs that motivated them)
 
 | Choice | Why |
@@ -166,10 +228,15 @@ grasp2show/
   grasp_sampler.py antipodal candidates -> 6-DoF grasps
   gripper_sim.py   floating-hand shake test (labels for check 1, ground truth for check 2)
   stability.py     analytic soft-finger stability model (checks 1-2)
+  franka_ik.py     analytic Franka IK, vectorised (port of He & Liu / frantik)
+  feasibility.py   checks 2-5: target stability, reachability + collision, QR visibility
+  _accel.py        uses the C++ kernels when installed
+cpp/               optional C++17 kernels + nanobind bindings (stability, IK)
 docs/physics.md    derivation of the stability model and its validation
 scripts/
   demo_pick_and_show.py   get_menagerie.py   get_objects.py
   select_objects.py       generate_grasps.py      validate_stability.py
+  evaluate_targets.py     bench_cpp.py
 tests/
 ```
 
@@ -184,8 +251,9 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Scene, QR object, scanner camera, scripted pick → move → show, ground-truth evaluation
 - [x] Real objects (40 scanned products), automatic QR placement, grasp sampler, simulated lift labels
 - [x] Analytic stability (checks 1–2): soft-finger model, validated on 5,225 simulated grasps
-- [ ] Reachability at start and target (checks 3–4) · QR visibility by ray casting (check 5)
-- [ ] C++ implementation of the stability model (Python bindings) and speed comparison
+- [x] Reachability at start and target (checks 3–4) · QR visibility by ray casting (check 5)
+- [x] C++ kernels (stability, analytic IK) with Python bindings and speed comparison
+- [ ] Validate checks 1–5 against full pick-and-show episodes (QR decoded by OpenCV)
 - [ ] Target *set* (rotations about the viewing axis) and robust labels under pose noise
 - [ ] Baseline (most stable grasp) vs target-aware selection: success-rate table
 - [ ] Learned scorer (point cloud + grasp + target → feasibility); speed and unseen-object test
@@ -211,3 +279,5 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 Code: MIT. The Franka Panda model is fetched from MuJoCo Menagerie under its own license.
 Objects: Google Scanned Objects (Google Research, CC-BY 4.0), MuJoCo conversion by
 [kevinzakka/mujoco_scanned_objects](https://github.com/kevinzakka/mujoco_scanned_objects).
+The analytic IK (`grasp2show/franka_ik.py`, `cpp/src/franka_ik.hpp`) is adapted from
+[frantik](https://github.com/CoMMALab/frantik), Apache-2.0 (`licenses/frantik-Apache-2.0.txt`).

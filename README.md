@@ -46,8 +46,8 @@ finger covers the QR, so decoding fails. A stability-only planner cannot tell th
 > **Status: week 2 of a 3-week plan.** Week 1: scene and scripted pick-and-show, 40 scanned
 > products, grasp sampler and simulated lift labels, five analytic checks, C++ kernels, validation
 > against 865 full episodes and the policy comparison. Week 2 so far: a 20,902-sample dataset of
-> full-episode outcomes, a learned scorer, and its evaluation as a policy on unseen objects.
-> Goal-conditioned heatmaps (way A). Next: robustness to pose noise, write-up; week 3: way B.
+> full-episode outcomes, a learned scorer and its evaluation as a policy on unseen objects, and
+> goal-conditioned heatmaps (way A). Next: robustness to pose noise and a write-up; week 3: way B.
 
 ## Quickstart
 

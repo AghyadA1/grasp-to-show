@@ -7,9 +7,10 @@ the PyTorch twin of the optimiser's checker (grasp2show/learn/transport_torch.py
 TransportProblem.evaluate to 1e-11), so no labels are needed and the friction can be drawn
 fresh for every problem in every batch:
 
-    loss = log T + 0.05 relu(extra jerk) + 10 (max_t v + mean_t v)   for each constraint
+    loss = log T + 0.05 relu(extra jerk) + 30 (max_t v + mean_t v)   for each constraint
     v    = how far the constraint is violated at sample t, with a small margin
-           (u <= u_lim - 0.02, limits <= 0.98), so the raw output is feasible under the exact check
+           (u <= u_lim - 0.1, limits <= 0.9), so the raw output stays feasible on new problems
+           (picked on validation: smaller margins overfit the boundary, see the README)
 
 Judged on the RAW network output only (no slowing down, no refinement, no fallback):
   feasible        share of motions that satisfy every constraint as predicted
@@ -20,7 +21,8 @@ Validation: 5 training-set objects held out (the same as in train_transport_net.
 10 unseen objects (data/transport_dataset_test), at their recorded friction. The imitation
 network is reported on the same problems for comparison.
 
-Usage:  python scripts/train_transport_selfsup.py [--epochs 3000] [--init imitation|scratch]
+Usage:  python scripts/train_transport_selfsup.py [--epochs 500] [--init imitation|scratch]
+        (uses data/transport_problems/ too when present: scripts/generate_transport_problems.py)
 Outputs: data/models/transport_net_ss.pt, transport_net_ss_metrics.json, media/transport_net_ss.png
 """
 from __future__ import annotations
@@ -141,17 +143,17 @@ def judge_numpy(model, rows, device) -> tuple[dict, np.ndarray, np.ndarray]:
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--data", type=Path, nargs="+", default=[ROOT / "data" / "transport_dataset"],
+    p.add_argument("--data", type=Path, nargs="+", default=[ROOT / "data" / "transport_dataset", ROOT / "data" / "transport_problems"],
                    help="training problem folders (labels not needed; extra geometry-only folders welcome)")
     p.add_argument("--test", type=Path, default=ROOT / "data" / "transport_dataset_test")
     p.add_argument("--init", choices=["imitation", "scratch"], default="imitation")
-    p.add_argument("--epochs", type=int, default=3000)
+    p.add_argument("--epochs", type=int, default=500)
     p.add_argument("--batch", type=int, default=64)
     p.add_argument("--lr", type=float, default=None)
     p.add_argument("--val-objects", type=int, default=5)
-    p.add_argument("--eval-every", type=int, default=50)
-    p.add_argument("--w-lin", type=float, default=10.0, help="penalty weight on constraint violations")
-    p.add_argument("--margin", type=float, default=0.02, help="safety margin on u and on the limit ratios")
+    p.add_argument("--eval-every", type=int, default=25)
+    p.add_argument("--w-lin", type=float, default=30.0, help="penalty weight on constraint violations")
+    p.add_argument("--margin", type=float, default=0.1, help="safety margin on u and on the limit ratios")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--out", default="transport_net_ss")
@@ -160,6 +162,7 @@ def main() -> int:
     rng = np.random.default_rng(args.seed + 1)
     dev = args.device
 
+    args.data = [d for d in args.data if d.exists()]
     rows = load(args.data)
     val_names = val_split([r for r in rows if r["file"].startswith(args.data[0].name)], args.val_objects, args.seed)
     tr = Data([r for r in rows if r["name"] not in val_names], dev)

@@ -21,7 +21,7 @@ Validation: 5 training-set objects held out (the same as in train_transport_net.
 10 unseen objects (data/transport_dataset_test), at their recorded friction. The imitation
 network is reported on the same problems for comparison.
 
-Usage:  python scripts/train_transport_selfsup.py [--epochs 500] [--init imitation|scratch]
+Usage:  python scripts/train_transport_selfsup.py [--epochs 500] [--device cpu] [--init imitation|scratch]
         (uses data/transport_problems/ too when present: scripts/generate_transport_problems.py)
 Outputs: data/models/transport_net_ss.pt, transport_net_ss_metrics.json, media/transport_net_ss.png
 """
@@ -48,6 +48,7 @@ from grasp2show.transport_opt import TransportProblem
 
 MU_COL = 21                       # position of mu in the feature vector
 MU_RANGE = (0.15, 0.6)
+DT = torch.float64                # float32 on a GPU (laptop GPUs are slow in float64)
 
 
 @cache
@@ -81,8 +82,8 @@ def val_split(rows: list[dict], k: int, seed: int) -> set[str]:
 class Data:
     """Problem tensors + features on the device; only problems the finger rays can grasp."""
 
-    def __init__(self, rows, device, dtype=torch.float64):
-        P = pack(rows, dtype=dtype, device=device)
+    def __init__(self, rows, device):
+        P = pack(rows, dtype=DT, device=device)
         keep = P.pop("index").tolist()
         self.rows = [rows[i] for i in keep]
         self.P = P
@@ -92,7 +93,7 @@ class Data:
 
 def predict(model, X):
     c, lt = model(X)
-    return c.double(), torch.exp(lt.double().clamp(np.log(0.2), np.log(30.0)))
+    return c.to(DT), torch.exp(lt.to(DT).clamp(np.log(0.2), np.log(30.0)))
 
 
 def loss_fn(con: Constraints, c, T, P, u_lim, w_lin: float = 10.0, m_u: float = 0.02, m_l: float = 0.02):
@@ -148,7 +149,7 @@ def main() -> int:
     p.add_argument("--test", type=Path, default=ROOT / "data" / "transport_dataset_test")
     p.add_argument("--init", choices=["imitation", "scratch"], default="imitation")
     p.add_argument("--epochs", type=int, default=500)
-    p.add_argument("--batch", type=int, default=64)
+    p.add_argument("--batch", type=int, default=256)
     p.add_argument("--lr", type=float, default=None)
     p.add_argument("--val-objects", type=int, default=5)
     p.add_argument("--eval-every", type=int, default=25)
@@ -156,8 +157,12 @@ def main() -> int:
     p.add_argument("--margin", type=float, default=0.1, help="safety margin on u and on the limit ratios")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    p.add_argument("--dtype", choices=["float32", "float64"], default=None,
+                   help="default: float32 on a GPU, float64 on the CPU (the final judge is always float64)")
     p.add_argument("--out", default="transport_net_ss")
     args = p.parse_args()
+    global DT
+    DT = getattr(torch, args.dtype or ("float32" if args.device.startswith("cuda") else "float64"))
     torch.manual_seed(args.seed)
     rng = np.random.default_rng(args.seed + 1)
     dev = args.device
@@ -192,7 +197,8 @@ def main() -> int:
     lr = args.lr or (3e-4 if args.init == "imitation" else 1e-3)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)
-    con = Constraints().to(dev)
+    con = Constraints(dtype=DT).to(dev)
+    tr_check = Data([tr.rows[i] for i in np.random.default_rng(0).choice(tr.n, min(tr.n, 400), replace=False)], dev)
 
     hist, best, best_state = [], -1.0, None
     t0 = time.perf_counter()
@@ -203,7 +209,7 @@ def main() -> int:
         for i in range(0, tr.n, args.batch):
             b = perm[i:i + args.batch]
             P = subset(tr.P, b)
-            mu = torch.as_tensor(rng.uniform(*MU_RANGE, len(b)), dtype=torch.float64, device=dev)
+            mu = torch.as_tensor(rng.uniform(*MU_RANGE, len(b)), dtype=DT, device=dev)
             P["mu"] = mu                                        # fresh friction every time
             X = tr.X[b].clone()
             X[:, MU_COL] = mu.float()
@@ -217,15 +223,18 @@ def main() -> int:
             opt.step()
             tot += loss.item() * len(b)
         sched.step()
+        el = time.perf_counter() - t0
+        print(f"epoch {ep}/{args.epochs}  loss {tot / tr.n:.4f}  ({el / ep:.1f} s/epoch, ~{el / ep * (args.epochs - ep) / 60:.0f} min left)",
+              flush=True)
         if ep % args.eval_every == 0 or ep == args.epochs:
             model.eval()
             v = judge_torch(model, con, va)
-            t_ = judge_torch(model, con, tr)
+            t_ = judge_torch(model, con, tr_check)
             hist.append({"epoch": ep, "loss": tot / tr.n, "train_feasible": t_["feasible"],
                          **{f"val_{k}": v[k] for k in ("feasible", "score", "T_over_T_opt_median")}})
             if v["score"] is not None and v["score"] > best:
                 best, best_state = v["score"], {k: x.detach().clone() for k, x in model.state_dict().items()}
-            print(f"epoch {ep}  loss {tot / tr.n:.4f}  train feasible {t_['feasible']:.2f}  val feasible {v['feasible']:.2f}  T/T_opt "
+            print(f"  check: train feasible {t_['feasible']:.2f}  val feasible {v['feasible']:.2f}  T/T_opt "
                   f"{v['T_over_T_opt_median']}  score {v['score']}  ({time.perf_counter() - t0:.0f} s)", flush=True)
     model.load_state_dict(best_state)
     model.eval()

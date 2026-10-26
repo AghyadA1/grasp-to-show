@@ -11,3 +11,4 @@ data/
 MUJOCO_LOG.TXT
 cpp/build/
 media/heatmap_*
+release/

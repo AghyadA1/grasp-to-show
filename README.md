@@ -102,6 +102,10 @@ python scripts\eval_learned_policy.py
 pytest -q
 ```
 
+**Skip the long runs:** the data and trained models behind every number here are on the
+[`data` branch](https://github.com/AghyadA1/grasp-to-show/tree/data) (`data-linux.tgz`,
+`data-windows.tgz`); extract one in the repository root.
+
 On a headless Linux machine set `MUJOCO_GL=egl` (GPU) or `MUJOCO_GL=osmesa` (CPU).
 
 Expected output:

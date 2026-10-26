@@ -27,6 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]
+learn = ["torch>=2.2"]   # learned scorer (week 2); GPU build: see README
 
 [tool.setuptools.packages.find]
 include = ["grasp2show*"]

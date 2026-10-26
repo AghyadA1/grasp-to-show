@@ -153,14 +153,17 @@ def summarise(recs):
 
 
 def plot(recs, s, path):
+    """Left: success vs median duration. Right: how much shaping shortens the motion compared with
+    only slowing down, for problems limited by the grasp vs by the robot's limits."""
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     col = {"today": "#9aa5b1", "retime_only": "#e07a2f", "shape_time": "#1d4e6e"}
-    lab = {"today": "today's planner", "retime_only": "slow down (retime only)", "shape_time": "move differently (shape + time)"}
-    fig, ax = plt.subplots(1, 2, figsize=(10.5, 3.8))
+    lab = {"today": "today's planner", "retime_only": "slow down (retime only)",
+           "shape_time": "move differently (shape + time)"}
+    fig, ax = plt.subplots(1, 2, figsize=(10.5, 3.9))
     for meth, c in col.items():
         pts = []
         for sp in (1.0, 1.25, 2.0):
@@ -171,22 +174,30 @@ def plot(recs, s, path):
             xs, ys, _ = zip(*pts)
             ax[0].plot(xs, ys, "o-", c=c, label=lab[meth])
             for x, y, sp in pts:
-                ax[0].annotate(f"x{sp:g}", (x, y), xytext=(4, 4), textcoords="offset points", fontsize=7, color="0.3")
+                ax[0].annotate(f"x{sp:g}", (x, y), xytext=(4, -10), textcoords="offset points", fontsize=7, color="0.3")
     ax[0].set_xlabel("median transport duration (s)")
     ax[0].set_ylabel("task success")
-    ax[0].set_ylim(0, 1.02)
+    ax[0].set_ylim(0.85, 1.0)
     ax[0].legend(frameon=False, fontsize=8, loc="lower right")
-    ax[0].set_title(f"{s['problems']} problems (unseen objects, μ 0.2-0.3)", fontsize=9)
-    keys = ["today x1.0", "retime_only x1.0", "shape_time x1.0"]
-    labels = ["today", "retime only", "shape + time"]
-    metrics = [("stops", "stops"), ("qdd_ratio", "peak joint acc. / limit"), ("u_max", "peak friction use")]
-    w = 0.25
-    for i, (k, nm) in enumerate(metrics):
-        vals = [s["methods"].get(kk, {}).get(k) or 0 for kk in keys]
-        ax[1].bar(np.arange(3) + (i - 1) * w, vals, w, label=nm, color=["#cfd8dc", "#9aa5b1", "#1d4e6e"][i])
-    ax[1].set_xticks(range(3), labels, fontsize=8)
-    ax[1].legend(frameon=False, fontsize=8)
-    ax[1].set_title("Motion quality (medians)", fontsize=9)
+    ax[0].set_title(f"{s['problems']} problems: unseen objects, \u03bc 0.2-0.3", fontsize=9)
+    by = {}
+    for r in recs:
+        by.setdefault((r["object"], r["yaw_deg"], r["mu"]), {})[(r["method"], r["speed"])] = r
+    pairs = [(v[("retime_only", 1.0)], v[("shape_time", 1.0)]) for v in by.values()
+             if ("retime_only", 1.0) in v and ("shape_time", 1.0) in v and "planned_T" in v[("shape_time", 1.0)]]
+    grip = [b["planned_T"] / a["planned_T"] for a, b in pairs if a["planned_u_max"] >= 0.95 * a["u_lim"]]
+    robot = [b["planned_T"] / a["planned_T"] for a, b in pairs if a["planned_u_max"] < 0.95 * a["u_lim"]]
+    rng = np.random.default_rng(0)
+    for i, (vals, c) in enumerate(((grip, "#1d4e6e"), (robot, "#9aa5b1"))):
+        ax[1].scatter(i + rng.uniform(-0.15, 0.15, len(vals)), vals, s=10, c=c, alpha=0.6)
+        if vals:
+            ax[1].hlines(np.median(vals), i - 0.25, i + 0.25, colors="k", lw=2)
+            ax[1].text(i + 0.28, np.median(vals), f"median {np.median(vals):.2f}", va="center", fontsize=8)
+    ax[1].axhline(1, ls=":", c="0.5")
+    ax[1].set_xticks([0, 1], [f"limited by the grasp\n({len(grip)} problems)", f"limited by the robot\n({len(robot)})"],
+                     fontsize=8)
+    ax[1].set_ylabel("duration: shaped / only slowed down")
+    ax[1].set_title("Moving differently pays off when the grasp is the limit", fontsize=9)
     for a in ax:
         a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()

@@ -478,6 +478,67 @@ scenarios. An earlier run of the smoothed variant was corrupted by a rendering b
 notes); every other result was re-run with the fix and reproduced exactly (80 / 80 identical).
 
 
+## Part 2: carrying the object so the grasp holds (in progress)
+
+Same grasp, same start, same presentation pose; only *how the arm moves in between* changes. A
+two-finger grasp is anisotropic: a load along the finger axis is carried by the grip force itself
+(up to 2F), a load across it only by friction (2μF), and a torque about the finger axis only by
+torsional friction, the weakest of all. Leverage turns every load with a lever arm into torque.
+So a motion that points the combined load of gravity and acceleration where the grasp is strong
+can be faster without slipping (the tray version of this idea: [Heins & Schoellig, RA-L 2023](https://arxiv.org/pdf/2305.17484);
+time-optimal retiming with grasp constraints: [Pham & Pham, ICRA 2019](https://arxiv.org/pdf/1809.03151);
+learned constraints: [GOMP-ST](https://arxiv.org/pdf/2203.08359)).
+
+**The load the motion asks of the grasp** (`grasp2show/transport.py`): from the object's
+trajectory, the d'Alembert load m(g − a) and the inertial torque, fed to the soft-finger model,
+give the friction utilisation u(t) at every instant. It is made *robust to leverage*: the grasp must
+also hold with the centre of mass ±5 mm off along each gripper axis, because an object balanced on
+the finger axis looks perfectly safe to the nominal model yet behaves like an inverted pendulum on
+the lower finger. A hold test in simulation (`scripts/hold_tilt_test.py`) also showed the simulated
+hand carries much less along its finger axis than the ideal 2F (a 1.5 kg box tilted vertical held
+with 9 mm slip, 2 kg was lost), so that load is capped at 14 N.
+
+**Today's planner, measured** (`scripts/transport_baseline.py`, 1,200 episodes: way B's grasp on
+the 10 unseen objects × 8 start poses × 5 speeds × μ 0.2/0.3/0.5):
+
+![baseline](media/transport_baseline.png)
+
+The model's peak utilisation predicts slip during the motion with **AUC 0.88** (the static end
+pose alone: 0.77). Today's planner stops 2–3 times, and at 2× speed already reaches the Franka
+joint-acceleration limit (1.9× at 3×); at μ = 0.2 its success falls from 95 % to 75 % as it speeds up.
+
+**The optimiser** (`grasp2show/transport_opt.py`): one smooth joint trajectory from the lifted
+pose to the presentation pose (minimum-jerk plus Chebyshev bumps that leave the ends at rest), its
+shape and duration chosen together to minimise time and needless jerk, subject to: robust
+utilisation ≤ 0.7, ≤ 60 % of the Franka velocity and acceleration limits, joint limits, no
+collision. Baseline: *retime only*, the straight path made as fast as the same constraints allow.
+
+**Result** (`scripts/transport_compare.py`, 160 problems: 80 unseen-object scenarios × μ 0.2/0.3):
+
+![compare](media/transport_compare.png)
+
+| Method | Success [95 % CI] | Median duration | Slip > 5 mm / 5° |
+|---|---|---|---|
+| today's planner | 94 % [90, 97] | 5.0 s | 10 % |
+| today's planner, 2× speed | 89 % [84, 93] | 2.5 s | 19 % |
+| retime only (slow down to stay safe) | 95 % [90, 97] | 3.7 s | 18 % |
+| **shape + time (move differently)** | **98 % [95, 99]** | **3.6 s** | 11 % |
+| shape + time, run 25 % faster than planned | 95 % | 2.9 s | 9 % |
+
+Paired, shape + time vs today's planner: 6 scenarios won, 0 lost (p = 0.03), 38 % faster; vs
+today's planner at 2× speed: 15 won, 1 lost (p = 5e-4). **The effect the idea predicts shows
+where the grasp is the bottleneck**: in the 43 problems where the slowed-down motion is limited by
+the grasp (median object 0.38 kg, low friction), shaping the motion makes it **38 % shorter**
+(median duration ratio 0.62, some cases 5× shorter) and lifts success from 86 % to 93 %; where
+the robot's own limits bind (117 problems, light objects), the gain is 7 %.
+
+Caveats: the optimiser is a sampling search (≈25 s per problem) and ends slightly outside the
+constraints in 22 % of problems (they still ran in simulation); for 10 % of the problems even the
+end poses at rest exceed the 0.7 limit under the robust model, and the limit is relaxed to that
+need. Next: a network that predicts these motions in milliseconds, trained on optimised motions
+for random start places, frictions and training objects (`scripts/generate_transport_data.py`,
+`scripts/train_transport_net.py`).
+
 ## C++ kernels
 
 `cpp/` is an optional C++17 package (nanobind bindings, no other dependencies) with the two hot
@@ -575,6 +636,8 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Learned scorer (point cloud + grasp + target → success), trained on full-episode outcomes; speed and unseen-object test
 - [x] Goal-conditioned grasp heatmaps on the object surface (way A: checks painted on the mesh)
 - [x] Way B: dense goal-conditioned heatmap network, tested in full episodes on unseen objects
+- [x] Part 2: transport motion that keeps the grasp safe: dynamic grasp model (AUC 0.88), optimiser (38 % faster where the grasp limits)
+- [ ] Part 2: transport network (imitates the optimiser), varied camera poses, presentation tilt
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 
 ## Related work

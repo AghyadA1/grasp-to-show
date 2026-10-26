@@ -18,7 +18,7 @@ def _problem(seed):
     q0 = np.array([0.0, -0.3, 0.0, -2.2, 0.0, 1.9, 0.785]) + rng.normal(0, 0.1, 7)
     q1 = q0 + rng.normal(0, 0.6, 7)
     q1[3] = min(q1[3], -0.3)
-    return dict(obj=obj, q0=q0, q1=q1, T_obj_tcp=np.eye(4), mu=float(rng.uniform(0.15, 0.6)))  # centred grasp
+    return {"obj": obj, "q0": q0, "q1": q1, "T_obj_tcp": np.eye(4), "mu": float(rng.uniform(0.15, 0.6))}  # centred grasp
 
 
 def test_fk_matches():

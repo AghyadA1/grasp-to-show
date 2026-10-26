@@ -30,6 +30,12 @@ scanner a finger covers part of the QR and it cannot be read (inset: the scanner
 the target-aware grasp was chosen knowing where the fingers will be at the scanner, so the QR is
 unobstructed and decoded.*
 
+![overlay](media/overlay.gif)
+
+*The same two episodes in one view (orange: baseline, blue: ours, each at half opacity), with
+the path of each gripper drawn in 3D. The two grasps send the arm on visibly different paths to
+the same scanner; insets: what the scanner sees. (`scripts/demo_overlay.py`)*
+
 ![policy comparison](media/policy_comparison.png)
 
 ![clear vs covering grasp](media/clear_vs_covering.gif)

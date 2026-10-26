@@ -31,15 +31,21 @@ LABEL = {"stability_only": "baseline: most stable grasp", "aware": "target-aware
 
 
 def find_scenario() -> tuple[str, float]:
+    """A scenario where the baseline fails and ours succeeds with a *different* grasp; prefer the
+    most common win type, a baseline finger hiding the QR, then any other."""
     f = ROOT / "data" / "episodes" / "records.jsonl"
     by = {}
     for line in f.read_text().splitlines():
         r = json.loads(line)
         if r["kind"] == "policy" and r["policy"] in LABEL:
             by.setdefault((r["object"], r["yaw_deg"]), {})[r["policy"]] = r
-    for (obj, yaw), v in by.items():
-        if v.get("aware", {}).get("success") and not v.get("stability_only", {}).get("success", True):
-            return obj, yaw
+    wins = [(k, v) for k, v in by.items()
+            if v.get("aware", {}).get("success") and not v.get("stability_only", {}).get("success", True)
+            and v["aware"]["grasp"] != v["stability_only"]["grasp"]]
+    for want in ("qr", ""):
+        for (obj, yaw), v in wins:
+            if v["stability_only"]["reason"].startswith(want):
+                return obj, yaw
     raise SystemExit("no scenario where the baseline fails and target-aware succeeds")
 
 

@@ -11,7 +11,8 @@ as a real system would fall back to its next grasp when motion planning fails):
                   with a reachable target pose (largest joint margin). A standard "grasp
                   planner + motion planner" pipeline: kinematics are checked, but not whether the
                   QR will be visible or the grasp stable once the object is turned.
-  aware           ours: the best grasp passing all checks (score = smallest normalised margin).
+  aware           ours: the best grasp passing all checks, ranked by its normalised margins
+                  (leximin: the smallest margin first, ties broken by the next smallest).
   aware_no_vis    ablation: aware without the QR-visibility check (check 5);
   aware_no_stab   ablation: aware without the target-stability check (check 2);
   aware_single    ablation: aware with one target pose (roll 0) instead of the target set.
@@ -117,8 +118,11 @@ def choose(policy: str, reports: dict[int, GraspReport], lift_margin: dict[int, 
                     parts.append(t.stability_margin)
                 if use_vis:
                     parts.append((t.visibility.fraction - 0.9) / 0.1)
-                scored.append((min(parts), Choice(i, tw.twin, j, r.ok)))
-    scored.sort(key=lambda x: -x[0])
+                # Leximin: compare the smallest margin first, then the next smallest, ... A plain
+                # min() made every target roll tie whenever the (roll-independent) lift margin was
+                # the weakest, and picked a +0.29 target-stability roll over a +0.51 one.
+                scored.append((tuple(sorted(parts)), Choice(i, tw.twin, j, r.ok)))
+    scored.sort(key=lambda x: x[0], reverse=True)
     return [c for _, c in scored[:k]]
 
 

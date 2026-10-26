@@ -7,6 +7,7 @@ version of this script did exactly that.)
 """
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 
 import mujoco
@@ -20,6 +21,28 @@ from .qr import decode_qr
 from .scene import HOME_Q, PANDA_BODIES, Scene, reset_to_home, start_pose
 from .task import Grasp, body_pose, flipped, site_pose
 from .transforms import inv_T, make_T, rotation_angle
+
+_ACTIVE: dict = {"token": None, "renderer": None}
+
+
+def _acquire_renderer(model: mujoco.MjModel, height: int, width: int, token: object) -> mujoco.Renderer:
+    """One live offscreen renderer per process.
+
+    Freeing a MuJoCo renderer deletes its OpenGL objects in whichever context is current; when an
+    old episode object was garbage-collected after a new one had created its renderer, that
+    deleted the *new* renderer's textures and the scanner saw noise (OSMesa) or a wrong image.
+    Here the previous renderer is closed explicitly, with its own context current, before a new
+    one is created, and the renderer stays owned by this registry (not by the episode object).
+    """
+    if _ACTIVE["token"] is token:
+        return _ACTIVE["renderer"]
+    old = _ACTIVE["renderer"]
+    if old is not None:
+        with contextlib.suppress(Exception):   # best effort: the context may already be gone
+            old._gl_context.make_current()
+            old.close()
+    _ACTIVE.update(token=token, renderer=mujoco.Renderer(model, height, width))
+    return _ACTIVE["renderer"]
 
 
 @dataclass
@@ -65,11 +88,16 @@ class PickAndShow:
         self.ik = ik or PandaIK(cfg)
         self.data = mujoco.MjData(model)
         self.slip_tol_mm, self.slip_tol_deg = slip_tol_mm, slip_tol_deg
-        self.renderer = mujoco.Renderer(model, cfg.camera.height, cfg.camera.width)
+        self._render_token = object()
         self._robot_bodies = {model.body(b).id for b in PANDA_BODIES}
         self._fingers = {model.body("left_finger").id, model.body("right_finger").id}
         self._obj = model.body(scene.obj.name).id
         self._hand = model.body("hand").id
+
+    @property
+    def renderer(self) -> mujoco.Renderer:
+        """This episode's offscreen renderer; at most one is alive per process (see _acquire)."""
+        return _acquire_renderer(self.model, self.cfg.camera.height, self.cfg.camera.width, self._render_token)
 
     # -- planning ---------------------------------------------------------------------
     def key_poses(self, grasp: Grasp, T_target_obj: np.ndarray) -> dict[str, np.ndarray]:

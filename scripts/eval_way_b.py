@@ -76,7 +76,8 @@ def kinematic_choices(sc: Scenario, order: list[tuple[int, int]]) -> list[Choice
     return out
 
 
-def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k: int, min_sep: float = 0.01):
+def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k: int, min_sep: float = 0.01,
+                 start_xy: tuple[float, float] | None = None):
     """Top-k (grasp, target) pairs from the network: T_obj_tcp (k,4,4), width (k,), roll index (k,)."""
     import torch
 
@@ -87,7 +88,8 @@ def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k:
 
     net, clouds = _load(model_path, clouds_path)
     o = clouds.names.index(asset)
-    cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw)))
+    extra = {} if start_xy is None else {"start_xy": tuple(start_xy)}
+    cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw), **extra))
     obj = object_from_config(cfg.obj)
     rolls = np.linspace(0, 2 * np.pi, 12, endpoint=False)
     T0 = start_pose(cfg, obj)

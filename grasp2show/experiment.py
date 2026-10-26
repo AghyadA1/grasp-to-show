@@ -131,9 +131,11 @@ def choose(policy: str, reports: dict[int, GraspReport], lift_margin: dict[int, 
 class Scenario:
     """One object at one start pose: feasibility reports and episode execution."""
 
-    def __init__(self, asset: str, yaw_deg: float, grasps: dict, n_rolls: int = 12):
+    def __init__(self, asset: str, yaw_deg: float, grasps: dict, n_rolls: int = 12,
+                 start_xy: tuple[float, float] | None = None):
         self.asset, self.yaw_deg = asset, yaw_deg
-        self.cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw_deg)))
+        extra = {} if start_xy is None else {"start_xy": tuple(start_xy)}
+        self.cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw_deg), **extra))
         self.obj = object_from_config(self.cfg.obj)
         self.scene = build_scene(self.cfg, self.obj)
         self.fc = FeasibilityChecker(self.scene, self.cfg)

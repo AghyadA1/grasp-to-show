@@ -12,3 +12,5 @@ MUJOCO_LOG.TXT
 cpp/build/
 media/heatmap_*
 release/
+media/smoke*.png
+data/models/smoke*

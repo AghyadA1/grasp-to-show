@@ -22,6 +22,7 @@ Validation: 5 training-set objects held out (the same as in train_transport_net.
 network is reported on the same problems for comparison.
 
 Usage:  python scripts/train_transport_selfsup.py [--epochs 500] [--device cpu] [--init imitation|scratch|MODEL.pt] [--mass-scale 0.6 2.5]
+        [--labels data/transport_labels.npz]   (step 2, see scripts/refine_transport_labels.py)
         (uses data/transport_problems/ too when present: scripts/generate_transport_problems.py)
 Outputs: data/models/transport_net_ss.pt, transport_net_ss_metrics.json, media/transport_net_ss.png
 """
@@ -153,6 +154,9 @@ def main() -> int:
     p.add_argument("--mass-scale", type=float, nargs=2, default=None, metavar=("LO", "HI"),
                    help="also train on heavier/lighter versions of the objects: mass and inertia scaled by a "
                         "log-uniform factor in [LO, HI] (half of the problems in each batch; mass capped at 1.5 kg)")
+    p.add_argument("--labels", type=Path, default=None,
+                   help="step 2: optimiser labels for problems the network got wrong (refine_transport_labels.py)")
+    p.add_argument("--w-imit", type=float, default=5.0, help="weight of the label term (with --labels)")
     p.add_argument("--epochs", type=int, default=500)
     p.add_argument("--batch", type=int, default=256)
     p.add_argument("--lr", type=float, default=None)
@@ -205,6 +209,25 @@ def main() -> int:
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)
     con = Constraints(dtype=DT).to(dev)
+    L = None
+    if args.labels:
+        z = np.load(args.labels)
+        pos = {r["file"]: i for i, r in enumerate(tr.rows)}
+        sel = [j for j, f in enumerate(z["problem"]) if str(f) in pos]
+        idx = torch.as_tensor([pos[str(z["problem"][j])] for j in sel], device=dev)
+        PL = subset(tr.P, idx)
+        k = torch.as_tensor(z["mass_scale"][sel], dtype=DT, device=dev)
+        PL["mu"] = torch.as_tensor(z["mu"][sel], dtype=DT, device=dev)
+        PL["mass"], PL["inertia"] = PL["mass"] * k, PL["inertia"] * k[:, None, None]
+        XL = tr.X[idx].clone()
+        XL[:, MU_COL] = PL["mu"].float()
+        XL[:, MASS_COL] *= k.float()
+        XL[:, INERTIA_COLS] *= k.float()[:, None]
+        with torch.no_grad():
+            UL = torch.clamp(con.static_u(PL) + 0.05, min=con.u_lim0)
+        L = {"P": PL, "X": XL, "u_lim": UL, "c": torch.as_tensor(z["c"][sel], dtype=DT, device=dev),
+             "logT": torch.log(torch.as_tensor(z["T"][sel], dtype=DT, device=dev)), "n": len(sel)}
+        print(f"labels: {len(sel)} problems the network got wrong, with optimiser solutions")
     tr_check = Data([tr.rows[i] for i in np.random.default_rng(0).choice(tr.n, min(tr.n, 400), replace=False)], dev)
 
     hist, best, best_state = [], -1.0, None
@@ -232,6 +255,12 @@ def main() -> int:
                 u_lim = torch.clamp(con.static_u(P) + 0.05, min=con.u_lim0)
             c, T = predict(model, X)
             loss, _ = loss_fn(con, c, T, P, u_lim, args.w_lin, args.margin, args.margin)
+            if L is not None:                                   # step 2: pull towards the optimiser's solutions
+                lb = torch.randint(0, L["n"], (min(64, L["n"]),), device=dev)
+                cl, Tl = predict(model, L["X"][lb])
+                l_con, _ = loss_fn(con, cl, Tl, subset(L["P"], lb), L["u_lim"][lb], args.w_lin, args.margin, args.margin)
+                l_imit = ((cl - L["c"][lb]) ** 2).mean() + ((torch.log(Tl) - L["logT"][lb]) ** 2).mean()
+                loss = loss + l_con + args.w_imit * l_imit
             opt.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)

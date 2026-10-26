@@ -7,6 +7,8 @@ same constraints (friction use <= 0.7 robust to +-5 mm COM error, <= 14 N along 
 
   retime       the straight joint-space motion, slowed to the shortest safe duration
   optimiser    the full shape + time search (60 iterations, as in the training labels)
+  net_raw      the network's motion exactly as predicted: no check, no slowing, no fallback
+With --failsafe, also (the deployment versions, judged separately):
   net          the network's motion, slowed down if needed to satisfy the constraints;
                falls back to `retime` if no duration works (e.g. the path turns the object where
                its weight alone is too much for the grip) or it collides
@@ -15,7 +17,8 @@ same constraints (friction use <= 0.7 robust to +-5 mm COM error, <= 14 N along 
 
 Every motion is executed in simulation. Reported: success, transport duration, planning time,
 how often the fallback was needed.
-Usage:  python scripts/transport_net_episodes.py [--workers 4] [--refine-iters 10]
+Usage:  python scripts/transport_net_episodes.py [--workers 4] [--net data/models/transport_net_ss_mass.pt]
+        [--failsafe] [--refine-iters 10]
 Outputs: data/transport_net_episodes/records.jsonl, summary.json, media/transport_net_episodes.png
 """
 from __future__ import annotations
@@ -43,7 +46,8 @@ from grasp2show.transport import friction_params, motion_metrics
 from grasp2show.transport_opt import Solution, TransportProblem
 
 OUT = ROOT / "data" / "transport_net_episodes"
-METHODS = ("retime", "optimiser", "net", "net+refine")
+METHODS = ("retime", "optimiser", "net_raw", "net", "net+refine")
+NETS = ("net_raw", "net", "net+refine")
 _NET = None
 
 
@@ -65,7 +69,7 @@ def net_predict(path: Path, x: np.ndarray) -> tuple[np.ndarray, float]:
 
 
 def run(job):
-    f, model, clouds, net_path, refine_iters = job
+    f, model, clouds, net_path, refine_iters, failsafe = job
     from grasp2show.learn.transport_net import features
 
     z = dict(np.load(f, allow_pickle=True))
@@ -103,7 +107,15 @@ def run(job):
     t0 = time.perf_counter()
     x = features(q0, q1, mu, grasp.T_obj_tcp, grasp.width, sc.obj.mass, sc.obj.com, sc.obj.inertia)
     c, T_pred = net_predict(net_path, x)
-    as_pred = pr.evaluate(c, T_pred)["feasible"]
+    t_net = time.perf_counter() - t0
+    e_raw = pr.evaluate(c, T_pred)                      # with collisions: recorded, not used
+    as_pred = e_raw["feasible"]
+    sols["net_raw"] = (Solution(T_pred, c, as_pred, e_raw), t_net,
+                       {"as_predicted": bool(as_pred), "planned_hits": int(e_raw["hits"]),
+                        "planned_u_over": round(e_raw["u_max"] - pr.u_lim, 3)})
+    if not failsafe:
+        return execute_all(sc, grasp, paths, pr, prm, mu, dt, base, sols)
+    t0 = time.perf_counter()
     T_fix = slow_to_feasible(pr, c, T_pred)
     net = Solution(T_fix, c, False, {})
     if np.isfinite(T_fix):
@@ -115,9 +127,12 @@ def run(job):
     start = net if net.feasible else Solution(T_pred, c, False, {})
     ref = pr.shape_and_time(start, iters=refine_iters, seed=1)
     sols["net+refine"] = with_fallback(ref, {}, t0)
+    return execute_all(sc, grasp, paths, pr, prm, mu, dt, base, sols)
 
+
+def execute_all(sc, grasp, paths, pr, prm, mu, dt, base, sols):
     recs = []
-    for name in METHODS:
+    for name in [m for m in METHODS if m in sols]:
         s, secs, extra = sols[name]
         p = dict(paths)
         p["transport"] = pr.sample(s.c, s.T, dt)
@@ -143,17 +158,23 @@ def summarise(recs):
              "planned_feasible": round(float(np.mean([r["planned_feasible"] for r in rs])), 3),
              "duration_median_s": round(float(np.median([r["planned_T"] for r in rs])), 3),
              "plan_s_median": round(float(np.median([r["plan_s"] for r in rs])), 4)}
-        if m.startswith("net"):
+        if m == "net_raw":
+            ap = [r for r in rs if r["as_predicted"]]
+            nap = [r for r in rs if not r["as_predicted"]]
+            d["feasible_as_predicted"] = round(len(ap) / len(rs), 3)
+            d["success_when_feasible"] = round(float(np.mean([r["success"] for r in ap])), 3) if ap else None
+            d["success_when_not"] = round(float(np.mean([r["success"] for r in nap])), 3) if nap else None
+            d["predicted_collision"] = int(sum(r["planned_hits"] > 0 for r in rs))
+        if m in ("net", "net+refine"):
             d["fallback_to_retime"] = round(float(np.mean([r["fallback"] for r in rs])), 3)
             d["retime_was_shorter"] = round(float(np.mean([r["retime_shorter"] for r in rs])), 3)
-        if m == "net":
-            d["feasible_as_predicted"] = round(float(np.mean([r["as_predicted"] for r in rs])), 3)
         out["methods"][m] = d
     by = {}
     for r in ok:
         by.setdefault(r["file"], {})[r["method"]] = r
     ratios = {}
-    for m in ("optimiser", "net", "net+refine"):
+    present = {r["method"] for r in ok}
+    for m in [m for m in ("optimiser",) + NETS if m in present]:
         both = [v for v in by.values() if m in v and "retime" in v and v["retime"]["planned_feasible"]]
         ratios[f"{m} / retime"] = round(float(np.median([v[m]["planned_T"] / v["retime"]["planned_T"] for v in both])), 3)
         if m != "optimiser":
@@ -164,7 +185,7 @@ def summarise(recs):
     # problems the straight motion cannot do at all (retime infeasible): only shaping helps there
     hard = [v for v in by.values() if "retime" in v and not v["retime"]["planned_feasible"]]
     out["retime_infeasible"] = {"n": len(hard), **{m: int(sum(v[m]["planned_feasible"] for v in hard if m in v))
-                                                   for m in ("optimiser", "net", "net+refine")}}
+                                                   for m in ("optimiser",) + NETS if m in present}}
     return out
 
 
@@ -174,7 +195,7 @@ def plot(recs, s, path):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    col = {"retime": "#e07a2f", "optimiser": "#1d4e6e", "net": "#9aa5b1", "net+refine": "#3f8f6b"}
+    col = {"retime": "#e07a2f", "optimiser": "#1d4e6e", "net_raw": "#7a5ba6", "net": "#9aa5b1", "net+refine": "#3f8f6b"}
     fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
     ms = [m for m in METHODS if m in s["methods"]]
     for m in ms:
@@ -187,19 +208,15 @@ def plot(recs, s, path):
     ax[0].set_ylabel("transport duration, median (s)")
     ax[0].legend(frameon=False, fontsize=8)
     ax[0].set_title(f"{s['problems']} problems on unseen objects", fontsize=9)
-    ok = [r for r in recs if r.get("status") == "ok"]
-    by = {}
-    for r in ok:
-        by.setdefault(r["file"], {})[r["method"]] = r
-    for i, m in enumerate(("net", "net+refine")):
-        v = [b[m]["planned_T"] / b["optimiser"]["planned_T"] for b in by.values() if m in b and "optimiser" in b]
-        ax[1].scatter(i + np.random.default_rng(0).uniform(-0.15, 0.15, len(v)), v, s=10, c=col[m], alpha=0.6)
-        ax[1].hlines(np.median(v), i - 0.25, i + 0.25, colors="k", lw=2)
-        ax[1].text(i + 0.28, np.median(v), f"median {np.median(v):.2f}", va="center", fontsize=8)
-    ax[1].axhline(1, ls=":", c="0.5")
-    ax[1].set_xticks([0, 1], ["network (+ slow down)", "network + short refine"], fontsize=8)
-    ax[1].set_ylabel("duration / optimiser's duration")
-    ax[1].set_yscale("log")
+    for i, m in enumerate(ms):
+        d = s["methods"][m]
+        ax[1].bar(i, d["success"], color=col[m], width=0.6)
+        ax[1].errorbar(i, d["success"], yerr=[[d["success"] - d["ci95"][0]], [d["ci95"][1] - d["success"]]],
+                       c="k", capsize=3, lw=1)
+        ax[1].text(i, 0.02 + d["ci95"][1], f"{d['success']:.0%}", ha="center", fontsize=8)
+    ax[1].set_xticks(range(len(ms)), [m.replace("_", " ") for m in ms], fontsize=8)
+    ax[1].set_ylim(0.5, 1.08)
+    ax[1].set_ylabel("task success in simulation (95 % CI)")
     for a in ax:
         a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
@@ -210,7 +227,8 @@ def plot(recs, s, path):
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--data", type=Path, default=ROOT / "data" / "transport_dataset_test")
-    p.add_argument("--net", type=Path, default=ROOT / "data" / "models" / "transport_net.pt")
+    p.add_argument("--net", type=Path, default=ROOT / "data" / "models" / "transport_net_ss_mass.pt")
+    p.add_argument("--failsafe", action="store_true", help="also the deployment versions (slow down / refine + fallback)")
     p.add_argument("--model", type=Path, default=ROOT / "data" / "models" / "heatmap_net.pt")
     p.add_argument("--clouds", type=Path, default=ROOT / "data" / "dataset" / "clouds.npz")
     p.add_argument("--refine-iters", type=int, default=10)
@@ -218,7 +236,7 @@ def main() -> int:
     p.add_argument("--workers", type=int, default=min(4, max(1, (os.cpu_count() or 2) - 1)))
     args = p.parse_args()
     files = sorted(args.data.glob("*.npz"))[: args.limit]
-    jobs = [(str(f), args.model, args.clouds, args.net, args.refine_iters) for f in files]
+    jobs = [(str(f), args.model, args.clouds, args.net, args.refine_iters, args.failsafe) for f in files]
     OUT.mkdir(parents=True, exist_ok=True)
     print(f"{len(jobs)} problems, {args.workers} workers")
     recs = []
@@ -226,7 +244,7 @@ def main() -> int:
         for k, rs in enumerate(pool.imap_unordered(run, jobs), 1):
             recs += rs
             ok = [r for r in rs if r.get("status") == "ok"]
-            line = "  ".join(f"{r['method']}: {r['planned_T']:.2f} s {'ok' if r['success'] else 'FAIL'}" for r in ok)
+            line = "  ".join(f"{r['method']}: {r['planned_T']:.1f}s {'ok' if r['success'] else 'FAIL'}" for r in ok)
             print(f"[{k}/{len(jobs)}] {(rs[0]['object'][:24] if rs else '(none)'):24s} {line or (rs[0]['status'] if rs else '')}",
                   flush=True)
     (OUT / "records.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))

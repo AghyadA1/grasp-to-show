@@ -556,15 +556,49 @@ joint configurations, μ, and the object's mass, centre of mass and inertia *in 
 | duration vs the slowed straight motion | 0.99× | 0.99× |
 | time per motion | 0.01 ms (vs ≈25 s) | 0.01 ms |
 
-So far it is fast but not good enough on its own: it recovers only a small part of the optimiser's
-7–8 % gain, and in the 13 % of test problems it cannot do, its path turns the object through an
-orientation where *the weight alone* already exceeds the grip, which no slowing down can fix (these
-are mostly the heavy problems where the straight motion is impossible too and the optimiser's
-detour is the only solution). 400 examples are few for 33 inputs and a 29-number output, and the
-optimiser's labels are themselves noisy (a sampling search). Next
-(`scripts/transport_net_episodes.py`): the network's motion as the *starting point* of a short
-search (10 iterations instead of 60), with the straight motion as fallback, all in full episodes
-with collisions.
+Imitation alone is not good enough: the network recovers only a small part of the optimiser's
+7–8 % gain, and in 13 % of the test problems its path turns the object through an orientation
+where *the weight alone* already exceeds the grip, which no slowing down can fix. The labels are
+the reason more than their number: the optimiser is a sampling search, and where several detours
+are equally good it picks one at random, so the network learns their average, which can be worse
+than any of them.
+
+**Training on the constraints instead of on the optimiser's answers** (self-supervised). The
+whole checker (forward kinematics, the d'Alembert load, the soft-finger model with the ±5 mm
+leverage worst case, the axial cap, the robot limits) is rewritten in PyTorch
+(`grasp2show/learn/transport_torch.py`): it agrees with the optimiser's checker to 1e-11 and is
+differentiable (where the torque about the finger axis binds, the soft-finger utilisation is found
+by bisection and differentiated with the implicit function theorem). The network is then trained
+to do what the optimiser does, minimise log duration plus penalties on any violation (with a
+margin, so that the raw output stays feasible on new problems), on any problem, without labels
+(`scripts/train_transport_selfsup.py`). So the friction is drawn fresh for every problem in every
+batch, and problems are cheap: 3,281 more were generated without the optimiser
+(`scripts/generate_transport_problems.py`, 35 min). Starting from the imitation network, 500
+epochs took 82 min on the laptop GPU.
+
+![self-supervised](media/transport_net_ss.png)
+
+Judged on the **raw** network output (no slowing down, no refinement, no fallback; collisions
+checked later, in full episodes):
+
+| | imitation | **self-supervised** |
+|---|---|---|
+| validation objects: feasible as predicted | 52 % | **100 %** |
+| validation: duration vs the optimiser (median) | 1.11× | **0.99×** |
+| validation: score (1 = always feasible and as fast as the optimiser) | 0.45 | **1.00** |
+| unseen objects: feasible as predicted | 45 % | **84 %** |
+| unseen: duration vs the optimiser (median) | 1.14× | **1.00×** |
+| unseen: score | 0.41 | **0.96** |
+| unseen: problems the straight motion cannot do at all (12; the optimiser finds 10) | 2 | 3 |
+| time per motion | 0.01 ms | 0.01 ms |
+
+Where it is feasible it is as fast as the optimiser, and on three of the hard problems it is 4–6×
+faster than the optimiser's detour (right panel). What it still misses is concentrated: 9 of the 16
+infeasible test motions belong to one object, the heaviest of the test set (0.61 kg; only one
+training object is above 0.5 kg), the others to the problems where only a detour works. Next: train
+on heavier and lighter versions of the same objects (mass and inertia scaled, as the friction is
+varied), then improve the labels for the detour problems (step 2: the optimiser refines the
+network's own motions, which are then learned).
 
 ## C++ kernels
 

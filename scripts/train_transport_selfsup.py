@@ -21,7 +21,7 @@ Validation: 5 training-set objects held out (the same as in train_transport_net.
 10 unseen objects (data/transport_dataset_test), at their recorded friction. The imitation
 network is reported on the same problems for comparison.
 
-Usage:  python scripts/train_transport_selfsup.py [--epochs 500] [--device cpu] [--init imitation|scratch]
+Usage:  python scripts/train_transport_selfsup.py [--epochs 500] [--device cpu] [--init imitation|scratch|MODEL.pt] [--mass-scale 0.6 2.5]
         (uses data/transport_problems/ too when present: scripts/generate_transport_problems.py)
 Outputs: data/models/transport_net_ss.pt, transport_net_ss_metrics.json, media/transport_net_ss.png
 """
@@ -46,7 +46,8 @@ from grasp2show.objects import object_from_config
 from grasp2show.transport import friction_params
 from grasp2show.transport_opt import TransportProblem
 
-MU_COL = 21                       # position of mu in the feature vector
+MU_COL, MASS_COL = 21, 22         # positions in the feature vector (see transport_net.features)
+INERTIA_COLS = slice(26, 32)
 MU_RANGE = (0.15, 0.6)
 DT = torch.float64                # float32 on a GPU (laptop GPUs are slow in float64)
 
@@ -147,7 +148,11 @@ def main() -> int:
     p.add_argument("--data", type=Path, nargs="+", default=[ROOT / "data" / "transport_dataset", ROOT / "data" / "transport_problems"],
                    help="training problem folders (labels not needed; extra geometry-only folders welcome)")
     p.add_argument("--test", type=Path, default=ROOT / "data" / "transport_dataset_test")
-    p.add_argument("--init", choices=["imitation", "scratch"], default="imitation")
+    p.add_argument("--init", default="imitation",
+                   help="imitation (data/models/transport_net.pt), scratch, or the path of a model to continue from")
+    p.add_argument("--mass-scale", type=float, nargs=2, default=None, metavar=("LO", "HI"),
+                   help="also train on heavier/lighter versions of the objects: mass and inertia scaled by a "
+                        "log-uniform factor in [LO, HI] (half of the problems in each batch; mass capped at 1.5 kg)")
     p.add_argument("--epochs", type=int, default=500)
     p.add_argument("--batch", type=int, default=256)
     p.add_argument("--lr", type=float, default=None)
@@ -183,7 +188,9 @@ def main() -> int:
         imit = TransportNet().to(dev)
         imit.load_state_dict(torch.load(ck_path, map_location=dev, weights_only=False)["state_dict"])
         imit.eval()
-    if args.init == "imitation":
+    if args.init not in ("imitation", "scratch"):
+        model.load_state_dict(torch.load(args.init, map_location=dev, weights_only=False)["state_dict"])
+    elif args.init == "imitation":
         if imit is None:
             raise SystemExit("no data/models/transport_net.pt: run train_transport_net.py or use --init scratch")
         model.load_state_dict(imit.state_dict())
@@ -194,7 +201,7 @@ def main() -> int:
         torch.nn.init.zeros_(last.weight)
         torch.nn.init.zeros_(last.bias)
         last.bias.data[-1] = float(np.log(3.0))
-    lr = args.lr or (3e-4 if args.init == "imitation" else 1e-3)
+    lr = args.lr or (1e-3 if args.init == "scratch" else 3e-4)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)
     con = Constraints(dtype=DT).to(dev)
@@ -213,6 +220,14 @@ def main() -> int:
             P["mu"] = mu                                        # fresh friction every time
             X = tr.X[b].clone()
             X[:, MU_COL] = mu.float()
+            if args.mass_scale:                                 # heavier / lighter versions of the same objects
+                lo, hi = np.log(args.mass_scale)
+                k = np.where(rng.random(len(b)) < 0.5, np.exp(rng.uniform(lo, hi, len(b))), 1.0)
+                k = torch.as_tensor(k, dtype=DT, device=dev)
+                k = torch.minimum(k, 1.5 / P["mass"])
+                P["mass"], P["inertia"] = P["mass"] * k, P["inertia"] * k[:, None, None]
+                X[:, MASS_COL] *= k.float()
+                X[:, INERTIA_COLS] *= k.float()[:, None]
             with torch.no_grad():
                 u_lim = torch.clamp(con.static_u(P) + 0.05, min=con.u_lim0)
             c, T = predict(model, X)

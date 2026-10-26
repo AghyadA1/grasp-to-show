@@ -25,8 +25,10 @@ what the static checks cannot see: slip during the motion.
 
 ![baseline vs ours](media/baseline_vs_ours.gif)
 
-*Same box, same start pose. Left: the most stable grasp holds the box near one end; turned towards
-the scanner, gravity twists it 19° in the hand. Right: the target-aware grasp, QR decoded.*
+*Same box of crayons, same start pose. Left: the baseline takes the most stable grasp; at the
+scanner a finger covers part of the QR and it cannot be read (inset: the scanner's view). Right:
+the target-aware grasp was chosen knowing where the fingers will be at the scanner, so the QR is
+unobstructed and decoded.*
 
 ![policy comparison](media/policy_comparison.png)
 

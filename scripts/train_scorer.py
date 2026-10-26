@@ -29,7 +29,7 @@ from torch import nn
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from grasp2show.learn.data import Split, load_dataset
+from grasp2show.learn.data import N_CHECKS, Split, load_dataset
 from grasp2show.learn.model import Scorer
 from grasp2show.objects import load_object_set
 
@@ -43,17 +43,20 @@ def auc(score: np.ndarray, y: np.ndarray) -> float:
     return float((r[y].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
 
 
-def tensors(s: Split, device):
-    f = lambda a, dt=torch.float32: torch.as_tensor(a, dtype=dt, device=device)
-    return (f(s.obj, torch.long), f(s.R), f(s.t), f(s.glob), f(s.y), f(s.reason, torch.long))
+def tensors(s: Split, device, with_checks: bool = False):
+    def f(a, dt=torch.float32):
+        return torch.as_tensor(a, dtype=dt, device=device)
+
+    g = np.concatenate([s.glob, s.checks], 1) if with_checks else s.glob
+    return (f(s.obj, torch.long), f(s.R), f(s.t), f(g), f(s.y), f(s.reason, torch.long))
 
 
 @torch.no_grad()
-def predict(model: Scorer, s: Split, device, batch: int = 2048) -> np.ndarray:
+def predict(model: Scorer, s: Split, device, n_points: int, batch: int = 1024) -> np.ndarray:
     model.eval()
-    obj, R, t, g, _, _ = tensors(s, device)
-    out = [torch.sigmoid(model(obj[i:i + batch], R[i:i + batch], t[i:i + batch], g[i:i + batch])[0])
-           for i in range(0, len(s), batch)]
+    obj, R, t, g, _, _ = tensors(s, device, model.n_extra > 0)
+    out = [torch.sigmoid(model(obj[i:i + batch], R[i:i + batch], t[i:i + batch], g[i:i + batch],
+                               n_points=n_points)[0]) for i in range(0, len(s), batch)]
     return torch.cat(out).cpu().numpy()
 
 
@@ -73,7 +76,7 @@ def top1(score: np.ndarray, s: Split) -> dict:
 
 
 def train(model, tr: Split, va: Split, args, device):
-    obj, R, t, g, y, reason = tensors(tr, device)
+    obj, R, t, g, y, reason = tensors(tr, device, model.n_extra > 0)
     pos = float(tr.y.mean())
     bce = nn.BCEWithLogitsLoss(pos_weight=torch.tensor((1 - pos) / max(pos, 1e-3), device=device))
     ce = nn.CrossEntropyLoss()
@@ -94,7 +97,7 @@ def train(model, tr: Split, va: Split, args, device):
             opt.step()
             tot += loss.item() * len(b)
         sched.step()
-        p = predict(model, va, device)
+        p = predict(model, va, device, args.points)
         va_auc = auc(p[va.simulated], va.y[va.simulated])
         history.append({"epoch": ep, "loss": round(tot / n, 4), "val_auc_simulated": round(va_auc, 4)})
         print(f"epoch {ep:3d}  loss {tot / n:.4f}  val AUC (simulated) {va_auc:.3f}")
@@ -114,6 +117,8 @@ def main() -> int:
     p.add_argument("--aux", type=float, default=0.3, help="weight of the failure-reason loss")
     p.add_argument("--val-objects", type=int, default=5)
     p.add_argument("--no-qr-flag", action="store_true", help="ablation: hide the QR location")
+    p.add_argument("--with-checks", action="store_true",
+                   help="variant: also give the network the analytic checks' outputs as inputs")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--tag", default="scorer")
@@ -133,13 +138,14 @@ def main() -> int:
           f"(simulated {tr.simulated.sum()}/{va.simulated.sum()}/{te.simulated.sum()}); "
           f"success rate (simulated, train) {tr.y[tr.simulated].mean():.2f}")
 
-    model = Scorer(torch.as_tensor(clouds.feats), use_qr_flag=not args.no_qr_flag).to(device)
+    model = Scorer(torch.as_tensor(clouds.feats), use_qr_flag=not args.no_qr_flag,
+                   n_extra=N_CHECKS if args.with_checks else 0).to(device)
     t0 = time.perf_counter()
     best_val, history = train(model, tr, va, args, device)
     train_s = time.perf_counter() - t0
 
     # -- evaluation on unseen objects --------------------------------------------------------
-    p_te = predict(model, te, device)
+    p_te = predict(model, te, device, args.points)
     sim = te.simulated
     rand = rng.random(len(te))
     m = {
@@ -158,11 +164,11 @@ def main() -> int:
     big = te.subset(np.arange(min(4096, len(te))))
     for dev in {"cpu", str(device)}:
         mdl = model.to(dev)
-        predict(mdl, big, dev)
+        predict(mdl, big, dev, args.points)
         if dev.startswith("cuda"):
             torch.cuda.synchronize()
         t = time.perf_counter()
-        predict(mdl, big, dev)
+        predict(mdl, big, dev, args.points)
         if dev.startswith("cuda"):
             torch.cuda.synchronize()
         m[f"us_per_tuple_{dev.split(':')[0]}"] = round((time.perf_counter() - t) / len(big) * 1e6, 2)

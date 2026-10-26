@@ -19,6 +19,7 @@ import numpy as np
 
 G = np.array([0.0, 0.0, -1.0])
 N_GLOBAL = 32
+N_CHECKS = 9   # optional inputs: the analytic checks' outputs (see check_features)
 LIMIT_SCALE = 0.5
 
 
@@ -34,6 +35,7 @@ class Split:
     scenario: np.ndarray     # (N,) int: scenario id (object x yaw)
     pred_ok: np.ndarray      # (N,) bool: analytic checks say feasible
     aware_score: np.ndarray  # (N,) analytic leximin first element (smallest normalised margin)
+    checks: np.ndarray       # (N, 9) analytic check outputs, for the "checks + learning" variant
 
     def __len__(self) -> int:
         return len(self.y)
@@ -51,11 +53,14 @@ class Clouds:
     qr_normal: np.ndarray    # (O, 3)
 
 
-def load_clouds(path: Path) -> Clouds:
+def load_clouds(path: Path, seed: int = 0) -> Clouds:
+    """Per-object clouds; points shuffled once (fixed seed) so any prefix is a uniform subset."""
     z = np.load(path)
     names = [str(n) for n in z["names"]]
+    rng = np.random.default_rng(seed)
     feats = np.stack([np.concatenate([z[f"points__{n}"], z[f"normals__{n}"],
                                       z[f"on_qr__{n}"][:, None].astype(np.float32)], 1) for n in names])
+    feats = feats[:, rng.permutation(feats.shape[1])]
     return Clouds(names, feats.astype(np.float32), np.array([float(z[f"mass__{n}"]) for n in names]),
                   np.stack([z[f"com__{n}"] for n in names]), np.stack([z[f"T_obj_qr__{n}"][:3, 0] for n in names]))
 
@@ -89,6 +94,15 @@ def analytic_score(z) -> np.ndarray:
     return np.where(z["pred_ok"], s, -np.inf)
 
 
+def check_features(z) -> np.ndarray:
+    """(N, 9) analytic check outputs: margins (missing -> -1) and pass/fail flags."""
+    def m(k, scale=1.0):
+        return np.nan_to_num(np.clip(np.asarray(z[k], float) / scale, -3, 3), nan=-1.0)
+    return np.stack([m("lift_margin"), m("start_limit", LIMIT_SCALE), m("target_limit", LIMIT_SCALE),
+                     m("stab_margin"), m("vis_fraction"), z["lift_ok"], z["start_ok"], z["reach_ok"],
+                     z["pred_ok"]], 1).astype(np.float32)
+
+
 def load_dataset(root: Path) -> tuple[Clouds, Split]:
     clouds = load_clouds(root / "clouds.npz")
     idx = {n: i for i, n in enumerate(clouds.names)}
@@ -108,7 +122,7 @@ def load_dataset(root: Path) -> tuple[Clouds, Split]:
         parts.append(Split(np.full(n, o), T[:, :3, :3].astype(np.float32), T[:, :3, 3].astype(np.float32),
                            glob, z["success"].astype(np.float32), z["reason"].astype(int),
                            z["simulated"].astype(bool), np.full(n, sid), z["pred_ok"].astype(bool),
-                           analytic_score(z)))
+                           analytic_score(z), check_features(z)))
         sid += 1
     cat = {f: np.concatenate([getattr(p, f) for p in parts]) for f in Split.__dataclass_fields__}
     return clouds, Split(**cat)

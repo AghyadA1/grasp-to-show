@@ -15,9 +15,11 @@ N_REASONS = 8
 
 
 class Scorer(nn.Module):
-    def __init__(self, clouds: torch.Tensor, width: int = 256, use_qr_flag: bool = True):
-        """clouds: (O, P, 7) per-object points (xyz, normal, on_qr) in the object frame."""
+    def __init__(self, clouds: torch.Tensor, width: int = 256, use_qr_flag: bool = True, n_extra: int = 0):
+        """clouds: (O, P, 7) per-object points (xyz, normal, on_qr) in the object frame, shuffled.
+        n_extra: extra global inputs appended to the 32 geometric ones (e.g. the checks' outputs)."""
         super().__init__()
+        self.n_extra = n_extra
         self.register_buffer("clouds", clouds)
         self.use_qr_flag = use_qr_flag
         self.point_mlp = nn.Sequential(
@@ -25,7 +27,7 @@ class Scorer(nn.Module):
             nn.Conv1d(64, 128, 1), nn.BatchNorm1d(128), nn.ReLU(),
             nn.Conv1d(128, width, 1), nn.BatchNorm1d(width), nn.ReLU(),
         )
-        self.glob_mlp = nn.Sequential(nn.Linear(N_GLOBAL, 64), nn.ReLU())
+        self.glob_mlp = nn.Sequential(nn.Linear(N_GLOBAL + n_extra, 64), nn.ReLU())
         self.trunk = nn.Sequential(nn.Linear(width + 64, 256), nn.ReLU(), nn.Dropout(0.2),
                                    nn.Linear(256, 128), nn.ReLU())
         self.success_head = nn.Linear(128, 1)
@@ -35,7 +37,9 @@ class Scorer(nn.Module):
         """(B, 7, P') gripper-frame point features for a batch of grasps."""
         pc = self.clouds[obj]                                          # (B, P, 7)
         if n_points is not None and n_points < pc.shape[1]:
-            sel = torch.randperm(pc.shape[1], device=pc.device)[:n_points]
+            # Training: a random subset each batch (augmentation). Evaluation: a fixed prefix of
+            # the shuffled cloud, so predictions are deterministic.
+            sel = torch.randperm(pc.shape[1], device=pc.device)[:n_points] if self.training else slice(0, n_points)
             pc = pc[:, sel]
         xyz = torch.bmm(pc[..., :3] - t[:, None, :], R) * 10.0         # (p - t) R, decimetres
         nrm = torch.bmm(pc[..., 3:6], R)

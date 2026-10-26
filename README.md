@@ -47,7 +47,7 @@ finger covers the QR, so decoding fails. A stability-only planner cannot tell th
 > products, grasp sampler and simulated lift labels, five analytic checks, C++ kernels, validation
 > against 865 full episodes and the policy comparison. Week 2 so far: a 20,902-sample dataset of
 > full-episode outcomes, a learned scorer and its evaluation as a policy on unseen objects, and
-> goal-conditioned heatmaps (way A). Next: robustness to pose noise and a write-up; week 3: way B.
+> goal-conditioned heatmaps (way A), robustness to pose error. Next: a write-up; week 3: way B.
 
 ## Quickstart
 
@@ -310,14 +310,17 @@ failure reason (8 classes) as an auxiliary loss. 161k parameters. A second varia
 the 9 outputs of the analytic checks. Split **by object**: the 10 test objects are never seen in
 training; 5 training objects are held out for model selection.
 
-**Offline, on the 10 unseen objects** (`scripts/train_scorer.py`):
+**Offline, on the 10 unseen objects** (`scripts/train_scorer.py`; 5 training seeds, which also
+change the validation objects; mean ± std, [min, max]):
 
 | | analytic checks | learned (geometry) | learned + checks' outputs |
 |---|---|---|---|
-| AUC, simulated tuples (the hard cases) | 0.72 | 0.77 | **0.81** |
-| top-1: best-ranked tuple per scenario succeeds | 68 % | 86 % | **92 %** |
+| AUC, simulated tuples (the hard cases) | 0.72 | 0.79 ± 0.01 [0.77, 0.80] | **0.82 ± 0.01** [0.81, 0.82] |
+| top-1: best-ranked tuple per scenario succeeds (36 scenarios) | 68 % | 83 ± 7 % [72, 92] | **87 ± 4 %** [81, 92] |
 
-(Random pick: 44 %. Oracle: 100 %.)
+(Random pick: 44 %. Oracle: 100 %.) The ranking quality (AUC) is stable across seeds; top-1 on 36
+scenarios is noisy, especially for the geometry-only model (a GPU re-run of seed 0 gave 64 %).
+The checks' outputs make the network both better and steadier. The episodes below use seed 0.
 
 ![scorer evaluation](media/scorer_checks_eval.png)
 
@@ -342,15 +345,39 @@ scenarios no grasp survives the lift test, so 90 % is the ceiling. **The gain is
 slip** (18 → 2): the network learned which grasps stay put while the arm swings the object, which
 the static friction margin cannot tell.
 
-**Speed.** Scoring costs about 1.2 ms per tuple on one CPU thread (1.4 s for the 1,206 feasible
-tuples of the largest scenario). It does not replace the exact IK/collision checks, which run
-first, so on a CPU the network buys accuracy, not speed.
+**Speed.** Scoring costs 50 µs per tuple on a laptop GPU (RTX 3050, batches of 1,024), 26×
+faster than the same laptop's CPU (1.3 ms); a whole scenario's 1,206 feasible tuples take 60 ms.
+Training: 80 s on that GPU vs 9–11 min on 2 CPU cores. The network does not replace the exact
+IK/collision checks, which run first: it buys accuracy more than speed.
 
 **Caveats.** The network is trained and tested in the same simulator, so part of what it learned
 is this simulator's contact behaviour; a real robot would need real or domain-randomised data.
-Test objects are unseen but come from the same filtered pool (box-like packages). One training
-seed; the two learned variants' intervals overlap. The training scenarios used yaws 0/90/180/270,
+Test objects are unseen but come from the same filtered pool (box-like packages). The episode
+results use one training seed (see the seed spread above); the two learned variants' intervals
+overlap. The training scenarios used yaws 0/90/180/270,
 so half of the evaluation poses are new for the start pose but not the object.
+
+## Robustness: the object is not exactly where the robot thinks
+
+A real robot estimates the object's pose with some error. Here every policy chooses and plans its
+grasp for the nominal pose, then the episode runs with the object actually shifted on the table by
+a random offset it does not know about (dx, dy ~ N(0, σ), yaw ~ N(0, σ_yaw)); 3 offsets per level,
+the same offsets for every policy (`scripts/robustness.py`, run on Windows).
+
+![robustness](media/robustness.png)
+
+| σ position / yaw | baseline | analytic checks | learned + checks | learned vs checks (paired wins / losses) |
+|---|---|---|---|---|
+| 0 | 55 % | 64 % | **82 %** | 17 / 2 |
+| 2 mm / 2° | 53 % | 61 % | **83 %** | 60 / 8 |
+| 5 mm / 5° | 48 % | 54 % | **76 %** | 66 / 12 |
+| 10 mm / 10° | 40 % | 44 % | **50 %** | 47 / 31 (p = 0.09) |
+
+The learned choice keeps its lead up to 5 mm / 5°. At 10 mm / 10° every policy collapses into
+the same failure: the gripper, sent open-loop to where the object should be, hits it (65–79
+collisions per policy). That is the limit of executing a plan without looking again, not of grasp
+selection; closing the loop (re-detecting the object before the approach) is the fix. The
+nominal row reproduces the Linux episodes on Windows (55 / 65 / 85 % there).
 
 ## Goal-conditioned grasp heatmaps (way A)
 
@@ -440,7 +467,7 @@ scripts/
   select_objects.py       generate_grasps.py      validate_stability.py
   evaluate_targets.py     bench_cpp.py            run_experiments.py      demo_comparison.py
   generate_dataset.py     train_scorer.py         eval_learned_policy.py
-  heatmap_way_a.py        demo_overlay.py
+  heatmap_way_a.py        demo_overlay.py         robustness.py
 tests/
 ```
 
@@ -459,7 +486,8 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] C++ kernels (stability, analytic IK) with Python bindings and speed comparison
 - [x] Validate checks 1–5 against full pick-and-show episodes (QR decoded by OpenCV)
 - [x] Target *set* (12 rotations about the viewing axis)
-- [ ] Robust labels under object-pose noise
+- [x] Robustness to object-pose error (evaluation, 3 noise levels)
+- [ ] Robust labels: train on outcomes under pose noise
 - [x] Baseline (most stable grasp) vs target-aware selection, ablations: success-rate table
 - [x] Learned scorer (point cloud + grasp + target → success), trained on full-episode outcomes; speed and unseen-object test
 - [x] Goal-conditioned grasp heatmaps on the object surface (way A: checks painted on the mesh)

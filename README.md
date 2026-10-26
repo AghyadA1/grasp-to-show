@@ -47,7 +47,7 @@ finger covers the QR, so decoding fails. A stability-only planner cannot tell th
 > products, grasp sampler and simulated lift labels, five analytic checks, C++ kernels, validation
 > against 865 full episodes and the policy comparison. Week 2 so far: a 20,902-sample dataset of
 > full-episode outcomes, a learned scorer, and its evaluation as a policy on unseen objects.
-> Next: goal-conditioned heatmaps on the object surface.
+> Goal-conditioned heatmaps (way A). Next: robustness to pose noise, write-up; week 3: way B.
 
 ## Quickstart
 
@@ -348,6 +348,25 @@ Test objects are unseen but come from the same filtered pool (box-like packages)
 seed; the two learned variants' intervals overlap. The training scenarios used yaws 0/90/180/270,
 so half of the evaluation poses are new for the start pose but not the object.
 
+## Goal-conditioned grasp heatmaps (way A)
+
+![heatmap](media/heatmap.gif)
+
+*Where to grasp the crayon box, for each target pose. Left: what a target-blind planner sees
+(lift stability only), the same for every target. Right: the target-aware map: each surface point
+shows the best score among the grasps whose finger touches within 8 mm of it, for **this**
+target (0 = some check fails). The arrow is gravity at the target, in the object frame; as the
+target rolls about the scanner's viewing axis, gravity, arm reach and finger visibility change,
+and so does the map. The QR patch (red) is always cold: a finger there hides the code, and so is
+the matching spot on the opposite face, which is only reachable by a pinch through the QR.*
+
+`scripts/heatmap_way_a.py` samples ~3,200 candidates per object (1,193 collision-free here), runs
+the checks for both twins and 24 target poses, and paints the scores onto the mesh: 19 s on 2
+cores, no training (lift stability from the analytic model). The map answers "where can I grasp
+this object *for this task*?", which a stability map cannot: on the 10 unseen objects, 2–48 %
+of the collision-free candidates are feasible for at least one target pose. Way B (week 3) learns
+this map directly.
+
 ## C++ kernels
 
 `cpp/` is an optional C++17 package (nanobind bindings, no other dependencies) with the two hot
@@ -407,6 +426,7 @@ grasp2show/
   feasibility.py   checks 2-5: target stability, reachability + collision, QR visibility
   _accel.py        uses the C++ kernels when installed
   experiment.py    grasp-selection policies, scenario setup, episode execution and judging
+  heatmap.py       goal-conditioned heatmaps (way A): per-target grasp scores painted on the surface
   learn/           learned scorer: dataset loading and features (data.py), PointNet model
                    (model.py), the scorer as a grasp-selection policy (policy.py)
 cpp/               optional C++17 kernels + nanobind bindings (stability, IK)
@@ -416,6 +436,7 @@ scripts/
   select_objects.py       generate_grasps.py      validate_stability.py
   evaluate_targets.py     bench_cpp.py            run_experiments.py      demo_comparison.py
   generate_dataset.py     train_scorer.py         eval_learned_policy.py
+  heatmap_way_a.py        demo_overlay.py
 tests/
 ```
 
@@ -437,7 +458,8 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [ ] Robust labels under object-pose noise
 - [x] Baseline (most stable grasp) vs target-aware selection, ablations: success-rate table
 - [x] Learned scorer (point cloud + grasp + target → success), trained on full-episode outcomes; speed and unseen-object test
-- [ ] Goal-conditioned grasp heatmaps on the object surface
+- [x] Goal-conditioned grasp heatmaps on the object surface (way A: checks painted on the mesh)
+- [ ] Way B: dense goal-conditioned heatmap network
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 
 ## Related work

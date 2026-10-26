@@ -299,6 +299,8 @@ class PickAndShow:
         the paths were planned for (pose-estimation error); the robot does not know.
         speed: the transport (lift, transit, present) runs `speed` times faster than planned.
         mu: finger-object friction for this episode (None: the default 0.5).
+        paths["transport"] (optional): a joint trajectory sampled every timestep that replaces the
+        transit and present segments (the optimised transport); it must end at paths["present"][-1].
         log_every > 0: record the transport every log_every steps (result.transport).
         """
         m, d, dt = self.model, self.data, self.model.opt.timestep
@@ -334,6 +336,8 @@ class PickAndShow:
         seg = {name: T for name, _, T in self.SEGMENTS}
         # Large joint-space moves get more time: peak joint speed ~ 1.875 * dq / T <= ~1.1 rad/s.
         for name in ("approach", "transit"):
+            if name not in paths:
+                continue
             dq = float(np.abs(np.diff(np.asarray(paths[name]), axis=0)).max())
             seg[name] = max(seg[name], 1.7 * dq)
         hold(HOME_Q, g_open, 0.3)
@@ -346,8 +350,16 @@ class PickAndShow:
         hold(paths["lift"][-1], 0.0, 0.3 / speed)
         state["holding"] = True                       # from here only finger contacts allowed
         T_tcp_obj_ref = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
-        follow(path_trajectory(paths["transit"], seg["transit"] / speed, dt), 0.0)
-        follow(path_trajectory(paths["present"], seg["present"] / speed, dt), 0.0)
+        if "transport" in paths:      # one optimised trajectory (grasp2show/transport_opt.py), sampled every dt
+            traj = np.asarray(paths["transport"])
+            if speed != 1.0:
+                t_src = np.arange(1, len(traj) + 1) * dt
+                t_new = np.arange(1, max(round(len(traj) / speed), 1) + 1) * dt * speed
+                traj = np.column_stack([np.interp(t_new, t_src, traj[:, j]) for j in range(traj.shape[1])])
+            follow(traj, 0.0)
+        else:
+            follow(path_trajectory(paths["transit"], seg["transit"] / speed, dt), 0.0)
+            follow(path_trajectory(paths["present"], seg["present"] / speed, dt), 0.0)
         log, state["log"] = state["log"], None
         hold(paths["present"][-1], 0.0, 1.0)
 

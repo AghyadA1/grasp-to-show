@@ -49,9 +49,9 @@ def find_scenario() -> tuple[str, float]:
     raise SystemExit("no scenario where the baseline fails and target-aware succeeds")
 
 
-def plan(sc: Scenario, policy: str) -> tuple[Grasp, dict]:
+def plan(sc: Scenario, policy: str, choices=None) -> tuple[Grasp, dict]:
     """The policy's first choice whose motion can be planned (as in the experiments)."""
-    for c in choose(policy, sc.reports, sc.lift_margin):
+    for c in choices if choices is not None else choose(policy, sc.reports, sc.lift_margin):
         tw = sc.reports[c.grasp].twins[c.twin]
         t = tw.targets[c.roll_idx]
         T = sc.T[c.grasp] if c.twin == 0 else twin_of(sc.T[c.grasp])
@@ -70,8 +70,9 @@ def outcome_text(res) -> tuple[str, bool]:
     return f"object slipped {res.slip_mm:.0f} mm / {res.slip_deg:.0f} deg", False
 
 
-def film(sc: Scenario, policy: str, fps: int):
-    grasp, paths = plan(sc, policy)
+def film(sc: Scenario, policy: str, fps: int, choices=None, label: str | None = None):
+    grasp, paths = plan(sc, policy, choices)
+    label = label or LABEL[policy]
     r = sc.ep.renderer
     frames = []
 
@@ -79,7 +80,7 @@ def film(sc: Scenario, policy: str, fps: int):
         r.update_scene(d, camera="overview")
         ov = r.render().copy()
         r.update_scene(d, camera="scanner")
-        frames.append(compose(ov, r.render(), LABEL[policy], d.time))
+        frames.append(compose(ov, r.render(), label, d.time))
 
     res = sc.ep.execute(grasp, paths, on_frame=on_frame, fps=fps)
     text, ok = outcome_text(res)

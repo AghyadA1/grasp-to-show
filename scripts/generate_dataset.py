@@ -94,7 +94,8 @@ def run_job(job) -> dict:
         rows.append({
             "grasp": i, "twin": twin, "roll": float(sc.rolls[j]),
             "T_obj_tcp": sc.T[i] if twin == 0 else twin_of(sc.T[i]), "width": float(sc.W[i]),
-            "R_target": T_obj_target[:3, :3], "success": success, "reason": reason_code(reason),
+            "R_target": T_obj_target[:3, :3], "T_target": T_obj_target,
+            "success": success, "reason": reason_code(reason),
             "simulated": simulated,
             # analytic checks for the same tuple
             "lift_ok": bool(sc.lift_ok[i]), "lift_margin": float(sc.lift_margin[i]),
@@ -103,6 +104,8 @@ def run_job(job) -> dict:
             "stab_margin": float(t.stability_margin) if t else np.nan,
             "vis_fraction": float(t.visibility.fraction) if t and t.visibility else np.nan,
             "pred_ok": bool(t.ok) if t else False,
+            "start_limit": float(tw.start.limit_margin) if tw else np.nan,
+            "target_limit": float(t.reach.limit_margin) if t else np.nan,
             "slip_mm": rec.slip_mm if rec else np.nan, "slip_deg": rec.slip_deg if rec else np.nan,
         })
 

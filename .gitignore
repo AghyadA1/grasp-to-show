@@ -10,3 +10,4 @@ media/*.mp4
 data/
 MUJOCO_LOG.TXT
 cpp/build/
+media/heatmap_*

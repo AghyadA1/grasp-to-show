@@ -25,9 +25,10 @@ what the static checks cannot see: slip during the motion.
 
 **Week 3: a goal-conditioned heatmap network** (way B) predicts, from the object's point cloud
 and the task, a grasp score and a grasp at every surface point in 7 ms on a laptop GPU. Its
-grasps succeed in **89 %** of 80 full episodes on unseen objects (baseline 55 %, analytic checks
-64 %; paired vs the checks: 27 won, 7 lost, p = 8e-4). Caveat and a surprise below: it beats
-the slow dense search it was trained to imitate (52 %).
+grasps succeed in **89–94 %** (3 seeds) of 80 full episodes on unseen objects (baseline 55 %,
+analytic checks 64 %; paired vs the checks: 27 won, 7 lost, p = 8e-4). It even beats the slow
+search it imitates (51 %); a controlled test shows why: it prefers regions where many grasps
+work over the single best-scoring one.
 
 **One-page summary:** [docs/grasp-to-show-summary.pdf](docs/grasp-to-show-summary.pdf)
 
@@ -435,29 +436,46 @@ the network's *own* grasp in a full episode:
 **In full episodes** (`scripts/eval_way_b.py`; 10 unseen objects × 8 start poses, half of them
 never in training). The network's best (point, target) pairs become grasps; the first 10 whose
 open gripper clears the object (the filter every sampled candidate gets) go through the exact
-start/target reach checks and the usual planning fallback, then a complete episode.
+start/target reach checks and the usual planning fallback, then a complete episode. All five
+policies run on the same scenarios (paired; Windows run, `data/episodes_way_b_final`).
 
 | Policy (80 scenarios, unseen objects) | Success [95 % CI] | slip | QR | collision | no grasp | way B wins / losses |
 |---|---|---|---|---|---|---|
 | stability only (baseline) | 55 % [44, 65] | 22 | 4 | 2 | 8 | 29 / 2 |
 | analytic checks (labelled candidates) | 64 % [53, 73] | 19 | 1 | 1 | 8 | 27 / 7 |
-| way A: all checks, ~1,000 dense candidates | 52 % [42, 63] | 23 | 8 | 7 | 0 | 30 / 1 |
+| way A: all checks, ~1,000 dense candidates, best score | 51 % [41, 62] | 24 | 8 | 7 | 0 | 31 / 1 |
+| way A, score averaged over neighbouring grasps | 84 % [74, 90] | 4 | 1 | 8 | 0 | 7 / 3 |
 | **way B: heatmap network** | **89 % [80, 94]** | 8 | 1 | 0 | 0 | |
 
-**Why does the student beat its teacher?** Way B was trained to imitate way A, yet way A is the
-worst policy here. Two observations, not yet proven explanations:
-- *Way A takes the maximum of an imperfect score over ~1,000 candidates* (lift stability from the
-  analytic model, not simulation). The argmax of many noisy estimates favours candidates whose
-  score is overestimated (the "winner's curse"); its grasps slip a median 12 mm.
-- *The network averages*: its score and its grasp at a point are smoothed over the neighbouring
-  candidates, so it prefers regions where many grasps work and proposes the central grasp of such a
-  region. Its grasps slip a median 3.9 mm. It also escapes the labelled set: on the one test object
-  where none of the 69 labelled candidates both holds when lifted (14 do) and is reachable (8
-  scenarios, "no grasp" for the labelled-set policies), way B succeeds 8/8.
+Three training seeds of way B: **89 %, 94 %, 93 %** (mean 92 %); offline point AUC 0.93–0.94.
 
-Caveats: one training seed; labels from the analytic checks only (the simulator judges the
-episodes); 80 scenarios. Testing the explanation (way A with a neighbourhood-smoothed score) is
-the next experiment.
+![way B on unseen objects](media/way_b_objects.png)
+
+*Four unseen objects. Top: way A, the checks run on ~1,000 candidates (~25 s). Bottom: the
+network's map from one forward pass (7 ms) and its top grasp (orange), for the target it rates
+best. Arrow: gravity at the target; red: the QR patch.*
+
+![way B episodes](media/way_b_demo.gif)
+
+*The network's grasps executed in full simulation on two unseen objects; left, the box for which
+none of the labelled candidates was usable.*
+
+**Why does the student beat its teacher?** Way B was trained to imitate way A, yet plain way A
+is the worst policy here. The hypothesis was that way A takes the *maximum* of an imperfect score
+over ~1,000 candidates, which favours candidates whose score is overestimated (the winner's
+curse: lift stability here comes from the analytic model, not simulation), while the network
+*averages* over neighbouring candidates and so prefers regions where many grasps work. The test,
+decided before running it: rank way A's own feasible candidates by their score averaged over the
+neighbouring grasps (TCP within 1 cm, axes within 30°). Result: **51 % → 84 %** (28 scenarios
+won, 2 lost, p = 9e-7), with slip failures falling from 24 to 4, and the network is no longer
+significantly better (7 / 3, p = 0.34). So most of way B's advantage comes from preferring
+robust *regions* over the single best-scoring grasp, an effect that a cheap smoothing step
+also gets; the network delivers it in 7 ms instead of 25 s, and with fewer collisions (0 vs 8),
+because its proposed grasps sit centrally in such regions.
+
+Caveats: labels from the analytic checks only (the simulator judges the episodes); 80
+scenarios. An earlier run of the smoothed variant was corrupted by a rendering bug (see design
+notes); every other result was re-run with the fix and reproduced exactly (80 / 80 identical).
 
 
 ## C++ kernels
@@ -496,6 +514,7 @@ in a robot: a dependency-free C++ core that can run inside a controller.
 | **Two QR decoders** | OpenCV's classic detector missed a fully visible 90-px code on busy packaging; its ArUco-based detector read it. Real scanners are robust, so the judge tries both. |
 | **Gross-slip threshold 20 mm / 15°** | A 70 g box with 96 % friction reserve still creeps a few mm; a 5 mm limit would score the simulator, not the grasp. Exact slip is always recorded. |
 | **Target configuration closest to the start one** | The checker first picked the target configuration with the most joint-limit margin; the arm then spun its wrist 265° while carrying the object. |
+| **One live offscreen renderer per process** | Freeing a MuJoCo renderer deletes GL objects in whichever context is current. When an old episode object was garbage-collected after a new one had made its renderer, the new scanner image became noise (Linux) or wrong (Windows) and counted as an unreadable QR. Found because one variant failed 68 times on "QR"; a guard now rejects noise images. |
 | **Collision-checked joint-space segments with detours** | The transit swung held objects into the table; the planner now checks the path and detours via a raised pose. |
 
 ## Repository layout

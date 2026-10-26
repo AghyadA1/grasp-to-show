@@ -226,9 +226,17 @@ executed (a real system also falls back to its next grasp when motion planning f
 | ours without check 5 | no QR visibility | 52 % |
 | ours without check 2 | no stability at the target orientation | 59 % |
 | ours with one target pose | no target set (roll 0 only) | 62 % |
+| ours, leximin tie-break *(post hoc)* | ties broken by the next-smallest margin | 63 % (61 % on Windows) |
 
-[95 % Wilson intervals.] The baseline already checks kinematics, so the gap isolates the two new
-checks: **where ours won, the baseline failed by an unreadable QR (20) or by slipping once the
+[95 % Wilson intervals.] **A lesson in honest evaluation:** after the main experiment I changed
+the tie-break among equally ranked grasps because of one demo case, and success *fell* from 70 %
+to 61–63 % on both machines. In the 60 scenarios where the two rules chose differently, the
+original won 14 and the new one 3; the new choices had the *same* static target-stability margin
+(0.78 vs 0.76) but slipped far more during the motion (20 vs 7). Static margins cannot rank grasps
+by dynamic slip, which is the learned scorer's job. The rule fixed before the experiment stays the
+primary result; the change is reported as a sensitivity test.
+
+The baseline already checks kinematics, so the gap isolates the two new checks: **where ours won, the baseline failed by an unreadable QR (20) or by slipping once the
 object was turned (21)**. In 8 scenarios (2 heavy objects) no grasp survives the lift test, which
 counts as a failure for every policy.
 

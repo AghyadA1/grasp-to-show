@@ -11,11 +11,15 @@ as a real system would fall back to its next grasp when motion planning fails):
                   with a reachable target pose (largest joint margin). A standard "grasp
                   planner + motion planner" pipeline: kinematics are checked, but not whether the
                   QR will be visible or the grasp stable once the object is turned.
-  aware           ours: the best grasp passing all checks, ranked by its normalised margins
-                  (leximin: the smallest margin first, ties broken by the next smallest).
+  aware           ours: the best grasp passing all checks, ranked by its smallest normalised
+                  margin (the rule fixed before any experiment; ties keep the enumeration order:
+                  grasp index, twin, target roll).
   aware_no_vis    ablation: aware without the QR-visibility check (check 5);
   aware_no_stab   ablation: aware without the target-stability check (check 2);
-  aware_single    ablation: aware with one target pose (roll 0) instead of the target set.
+  aware_single    ablation: aware with one target pose (roll 0) instead of the target set;
+  aware_leximin   sensitivity: ties broken by the next-smallest margin (leximin). Added after the
+                  main experiment because of one demo case; it raised slip failures (static
+                  margins do not capture slip during motion), so it is reported, not adopted.
 """
 from __future__ import annotations
 
@@ -31,7 +35,7 @@ from .scene import build_scene
 from .stability import StabilityParams, finger_contacts, utilisation_shake
 from .task import Grasp, show_pose
 
-POLICIES = ("stability_only", "aware", "aware_no_vis", "aware_no_stab", "aware_single")
+POLICIES = ("stability_only", "aware", "aware_no_vis", "aware_no_stab", "aware_single", "aware_leximin")
 LIMIT_SCALE = 0.5   # rad: a joint-limit margin of 0.5 rad counts as "fully comfortable"
 
 
@@ -118,11 +122,9 @@ def choose(policy: str, reports: dict[int, GraspReport], lift_margin: dict[int, 
                     parts.append(t.stability_margin)
                 if use_vis:
                     parts.append((t.visibility.fraction - 0.9) / 0.1)
-                # Leximin: compare the smallest margin first, then the next smallest, ... A plain
-                # min() made every target roll tie whenever the (roll-independent) lift margin was
-                # the weakest, and picked a +0.29 target-stability roll over a +0.51 one.
-                scored.append((tuple(sorted(parts)), Choice(i, tw.twin, j, r.ok)))
-    scored.sort(key=lambda x: x[0], reverse=True)
+                key = tuple(sorted(parts)) if policy == "aware_leximin" else (min(parts),)
+                scored.append((key, Choice(i, tw.twin, j, r.ok)))
+    scored.sort(key=lambda x: x[0], reverse=True)       # stable: ties keep enumeration order
     return [c for _, c in scored[:k]]
 
 

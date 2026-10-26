@@ -142,13 +142,13 @@ def plot(summary: dict, path: Path) -> None:
 
     labels = {"stability_only": "stability only\n(baseline)", "aware": "target-aware\n(ours)",
               "aware_no_vis": "ours without\nvisibility check", "aware_no_stab": "ours without\ntarget stability",
-              "aware_single": "ours with one\ntarget pose"}
+              "aware_single": "ours with one\ntarget pose", "aware_leximin": "ours, leximin\ntie-break"}
     ps = list(POLICIES)
     n = [summary["policies"][p]["scenarios"] for p in ps]
     r = [summary["policies"][p]["success_rate"] or 0 for p in ps]
     ci = [wilson(round(ri * ni), ni) for ri, ni in zip(r, n)]
     err = np.array([[ri - lo for ri, (lo, _) in zip(r, ci)], [hi - ri for ri, (_, hi) in zip(r, ci)]])
-    colors = ["#9aa5b1", "#2a6f97", "#8fb8d6", "#8fb8d6", "#8fb8d6"]
+    colors = ["#9aa5b1", "#2a6f97"] + ["#8fb8d6"] * (len(ps) - 2)
     x = np.arange(len(ps))
     fig, ax = plt.subplots(figsize=(7.5, 3.6))
     ax.bar(x, r, 0.6, color=colors, yerr=err, capsize=4, error_kw={"lw": 1, "ecolor": "0.3"})

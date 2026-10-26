@@ -23,6 +23,8 @@ the gain.
 full pick-and-show episodes (vs the checks: 18 scenarios won, 2 lost, p = 4e-4). It mostly fixes
 what the static checks cannot see: slip during the motion.
 
+**One-page summary:** [docs/grasp-to-show-summary.pdf](docs/grasp-to-show-summary.pdf)
+
 ![baseline vs ours](media/baseline_vs_ours.gif)
 
 *Same box of crayons, same start pose. Left: the baseline takes the most stable grasp; at the
@@ -47,7 +49,7 @@ finger covers the QR, so decoding fails. A stability-only planner cannot tell th
 > products, grasp sampler and simulated lift labels, five analytic checks, C++ kernels, validation
 > against 865 full episodes and the policy comparison. Week 2 so far: a 20,902-sample dataset of
 > full-episode outcomes, a learned scorer and its evaluation as a policy on unseen objects, and
-> goal-conditioned heatmaps (way A), robustness to pose error. Next: a write-up; week 3: way B.
+> goal-conditioned heatmaps (way A), robustness to pose error. One-page summary. Next (week 3): way B.
 
 ## Quickstart
 

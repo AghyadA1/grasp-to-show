@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Grasp-to-Show: one-page summary</title>
+<style>
+@page { size: A4; margin: 11mm 12mm; }
+body { font-family: "Inter", "Helvetica Neue", Arial, sans-serif; font-size: 8.6pt; line-height: 1.32; color: #1b1f24; margin: 0; }
+h1 { font-size: 17pt; margin: 0 0 1mm; letter-spacing: -0.2pt; }
+.sub { color: #555; font-size: 9pt; margin-bottom: 2.5mm; }
+.claim { background: #eef4fa; border-left: 3px solid #1d4e6e; padding: 2mm 3mm; margin: 0 0 3mm; font-size: 9.2pt; }
+.cols { column-count: 2; column-gap: 6mm; }
+h2 { font-size: 10pt; margin: 2.2mm 0 0.8mm; color: #1d4e6e; break-after: avoid; }
+p { margin: 0 0 1.6mm; }
+table { border-collapse: collapse; width: 100%; font-size: 8.2pt; margin: 0.6mm 0 1.6mm; break-inside: avoid; }
+th, td { padding: 0.6mm 1.2mm; border-bottom: 0.4pt solid #d6dbe0; text-align: left; }
+th { font-weight: 600; color: #444; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.figs { display: grid; grid-template-columns: 1.06fr 1fr 1.06fr; gap: 3mm; margin: 2mm 0 1mm; align-items: start; }
+.figs img { width: 100%; display: block; border: 0.4pt solid #ccd; }
+.cap { font-size: 7.4pt; color: #555; margin-top: 0.8mm; }
+ul { margin: 0 0 1.6mm; padding-left: 4mm; } li { margin-bottom: 0.6mm; }
+.foot { margin-top: 1.5mm; font-size: 7.6pt; color: #555; border-top: 0.4pt solid #d6dbe0; padding-top: 1.2mm; }
+b { font-weight: 600; }
+</style></head><body>
+<h1>Grasp-to-Show: target-aware grasp selection</h1>
+<div class="sub">Aghyad Ali &middot; M2 MiSCIT, Université Grenoble Alpes &middot; solo project, simulation (MuJoCo, Franka Panda) &middot; github.com/AghyadA1/grasp-to-show</div>
+
+<div class="claim"><b>Result.</b> Choosing the grasp for the whole task (pick, carry, show a QR label to a scanner) instead of
+for stability alone raises task success from <b>51 % to 70 %</b> in 160 simulated scenarios (paired 42 wins / 12 losses,
+p = 5&times;10<sup>&minus;5</sup>, reproduced on Windows). A network trained on 14,502 simulated episodes reaches <b>85 %</b>
+on <b>unseen objects</b> (baseline 55 %, analytic checks 65 %), and scores a grasp in <b>50 µs</b> on a laptop GPU.</div>
+
+<div class="figs">
+ <div><img src="img/overlay_still.png"><div class="cap">Same box, same start. Orange: most stable grasp, a finger hides the QR. Blue: target-aware grasp, decoded. 3D gripper paths drawn.</div></div>
+ <div><img src="img/heatmap_still.png"><div class="cap">Goal-conditioned heatmap: where grasping works for <i>this</i> target (right) vs a target-blind stability map (left). Arrow: gravity at the target.</div></div>
+ <div><img src="../media/robustness.png"><div class="cap">Unknown pose error at execution: the learned choice keeps its lead up to 5 mm / 5&deg;.</div></div>
+</div>
+
+<div class="cols">
+<h2>Problem</h2>
+<p>Grasp planners pick the most stable grasp and ignore what comes next. To show a label to a scanner (a routine
+logistics step), the fingers must not cover it, the arm must reach the presentation pose <i>with that grasp</i>, and the
+grasp must still hold when gravity acts in a new direction in the object frame. One grasp fixes the arm configuration at
+the target through T<sub>world,tcp</sub> = T<sub>world,obj</sub> T<sub>obj,tcp</sub>.</p>
+
+<h2>Method</h2>
+<ul>
+<li><b>Ground truth:</b> full episode in MuJoCo (force-limited gripper, soft-finger contacts); success = QR decoded by
+OpenCV from the scanner image, object held, slip &lt; 20 mm / 15&deg;, no collision.</li>
+<li><b>Five analytic checks</b> per grasp, both 180&deg; twins and 12 target poses: lift and target stability
+(soft-finger friction model, solved for the friction utilisation; <b>AUC 0.92&ndash;0.94</b> vs simulation, no fitted
+parameters), reach at start and target (analytic IK, ported to numpy and C++ with two bug fixes), QR visibility by ray casting.</li>
+<li><b>Learned scorer:</b> PointNet on the object cloud in the gripper frame + gravity and poses at start and target,
+trained on full-episode outcomes, split by object; a variant also takes the checks' outputs.</li>
+<li><b>Heatmap (way A):</b> score ~3,200 candidates per target and paint each grasp's score on its contacts (19 s).</li>
+<li>40 Google Scanned Objects (30 train / 10 test), 5,225 simulated lift labels, C++17 kernels (nanobind, 2.4&ndash;7&times;).</li>
+</ul>
+
+<h2>Results</h2>
+<table>
+<tr><th>Policy</th><th class="n">160 scen.</th><th class="n">unseen, 80</th></tr>
+<tr><td>Most stable grasp (baseline, kinematics checked)</td><td class="n">51 %</td><td class="n">55 %</td></tr>
+<tr><td>Analytic checks 1&ndash;5 (min normalised margin)</td><td class="n">70 %</td><td class="n">65 %</td></tr>
+<tr><td>&nbsp;&nbsp;without the QR-visibility check</td><td class="n">52 %</td><td class="n">&ndash;</td></tr>
+<tr><td>Learned, geometry only</td><td class="n">&ndash;</td><td class="n">76 %</td></tr>
+<tr><td><b>Learned + checks' outputs</b></td><td class="n">&ndash;</td><td class="n"><b>85 %</b></td></tr>
+</table>
+<p>Validation of the checks on 865 episodes: success 73 % when they predict feasible vs 21 % when not (recall 95 %).
+19 % of the grasps a stability-only planner accepts cannot complete the task. The learned gain is almost all
+<b>slip during the motion</b> (18 &rarr; 2 failures), which static margins cannot see. Over 5 training seeds the
+scorer's AUC is 0.82 &plusmn; 0.01 (checks: 0.72).</p>
+
+<h2>Lessons</h2>
+<ul>
+<li><b>Validate the simulator first.</b> With default contact softness, held objects crept 13 mm in a gentle transit;
+stiffer grasp contacts cut it 5&times; and lifted the stability model's AUC from 0.80 to 0.93.</li>
+<li><b>Fix the rule before the experiment.</b> A tie-break changed after seeing one demo lowered success from 70 % to
+61&ndash;63 % on two machines; the rule fixed beforehand stays the primary result.</li>
+<li><b>Know the limit.</b> At 10 mm / 10&deg; pose error every policy collapses (open-loop approach hits the object):
+re-detection before grasping, not grasp choice, is the fix.</li>
+</ul>
+
+<h2>Next</h2>
+<p>Way B: a dense goal-conditioned network that predicts the heatmap directly (Contact-GraspNet style), judged by the
+simulated success of its top grasp. Then dexterous hands, regrasping, and unknown shapes.</p>
+</div>
+<div class="foot">Code: Python + C++17, 33 tests, CI on Linux; every number reproducible from the scripts in the repository
+(data and trained models on the <i>data</i> branch). Objects: Google Scanned Objects (CC-BY 4.0); robot: MuJoCo Menagerie.</div>
+</body></html>

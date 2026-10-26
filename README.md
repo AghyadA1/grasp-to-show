@@ -535,9 +535,36 @@ the robot's own limits bind (117 problems, light objects), the gain is 7 %.
 Caveats: the optimiser is a sampling search (≈25 s per problem) and ends slightly outside the
 constraints in 22 % of problems (they still ran in simulation); for 10 % of the problems even the
 end poses at rest exceed the 0.7 limit under the robust model, and the limit is relaxed to that
-need. Next: a network that predicts these motions in milliseconds, trained on optimised motions
-for random start places, frictions and training objects (`scripts/generate_transport_data.py`,
-`scripts/train_transport_net.py`).
+need.
+
+**A network that imitates the optimiser** (`grasp2show/learn/transport_net.py`, as
+[DJ-GOMP](https://arxiv.org/pdf/2003.01938) learns GOMP's solutions). Data
+(`scripts/generate_transport_data.py`): 400 optimised motions on training objects and 100 on the
+unseen test objects, each with a random start place and rotation, friction μ ∈ [0.15, 0.6] and way B's
+grasp; every motion was also run in simulation (94 % / 98 % success). An MLP maps start and end
+joint configurations, μ, and the object's mass, centre of mass and inertia *in the gripper frame*
+(the leverage) to the path coefficients and the duration (`scripts/train_transport_net.py`,
+73 s on the laptop).
+
+![network](media/transport_net_eval.png)
+
+| Held-out problems (no collision check yet) | 5 validation objects | 10 unseen objects |
+|---|---|---|
+| motion satisfies every constraint as predicted | 52 % | 46 % |
+| usable after slowing it down | 100 % | 87 % |
+| duration vs the optimiser (median, after slowing) | 1.08× | 1.07× |
+| duration vs the slowed straight motion | 0.99× | 0.99× |
+| time per motion | 0.01 ms (vs ≈25 s) | 0.01 ms |
+
+So far it is fast but not good enough on its own: it recovers only a small part of the optimiser's
+7–8 % gain, and in the 13 % of test problems it cannot do, its path turns the object through an
+orientation where *the weight alone* already exceeds the grip, which no slowing down can fix (these
+are mostly the heavy problems where the straight motion is impossible too and the optimiser's
+detour is the only solution). 400 examples are few for 33 inputs and a 29-number output, and the
+optimiser's labels are themselves noisy (a sampling search). Next
+(`scripts/transport_net_episodes.py`): the network's motion as the *starting point* of a short
+search (10 iterations instead of 60), with the straight motion as fallback, all in full episodes
+with collisions.
 
 ## C++ kernels
 

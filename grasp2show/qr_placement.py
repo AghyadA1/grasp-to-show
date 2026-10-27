@@ -72,3 +72,50 @@ def find_qr_face(mesh: trimesh.Trimesh, min_side: float = 0.03, max_side: float 
             if best_key is None or key > best_key:
                 best, best_key = QRPlacement(Tq, side, flat), key
     return best
+
+
+def find_qr_patch(mesh: trimesh.Trimesh, min_side: float = 0.03, max_side: float = 0.045,
+                  flat_tol: float = 0.004, grid: int = 7, up=(0, 0, 1), n_candidates: int = 300,
+                  seed: int = 0) -> QRPlacement | None:
+    """A QR sticker spot on any shape (not only on the faces of the bounding box).
+
+    Candidate centres are sampled on the surface; at each, the patch plane is the surface's
+    tangent plane, oriented with one edge horizontal. The ray test is the same as in
+    find_qr_face, with a looser flatness (a 3 cm sticker on a mug of 4 cm radius bulges by
+    2.9 mm): every ray must hit, and the heights under the patch must vary by less than
+    flat_tol. Bottom-facing spots are skipped; the largest, then side-facing, then flattest
+    spot wins. The sticker sits on the highest point under it (its edges may float a few mm
+    off a curved surface).
+    """
+    up = np.asarray(up, float)
+    pts, fid = trimesh.sample.sample_surface(mesh, n_candidates, seed=seed)
+    normals = mesh.face_normals[fid]
+    best, best_key = None, None
+    for c, n in zip(pts, normals):
+        if n @ up < -0.7:
+            continue
+        u = np.cross(up, n)
+        if np.linalg.norm(u) < 1e-3:                      # top-facing: any horizontal edge
+            u = np.cross([1.0, 0.0, 0.0], n)
+        u /= np.linalg.norm(u)
+        v = np.cross(n, u)
+        for side in (max_side, 0.5 * (min_side + max_side), min_side):
+            a = np.linspace(-0.55, 0.55, grid) * side
+            A, B = np.meshgrid(a, a)
+            grid_pts = c + A.reshape(-1, 1) * u + B.reshape(-1, 1) * v
+            origins = grid_pts + 0.03 * n
+            dirs = np.repeat(-n[None], len(origins), axis=0)
+            locs, ray_idx, _ = mesh.ray.intersects_location(origins, dirs, multiple_hits=False)
+            if len(np.unique(ray_idx)) < len(origins):
+                continue
+            h = (locs - c) @ n
+            flat = float(h.max() - h.min())
+            if flat > flat_tol or h.max() > 0.02:
+                continue
+            is_side = abs(n @ up) < 0.3
+            key = (round(side, 3), is_side, -flat)
+            if best_key is None or key > best_key:
+                Rq = np.column_stack([n, u, np.cross(n, u)])
+                best, best_key = QRPlacement(make_T(Rq, c + n * h.max()), side, flat), key
+            break                                        # largest size that fits here
+    return best

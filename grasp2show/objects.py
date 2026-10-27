@@ -39,9 +39,16 @@ def scanned_objects_dir() -> Path:
     return root / "models"
 
 
+def object_set_file() -> Path:
+    """The active object set: v1 (40 box-like packages, the default) or, with G2S_OBJECT_SET=v2,
+    the set of many shapes (scripts/select_objects_v2.py)."""
+    v = os.environ.get("G2S_OBJECT_SET", "v1")
+    return OBJECT_SET_FILE if v == "v1" else OBJECT_SET_FILE.with_name(f"object_set_{v}.json")
+
+
 def load_object_set() -> dict:
     """Selected object names, train/test split and cached QR placements."""
-    return json.loads(OBJECT_SET_FILE.read_text())
+    return json.loads(object_set_file().read_text())
 
 
 @dataclass

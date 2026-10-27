@@ -30,9 +30,10 @@ sys.path.insert(0, str(ROOT))
 from grasp2show.config import ObjectConfig, SceneConfig
 from grasp2show.grasp_sampler import candidates_from_pairs, sample_antipodal
 from grasp2show.gripper_sim import GripperSim
-from grasp2show.objects import load_object_set, object_from_config
+from grasp2show.objects import load_object_set, object_from_config, object_set_file
 
-OUT = ROOT / "data" / "grasps"
+OUT = ROOT / "data" / ("grasps" if os.environ.get("G2S_OBJECT_SET", "v1") == "v1" else
+                       f"grasps_{os.environ['G2S_OBJECT_SET']}")
 
 
 def plot_labels(obj, cand, success, path: Path, title: str, max_lines: int = 150) -> None:
@@ -88,6 +89,23 @@ def process(job: tuple[str, int, int, int, int]) -> dict:
             "success_rate": round(rate, 3), "seconds": round(time.perf_counter() - t0, 1)}
 
 
+def prune(bad: list[str]) -> None:
+    """Drop objects that no tested grasp could lift from the active object set file."""
+    f = object_set_file()
+    s = json.loads(f.read_text())
+    bad = set(bad)
+    for k in ("objects", "train", "test", "handle_candidates"):
+        if k in s:
+            s[k] = [n for n in s[k] if n not in bad]
+    for k in ("stats", "qr"):
+        s[k] = {n: v for n, v in s[k].items() if n not in bad}
+    if "classes" in s:
+        s["classes"] = {c: [n for n in v if n not in bad] for c, v in s["classes"].items()}
+    s["pruned_not_pickable"] = sorted(set(s.get("pruned_not_pickable", [])) | bad)
+    f.write_text(json.dumps(s, indent=1))
+    print(f"pruned {len(bad)} objects with no lifting grasp; {len(s['objects'])} remain in {f.name}")
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--split", choices=["all", "train", "test"], default="all")
@@ -97,6 +115,8 @@ def main() -> int:
     p.add_argument("--max-tests", type=int, default=300, help="shake tests per object")
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--prune", action="store_true",
+                   help="remove objects with no grasp that lifts from the active object set (pickability)")
     args = p.parse_args()
 
     oset = load_object_set()
@@ -122,6 +142,8 @@ def main() -> int:
                    "wall_seconds": round(time.perf_counter() - t0, 1)},
     }
     (OUT / "summary.json").write_text(json.dumps(summary, indent=1))
+    if args.prune:
+        prune([r["object"] for r in rows if r["success"] == 0])
     print(f"done: {succ}/{tested} successful grasps ({summary['totals']['success_rate']:.0%}) "
           f"in {summary['totals']['wall_seconds']} s -> {OUT / 'summary.json'}")
     return 0

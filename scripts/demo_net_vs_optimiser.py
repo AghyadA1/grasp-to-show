@@ -169,6 +169,9 @@ def main() -> int:
     rounds = [r for r in rounds if r]
     net_path = tcp_path(S, *S["sol"]["network"][:2])
     opt_final = tcp_path(S, *S["sol"]["optimiser"][:2])
+    pts = np.vstack([net_path, opt_final])                    # frame the carry: centre on the two paths
+    painter.cam.lookat[:] = 0.5 * (pts.min(0) + pts.max(0)) + np.array([0.0, 0.0, -0.05])
+    painter.cam.distance = float(np.clip(2.4 * np.ptp(pts, axis=0).max(), 1.0, 1.6))
     rng = np.random.default_rng(0)
     best, best_cost = first, None
     per = max(int(6.0 * args.fps / len(rounds)), 1)
@@ -185,7 +188,7 @@ def main() -> int:
 
         def deco(scn, greys=greys, best_path=best_path):
             for g in greys:
-                add_path(scn, g, (170, 172, 180), radius=0.0009)
+                add_path(scn, g, (200, 202, 210), radius=0.0013)
             add_path(scn, best_path, OPT, radius=0.0026)
             add_path(scn, net_path, NET, radius=0.0026)
 

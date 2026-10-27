@@ -593,12 +593,32 @@ checked later, in full episodes):
 | time per motion | 0.01 ms | 0.01 ms |
 
 Where it is feasible it is as fast as the optimiser, and on three of the hard problems it is 4–6×
-faster than the optimiser's detour (right panel). What it still misses is concentrated: 9 of the 16
-infeasible test motions belong to one object, the heaviest of the test set (0.61 kg; only one
-training object is above 0.5 kg), the others to the problems where only a detour works. Next: train
-on heavier and lighter versions of the same objects (mass and inertia scaled, as the friction is
-varied), then improve the labels for the detour problems (step 2: the optimiser refines the
-network's own motions, which are then learned).
+faster than the optimiser's detour (right panel). Training also on heavier and lighter versions of
+the same objects (mass and inertia × 0.6–2.5, `--mass-scale`, 300 more epochs) lifts the unseen
+objects to 87 % feasible (92 % of the 92 problems whose end poses are not already overloaded at
+rest; the optimiser: 98 %), 0.98× the optimiser's duration, and 5 of the 12 detour-only problems.
+
+**In full episodes** (`scripts/transport_net_episodes.py`: the 100 unseen-object problems rebuilt in
+simulation, collisions, slip and the QR read all real; the network's motion executed exactly as
+predicted, no check, no slowing down, no fallback):
+
+![episodes](media/transport_net_episodes.png)
+
+| | success [95 % CI] | median duration | planning time |
+|---|---|---|---|
+| slow down only (retime) | 93 % [86, 97] | 2.24 s | 80 ms |
+| optimiser | 99 % [95, 100] | 2.09 s | 25 s |
+| **network, raw** | **99 % [95, 100]** | **2.02 s** | **1 ms** |
+
+The raw network succeeds as often as the optimiser, with motions 3 % shorter, planned about
+20,000× faster. Its 13 motions that the conservative model calls infeasible all succeeded in
+simulation (the ±5 mm leverage margin and the axial cap leave room); its one failure is a QR read
+with 3 mm slip. Every failure of the slowed-down straight motion is a heavy object slipping in the
+hand (up to 47 cm): moving differently matters exactly where the grasp is the limit.
+
+Next: several candidate motions per problem with a predicted cost for each, as in
+[Loquercio et al., Science Robotics 2021](https://arxiv.org/pdf/2110.05113), so the network can
+choose between a detour to the left and one to the right instead of having to commit to one shape.
 
 ## C++ kernels
 
@@ -698,7 +718,8 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Goal-conditioned grasp heatmaps on the object surface (way A: checks painted on the mesh)
 - [x] Way B: dense goal-conditioned heatmap network, tested in full episodes on unseen objects
 - [x] Part 2: transport motion that keeps the grasp safe: dynamic grasp model (AUC 0.88), optimiser (38 % faster where the grasp limits)
-- [ ] Part 2: transport network (imitates the optimiser), varied camera poses, presentation tilt
+- [x] Part 2: transport network: trained on the constraints, 99 % in full episodes (= optimiser), 3 % shorter, 1 ms vs 25 s
+- [ ] Part 2: several candidate motions + predicted cost; varied camera poses, presentation tilt; fine-tuning in simulation
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 
 ## Related work

@@ -12,6 +12,7 @@ import argparse
 import re
 import sys
 import time
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -27,7 +28,8 @@ def fetch(url: str, dest: Path, retries: int = 3) -> None:
         return
     for attempt in range(retries):
         try:
-            with urllib.request.urlopen(url, timeout=60) as r:
+            # object names can contain non-ASCII letters (Pokémon_...): percent-encode the path
+            with urllib.request.urlopen(urllib.parse.quote(url, safe=":/"), timeout=60) as r:
                 data = r.read()
             tmp = dest.with_suffix(dest.suffix + ".part")
             tmp.write_bytes(data)

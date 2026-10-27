@@ -661,6 +661,46 @@ and the carry takes 0.98 s instead of 3.75 s (grip use stays far from the limit)
 
 ([mp4](media/joint_choice_Perricone_MD_The_Crease_.mp4): `scripts/demo_joint_choice.py`)
 
+## Part 3: many shapes, a scanner that moves (in progress)
+
+**Objects** (`scripts/select_objects_v2.py`, written-down criteria): from all 1030 scanned
+objects, those the hand can close on somewhere (antipodal pairs of 0.8–7.5 cm, so a mug
+qualifies by its handle or rim), portable (≤ 30 cm), with a spot for a 3 cm QR sticker (flat, or
+gently curved: a mug's side; `qr_placement.find_qr_patch`); a stratified draw by shape: box-like,
+rounded, irregular. Then the simulation decides: objects with no grasp that lifts
+(`generate_grasps.py --prune`: 25, mostly heavy) or no workable grasp from the table in any of 8
+scenes (`generate_dense_labels.py --prune`: 27, flat consoles and DVDs, big shoes) are dropped.
+**112 objects** remain: 58 box-like, 27 rounded, 27 irregular, 6 with a handle or rim; 81 train,
+31 unseen test.
+
+**The scanner moves** (`config.random_camera`): every scene draws a new look-at point (±10 cm,
+±8 cm in height) and viewing direction (±60° around, −10° to +35° in elevation, 24–36 cm away),
+with a new start place and rotation. Way B already takes the camera direction as an input; it is
+retrained on 893 such scenes (`train_heatmap_net.py`, 30 min). The analytic lift check was
+validated on boxes and rejects every mug grasp (a finger pressing a curved rim touches along a
+line and holds far more torque than the point-contact model allows), so check 1 now comes from
+the simulated shake test (`--sim-lift`).
+
+**Result** (`scripts/eval_way_b_v2.py`, full episodes, 124 scenes: the 31 unseen objects × 4
+unseen start and scanner poses):
+
+![part 3](media/way_b_v2_policy.png)
+
+| | success [95 % CI] | box / rounded / irregular | of the 88 scenes any method solved |
+|---|---|---|---|
+| analytic checks | 47 % [38, 56] | 67 / 44 / 12 % | 58 |
+| way B, trained on boxes, fixed scanner | 56 % [48, 65] | 78 / 47 / 25 % | 70 |
+| **way B, retrained** | **61 % [53, 69]** | **87 / 53 / 22 %** | **76** |
+
+The retrained way B beats the checks that labelled it (23 scenes won, 5 lost) and, less clearly,
+its predecessor (16/10). Box-like objects shown to a moving scanner are nearly solved (87 %).
+What is left is mostly not the choice but the absence of a working grasp: only 88 of the 124
+scenes were solved by any method, and only 13 of the 32 irregular ones; a shoe or a toy rarely
+offers a pinch that lifts it, survives the turn to the scanner and keeps the code visible. The
+other weak link is the teacher: the stability check at the presentation pose is still the
+point-contact model. Next: a grip model with every finger contact (pads, sides, tips, palm),
+which also makes hooking a handle a strong grasp, then hanging grasps and swing-aware carries.
+
 ## C++ kernels
 
 `cpp/` is an optional C++17 package (nanobind bindings, no other dependencies) with the two hot
@@ -761,7 +801,8 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Part 2: transport motion that keeps the grasp safe: dynamic grasp model (AUC 0.88), optimiser (38 % faster where the grasp limits)
 - [x] Part 2: transport network: trained on the constraints, 99 % in full episodes (= optimiser), 3 % shorter, 1 ms vs 25 s
 - [x] Part 2: grasp chosen together with the motion (19 % shorter carries, 100 % success)
-- [ ] Part 2: varied camera poses, presentation tilt; harder settings; fine-tuning in simulation
+- [x] Part 3: 112 objects of many shapes, random scanner poses; way B retrained: 61 % (87 % on boxes) vs 47 % for the checks
+- [ ] Part 3: grip model with every finger contact; hanging grasps; swing-aware carries; fine-tuning in simulation
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 
 ## Related work

@@ -116,26 +116,39 @@ def main() -> int:
 
 
 def plot(s, path):
+    """Left: success of each policy. Right: by shape class."""
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    labels = {"checks": "analytic checks", "way_b_v1": "way B, trained on\\nboxes + fixed scanner",
-              "way_b_v2": "way B, retrained on\\nmany shapes + random scanner"}
+    labels = {"checks": "analytic checks", "way_b_v1": "way B, trained on\nboxes, fixed scanner",
+              "way_b_v2": "way B, retrained on\nmany shapes, random scanner"}
     cols = {"checks": "#9aa5b1", "way_b_v1": "#e07a2f", "way_b_v2": "#1d4e6e"}
-    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    fig, ax = plt.subplots(1, 2, figsize=(11, 3.8), gridspec_kw={"width_ratios": [1, 1.2]})
     for i, pol in enumerate(POLICIES):
         d = s["policies"][pol]
-        ax.bar(i, d["success"], 0.6, color=cols[pol])
-        ax.errorbar(i, d["success"], yerr=[[d["success"] - d["ci95"][0]], [d["ci95"][1] - d["success"]]], c="k",
-                    capsize=3, lw=1)
-        ax.text(i, d["ci95"][1] + 0.02, f"{d['success']:.0%}", ha="center", fontsize=9)
-    ax.set_xticks(range(3), [labels[p] for p in POLICIES], fontsize=8)
-    ax.set_ylim(0, 1.1)
-    ax.set_ylabel("task success (95 % CI)")
-    ax.set_title(f"{s['scenes']} scenes: {s['objects']} unseen objects, unseen scanner poses", fontsize=9)
-    ax.spines[["top", "right"]].set_visible(False)
+        ax[0].bar(i, d["success"], 0.6, color=cols[pol])
+        ax[0].errorbar(i, d["success"], yerr=[[d["success"] - d["ci95"][0]], [d["ci95"][1] - d["success"]]], c="k",
+                       capsize=3, lw=1)
+        ax[0].text(i, d["ci95"][1] + 0.02, f"{d['success']:.0%}", ha="center", fontsize=9)
+    ax[0].set_xticks(range(3), [labels[p] for p in POLICIES], fontsize=8)
+    ax[0].set_ylim(0, 1.1)
+    ax[0].set_ylabel("task success (95 % CI)")
+    ax[0].set_title(f"{s['scenes']} scenes: {s['objects']} unseen objects, unseen scanner poses", fontsize=9)
+    classes = list(s["policies"]["way_b_v2"]["by_class"])
+    w = 0.26
+    for i, pol in enumerate(POLICIES):
+        v = [s["policies"][pol]["by_class"].get(c, 0) for c in classes]
+        ax[1].bar(np.arange(len(classes)) + (i - 1) * w, v, w, color=cols[pol], label=labels[pol].replace("\n", " "))
+        for x, y in zip(np.arange(len(classes)) + (i - 1) * w, v):
+            ax[1].text(x, y + 0.02, f"{y:.0%}", ha="center", fontsize=7)
+    ax[1].set_xticks(range(len(classes)), classes, fontsize=9)
+    ax[1].set_ylim(0, 1.1)
+    ax[1].legend(frameon=False, fontsize=7, loc="upper right")
+    ax[1].set_title("by shape class", fontsize=9)
+    for a in ax:
+        a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     fig.savefig(path, dpi=130)
     plt.close(fig)

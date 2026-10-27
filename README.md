@@ -616,9 +616,36 @@ simulation (the ±5 mm leverage margin and the axial cap leave room); its one fa
 with 3 mm slip. Every failure of the slowed-down straight motion is a heavy object slipping in the
 hand (up to 47 cm): moving differently matters exactly where the grasp is the limit.
 
-Next: several candidate motions per problem with a predicted cost for each, as in
-[Loquercio et al., Science Robotics 2021](https://arxiv.org/pdf/2110.05113), so the network can
-choose between a detour to the left and one to the right instead of having to commit to one shape.
+### Choosing the grasp together with the motion
+
+Way B ranks grasps by how likely they are to show the code; the robot used to take the first one it
+could plan and only then work out the carry. But grasps that are nearly as good for the task can
+need very different carries. Because the network plans a carry in about a millisecond, every
+candidate can be tried (`scripts/joint_grasp_motion.py`: way B's top 10, the plannable ones get a
+network motion, the safety model and the collision check; 0.24 s in total per problem, against
+~25 s per grasp with the optimiser). The joint choice takes, among the grasps whose way-B score is
+at most 0.02 below the best, the one with the shortest safe carry.
+
+![joint choice](media/joint_grasp_motion.png)
+
+| 100 unseen-object problems | success [95 % CI] | mean carry | median carry |
+|---|---|---|---|
+| way B's first grasp | 99 % [95, 100] | 2.03 s | 2.02 s |
+| **grasp chosen with the motion** | **100 % [96, 100]** | **1.64 s (−19 %)** | **1.56 s** |
+| shortest carry, way-B score ignored | 98 % [93, 99] | 1.57 s | 1.53 s |
+| *at friction 0.2:* way B's first / joint / shortest | 93 % / 94 % / 92 % | 2.05 / 1.71 / 1.62 s | |
+
+The joint choice picks another grasp in two problems out of three, and then the carry is 19 %
+shorter (median), up to 3.8× shorter. Ignoring way B's score shortens it a little more but loses
+successes (2 losses, 1 win; 3 losses at μ = 0.2): the score is what keeps the code readable.
+
+The example in the video (a 0.37 kg jar): way B's #1 and #2 hold it at the same spot; #2 has the
+hand flipped and shows the code the other way up, so the hand turns 44° on the way instead of 174°,
+and the carry takes 0.98 s instead of 3.75 s (grip use stays far from the limit).
+
+![joint choice video](media/joint_choice_Perricone_MD_The_Crease_.gif)
+
+([mp4](media/joint_choice_Perricone_MD_The_Crease_.mp4): `scripts/demo_joint_choice.py`)
 
 ## C++ kernels
 
@@ -719,7 +746,8 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Way B: dense goal-conditioned heatmap network, tested in full episodes on unseen objects
 - [x] Part 2: transport motion that keeps the grasp safe: dynamic grasp model (AUC 0.88), optimiser (38 % faster where the grasp limits)
 - [x] Part 2: transport network: trained on the constraints, 99 % in full episodes (= optimiser), 3 % shorter, 1 ms vs 25 s
-- [ ] Part 2: several candidate motions + predicted cost; varied camera poses, presentation tilt; fine-tuning in simulation
+- [x] Part 2: grasp chosen together with the motion (19 % shorter carries, 100 % success)
+- [ ] Part 2: varied camera poses, presentation tilt; harder settings; fine-tuning in simulation
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 
 ## Related work

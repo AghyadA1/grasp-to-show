@@ -46,7 +46,7 @@ from grasp2show.transport import friction_params, inertial_load, robust_utilisat
 
 W, H = 1280, 720
 BG = (17, 19, 23)
-ORANGE, BLUE, GREY = (235, 120, 40), (60, 140, 240), (150, 155, 165)
+ORANGE, BLUE, GREY = (235, 120, 40), (60, 140, 240), (215, 218, 225)
 RUNS = {"way_b": ("way B's first grasp", ORANGE), "joint": ("grasp chosen with the motion", BLUE)}
 
 
@@ -116,7 +116,7 @@ def setup(problem: str, model: Path, clouds_path: Path, net: Path, delta: float)
 
 
 # -- act 1: way B's candidates and the network's carry time for each ----------------------------------
-def candidates_figure(S, azim_offset: float, size=(12.8, 6.4), small=False) -> np.ndarray:
+def candidates_figure(S, azim_offset: float, size=(12.8, 6.0), small=False) -> np.ndarray:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -223,7 +223,7 @@ def planned_path(S, key: str, alpha: float) -> np.ndarray:
     return np.array(out)
 
 
-def add_dots(scn, pts, rgb, radius=0.0022, every=3):
+def add_dots(scn, pts, rgb, radius=0.0032, every=2):
     rgba = np.array([*np.asarray(rgb) / 255, 1.0], dtype=np.float32)
     for p in pts[::every]:
         if scn.ngeom >= scn.maxgeom:
@@ -273,7 +273,8 @@ def u_panel(runs, t_now, t_max, size=(440, 270)) -> np.ndarray:
     img = np.full((h, w, 3), BG, np.uint8)
     x0, x1, y0, y1 = 46, w - 12, 34, h - 34
     umax = 1.1
-    X = lambda t: int(x0 + (x1 - x0) * np.clip(t / t_max, 0, 1))
+    t_min = min(rn["u_t"][0] for rn in runs.values()) - 0.3       # from the lift on (the grip holds the object)
+    X = lambda t: int(x0 + (x1 - x0) * np.clip((t - t_min) / (t_max - t_min), 0, 1))
     Y = lambda u: int(y1 - (y1 - y0) * np.clip(u / umax, 0, 1))
     for key, rn in runs.items():                                  # carry windows
         a, b = rn["carry"]
@@ -297,7 +298,7 @@ def u_panel(runs, t_now, t_max, size=(440, 270)) -> np.ndarray:
     img = text(img, f"limit {lim:.2f}", (x1, Y(lim) - 18), 12, (220, 110, 110), anchor="ra")
     img = text(img, "1.0", (x0 - 8, Y(1.0) - 7), 11, (150, 150, 155), anchor="ra")
     img = text(img, "0.5", (x0 - 8, Y(0.5) - 7), 11, (150, 150, 155), anchor="ra")
-    img = text(img, "time (s)  ·  shaded: carry", (x1, y1 + 8), 11, (150, 150, 155), anchor="ra")
+    img = text(img, "from the lift to the end  ·  shaded: carry", (x1, y1 + 8), 11, (150, 150, 155), anchor="ra")
     return img
 
 
@@ -339,6 +340,21 @@ def main() -> int:
     a, b = info[pick["way_b"]], info[pick["joint"]]
     print(f"{S['asset']}: {len(info)} plannable grasps; way B #1 carry {a['T']:.2f} s, "
           f"joint #{pick['joint'] + 1} carry {b['T']:.2f} s")
+    from grasp2show.franka_ik import fk
+
+    def turn(i):
+        pr = info[i]["pr"]
+        R = fk(pr.q0)[:3, :3].T @ fk(pr.q1)[:3, :3]
+        return np.degrees(np.arccos(np.clip((np.trace(R) - 1) / 2, -1, 1))), float(np.abs(pr.dq).max())
+
+    (ra, ja), (rb, jb) = turn(pick["way_b"]), turn(pick["joint"])
+    same_spot = np.linalg.norm(a["grasp"].T_obj_tcp[:3, 3] - b["grasp"].T_obj_tcp[:3, 3]) < 0.005
+    story1 = (f"#1 and #{pick['joint'] + 1} hold the object at the same spot; #{pick['joint'] + 1} has the hand "
+              f"flipped and shows the code the other way up (still readable)." if same_spot else
+              f"#{pick['joint'] + 1} holds the object elsewhere with nearly the same score.") + \
+        f"  The hand turns {rb:.0f} deg on the way instead of {ra:.0f} deg."
+    story2 = (f"Orange must turn the hand {ra:.0f} deg on the way (joints up to {ja:.1f} rad), blue {rb:.0f} deg "
+              f"({jb:.1f} rad).  The bends are 28 numbers, predicted in one pass.")
     runs = {k: record(S, k, args.fps) for k in RUNS}
     frames = []
 
@@ -352,7 +368,8 @@ def main() -> int:
         canvas = text(canvas, f"{S['asset'].replace('_', ' ')[:40]}  ·  {S['obj'].mass:.2f} kg  ·  friction "
                       f"{S['mu']:.2f}.   Orange: way B's first choice.   Blue: nearly the same score, "
                       f"{a['T'] / b['T']:.1f}x shorter carry.", (24, 50), 15, (170, 175, 185))
-        canvas[80:80 + img.shape[0], :img.shape[1]] = img[:H - 80, :W]
+        canvas = text(canvas, story1, (24, H - 30), 15, (215, 215, 220))
+        canvas[76:76 + min(img.shape[0], H - 120), :img.shape[1]] = img[:H - 120, :W]
         frames += [canvas, canvas]
 
     painter = Painter(S)
@@ -377,8 +394,7 @@ def main() -> int:
                    (14, img.shape[0] - 30), 15, (230, 230, 230))
         frames.append(compose(img, small, u_panel(runs, 0, t_max),
                               "2 · The network bends the plain blend so the load stays where the grip is strong",
-                              "Start: the lifted pose.  End: the presentation pose in front of the scanner.  "
-                              "The bends are 28 numbers, predicted in one pass."))
+                              story2))
 
     # act 3: both episodes, real time
     n3 = max(len(rn["t"]) for rn in runs.values())

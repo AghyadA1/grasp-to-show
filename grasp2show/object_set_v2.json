@@ -149,7 +149,6 @@
   "Pinwheel_Pencil_Case",
   "Pokmon_Conquest_Nintendo_DS_Game",
   "Pokmon_X_Nintendo_3DS_Game",
-  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS",
   "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total",
   "Predator_LZ_TRX_FG",
   "RJ_Rabbit_Easter_Basket_Blue",
@@ -285,7 +284,6 @@
   "Pinwheel_Pencil_Case",
   "Pokmon_Conquest_Nintendo_DS_Game",
   "Pokmon_X_Nintendo_3DS_Game",
-  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS",
   "Predator_LZ_TRX_FG",
   "ReadytoUse_Rolled_Fondant_Pure_White_24_oz_box",
   "Reebok_BREAKPOINT_MID",
@@ -1875,19 +1873,6 @@
    "antipodal_pairs": 400,
    "qr_kind": "face",
    "mass_kg_est": 0.07,
-   "handle_name": false
-  },
-  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS": {
-   "extents_cm": [
-    3.1,
-    13.0,
-    14.2
-   ],
-   "boxiness": 0.94,
-   "class": "box",
-   "antipodal_pairs": 400,
-   "qr_kind": "face",
-   "mass_kg_est": 0.163,
    "handle_name": false
   },
   "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total": {
@@ -5996,36 +5981,6 @@
    "side": 0.045,
    "flatness": 0.00073
   },
-  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS": {
-   "T_obj_qr": [
-    [
-     0.002856,
-     0.008567,
-     0.999959,
-     -0.000164
-    ],
-    [
-     0.999496,
-     -0.031642,
-     -0.002584,
-     0.015399
-    ],
-    [
-     0.031619,
-     0.999463,
-     -0.008653,
-     0.06577
-    ],
-    [
-     0.0,
-     0.0,
-     0.0,
-     1.0
-    ]
-   ],
-   "side": 0.045,
-   "flatness": 0.0005
-  },
   "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total": {
    "T_obj_qr": [
     [
@@ -7522,7 +7477,6 @@
    "Phillips_Stool_Softener_Liquid_Gels_30_liquid_gels",
    "Pokmon_Conquest_Nintendo_DS_Game",
    "Pokmon_X_Nintendo_3DS_Game",
-   "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS",
    "ReadytoUse_Rolled_Fondant_Pure_White_24_oz_box",
    "Seagate_Archive_HDD_8_TB_Internal_hard_drive_SATA_6Gbs_35_ST8000AS0002",
    "Sony_Acid_Music_Studio",
@@ -7651,5 +7605,8 @@
   "Threshold_Porcelain_Coffee_Mug_All_Over_Bead_White",
   "Threshold_Porcelain_Pitcher_White",
   "Threshold_Porcelain_Teapot_White"
+ ],
+ "excluded_non_ascii": [
+  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS"
  ]
 }

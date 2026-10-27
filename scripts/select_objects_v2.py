@@ -5,6 +5,7 @@ From all 1030 Google Scanned Objects, written-down criteria (reproducible, not c
     0.8-7.5 cm among 400 tries (grasp_sampler.sample_antipodal), so a mug qualifies by its
     handle or rim even though it is 9 cm across;
   - portable: largest bounding-box side <= 30 cm, smallest >= 1 cm;
+  - an ASCII name (MuJoCo on Windows cannot open paths with other letters, e.g. Pokémon_...);
   - a QR sticker of at least 3 cm fits: on a flat face (qr_placement.find_qr_face, 2 mm), or
     on a gently curved spot (qr_placement.find_qr_patch, 4 mm: a mug's side);
 then a stratified draw so shapes are mixed: "box" (convex hull / bounding box >= 0.85),
@@ -44,6 +45,8 @@ HANDLE = re.compile(r"mug|(?<!gold_)cup(?!cake|sole)|pitcher|kettle|frother|bask
 
 
 def evaluate(d: Path):
+    if not d.name.isascii():
+        return None
     try:
         mesh = trimesh.load(d / "model.obj", force="mesh", process=True)
         ext = np.sort(mesh.bounding_box_oriented.primitive.extents)

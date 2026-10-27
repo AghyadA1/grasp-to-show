@@ -9,6 +9,13 @@ fails, else the smallest normalised margin, as in the target-aware policy (grasp
 The per-point labels (best grasp touching each surface point) are derived from these files at
 training time, so the painting radius can change without recomputing anything.
 
+With --sim-lift (part 3), check 1 (does the grasp lift the object) comes from the simulated
+shake test instead of the analytic soft-finger margin, which was validated on boxes but rejects
+every grasp of a mug (the fingers press a curved rim along a line, not at a point, and hold much
+more torque than the point-contact model allows). Grasps that lift in simulation get the
+analytic margin clipped to [0.1, 1]; the others are rejected. --max-candidates caps the shake
+tests per object.
+
 With --random-scenes K (part 3), each object gets K scenes instead of the fixed yaws: a random
 start rotation and place on the table and a random scanner pose (config.random_camera); the
 scanner pose is stored with the labels, since the targets depend on it.
@@ -48,7 +55,7 @@ OUT = ROOT / "data" / ("dense" if os.environ.get("G2S_OBJECT_SET", "v1") == "v1"
 
 
 def process(job) -> list[dict]:
-    asset, scenes, n_pairs, n_rolls, seed = job
+    asset, scenes, n_pairs, n_rolls, seed, sim_lift, max_cand = job
     t0 = time.perf_counter()
     cfg0 = SceneConfig(obj=ObjectConfig(asset=asset))
     obj = object_from_config(cfg0.obj)
@@ -57,6 +64,10 @@ def process(job) -> list[dict]:
     cand = candidates_from_pairs(p1, p2, 8, rng)
     sim = GripperSim(cfg0, obj)
     cand = cand.subset(np.array([not sim.in_collision(T, w) for T, w in zip(cand.T_obj_tcp, cand.width)], bool))
+    if max_cand:
+        cand = cand.subset(rng.permutation(len(cand))[:max_cand])
+    lift_sim = np.array([sim.shake_test(T, w).success for T, w in zip(cand.T_obj_tcp, cand.width)], bool) \
+        if sim_lift else None
     c1, c2, _ = finger_contacts(obj.mesh, cand.T_obj_tcp)
     rolls = np.linspace(0, 2 * np.pi, n_rolls, endpoint=False)
     rows = []
@@ -66,6 +77,8 @@ def process(job) -> list[dict]:
                           camera=cam if cam is not None else CameraConfig())
         fc = FeasibilityChecker(build_scene(cfg, obj), cfg)
         lm = lift_margins(obj, cand.T_obj_tcp, fc.stab)
+        if lift_sim is not None:
+            lm = np.where(lift_sim, np.clip(lm, 0.1, 1.0), -1.0)
         reports = [fc.evaluate(T, w, rolls) for T, w in zip(cand.T_obj_tcp, cand.width)]
         S = aware_scores(reports, lm, n_rolls)
         np.savez_compressed(
@@ -74,7 +87,8 @@ def process(job) -> list[dict]:
             lift_margin=lm.astype(np.float32), S=S.astype(np.float32), rolls=rolls, yaw=yaw,
             T_start=fc.T_start, T_target=np.stack([show_pose(cfg, obj, r) for r in rolls]),
             cam_pos=np.asarray(cfg.camera.pos), cam_look_at=np.asarray(cfg.camera.look_at),
-            start_xy=np.asarray(cfg.obj.start_xy))
+            start_xy=np.asarray(cfg.obj.start_xy),
+            **({} if lift_sim is None else {"lift_sim": lift_sim}))
         rows.append({"object": asset, "scene": tag, "yaw": round(yaw, 1), "candidates": len(cand),
                      "feasible_any_target": round(float((S.max(1) > 0).mean()), 3),
                      "feasible_per_target": round(float((S > 0).mean()), 3)})
@@ -91,6 +105,10 @@ def main() -> int:
     p.add_argument("--random-scenes", type=int, default=0,
                    help="K random scenes per object (start pose + scanner pose) instead of --yaws")
     p.add_argument("--split", choices=["all", "train", "test"], default="all")
+    p.add_argument("--sim-lift", action="store_true", help="check 1 from the simulated shake test (part 3)")
+    p.add_argument("--max-candidates", type=int, default=0, help="cap per object (0: no cap)")
+    p.add_argument("--prune", action="store_true",
+                   help="drop objects with no feasible grasp in any scene (not pickable from the table)")
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     args = p.parse_args()
     oset = load_object_set()
@@ -104,7 +122,8 @@ def main() -> int:
                        random_camera(r)) for k in range(args.random_scenes)]
         else:
             scenes = [(f"yaw{int(y)}", float(y), None, None) for y in args.yaws]
-        jobs.append((n, scenes, args.pairs, args.rolls, 1000 + oset["objects"].index(n)))
+        jobs.append((n, scenes, args.pairs, args.rolls, 1000 + oset["objects"].index(n), args.sim_lift,
+                     args.max_candidates))
     n_sc = args.random_scenes or len(args.yaws)
     print(f"{len(jobs)} objects x {n_sc} scenes x {args.rolls} targets, {args.workers} workers -> {OUT}")
     t0, rows = time.perf_counter(), []
@@ -116,6 +135,18 @@ def main() -> int:
                   f"({rs[-1]['seconds']} s)", flush=True)
     summary = {"config": vars(args), "wall_seconds": round(time.perf_counter() - t0, 1), "scenarios": rows}
     (OUT / "summary.json").write_text(json.dumps(summary, indent=1))
+    if args.prune:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from generate_grasps import prune
+
+        best = {}
+        for r in rows:
+            best[r["object"]] = max(best.get(r["object"], 0.0), r["feasible_any_target"])
+        bad = [n for n, b in best.items() if b == 0]
+        for n in bad:                                  # their label files would only teach "nothing works"
+            for f in OUT.glob(f"{n}__*.npz"):
+                f.unlink()
+        prune(bad)
     print(f"done in {summary['wall_seconds']} s -> {OUT}")
     return 0
 

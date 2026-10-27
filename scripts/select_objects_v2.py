@@ -74,8 +74,13 @@ def main():
     v1 = json.loads(OBJECT_SET_FILE.read_text())
     dirs = sorted(p for p in scanned_objects_dir().iterdir() if (p / "model.obj").exists())
     print(f"evaluating {len(dirs)} objects", flush=True)
+    results = []
     with Pool() as pool:
-        results = [r for r in pool.imap(evaluate, dirs, chunksize=4) if r is not None]
+        for k, r in enumerate(pool.imap(evaluate, dirs, chunksize=4), 1):
+            if r is not None:
+                results.append(r)
+            if k % 50 == 0:
+                print(f"  {k}/{len(dirs)} evaluated, {len(results)} pass", flush=True)
     passing = {r[0]: r for r in results}
     print(f"{len(passing)} pass the criteria", flush=True)
     rng = np.random.default_rng(CRITERIA["seed"])

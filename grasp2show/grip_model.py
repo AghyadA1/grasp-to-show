@@ -83,3 +83,31 @@ def utilisation_static(cs: ContactSet, com: np.ndarray, mass: float, g_obj: np.n
     """u for the object's weight with gravity g_obj (object frame, m/s^2): 1 / capacity."""
     a = capacity(cs, com, mass * np.asarray(g_obj, float), None, finger_force)
     return np.inf if a <= 0 else 1.0 / a
+
+
+def apply_to_reports(reports, contacts, obj, target_poses: np.ndarray, u_ok: float = 0.8,
+                     finger_force: float = 20.0) -> None:
+    """Replace the point-model stability margin of every reachable, visible target in feasibility
+    reports with this model's: margin = (u_ok - u) / u_ok, positive when u < u_ok (in validation,
+    70 % of grasps with u in 0.75-0.8 held, 98 % below 0.5). contacts[i]: the ContactSet of
+    grasp i (None: the fingers did not close on it -> every target fails). A grasp and its twin
+    (the hand turned 180 deg about the approach) touch the object at the same places, so one
+    contact set serves both. target_poses: (R, 4, 4) world poses of the object at the targets."""
+    g_world = np.array([0.0, 0.0, -9.81])
+    cache = {}
+    for i, rep in enumerate(reports):
+        cs = contacts[i]
+        for tw in rep.twins:
+            if not tw.start_ok:
+                continue
+            for j, t in enumerate(tw.targets):
+                if not t.reach.ok or t.visibility is None or not t.visibility.ok():
+                    continue
+                if cs is None:
+                    t.stability_margin = -1.0
+                    continue
+                if (i, j) not in cache:
+                    g = target_poses[j][:3, :3].T @ g_world
+                    cache[i, j] = utilisation_static(cs, obj.com, obj.mass, g, finger_force)
+                u = cache[i, j]
+                t.stability_margin = -1.0 if not np.isfinite(u) else (u_ok - u) / u_ok

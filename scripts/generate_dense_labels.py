@@ -16,6 +16,10 @@ more torque than the point-contact model allows). Grasps that lift in simulation
 analytic margin clipped to [0.1, 1]; the others are rejected. --max-candidates caps the shake
 tests per object.
 
+With --grip-model all (part 3), the stability check at each presentation target uses the grip
+model with every contact (grip_model.py; validated AUC 0.96 vs 0.92) instead of the two-pad
+point model: the contacts come from closing the simulated gripper on each candidate once.
+
 With --random-scenes K (part 3), each object gets K scenes instead of the fixed yaws: a random
 start rotation and place on the table and a random scanner pose (config.random_camera); the
 scanner pose is stored with the labels, since the targets depend on it.
@@ -43,7 +47,8 @@ from grasp2show.config import CameraConfig, ObjectConfig, SceneConfig, random_ca
 from grasp2show.experiment import lift_margins
 from grasp2show.feasibility import FeasibilityChecker
 from grasp2show.grasp_sampler import candidates_from_pairs, sample_antipodal
-from grasp2show.gripper_sim import GripperSim
+from grasp2show.grip_model import apply_to_reports
+from grasp2show.gripper_sim import GripperSim, close_contacts
 from grasp2show.heatmap import aware_scores
 from grasp2show.objects import load_object_set, object_from_config
 from grasp2show.scene import build_scene
@@ -55,7 +60,7 @@ OUT = ROOT / "data" / ("dense" if os.environ.get("G2S_OBJECT_SET", "v1") == "v1"
 
 
 def process(job) -> list[dict]:
-    asset, scenes, n_pairs, n_rolls, seed, sim_lift, max_cand = job
+    asset, scenes, n_pairs, n_rolls, seed, sim_lift, max_cand, grip_model = job
     t0 = time.perf_counter()
     cfg0 = SceneConfig(obj=ObjectConfig(asset=asset))
     obj = object_from_config(cfg0.obj)
@@ -68,6 +73,8 @@ def process(job) -> list[dict]:
         cand = cand.subset(rng.permutation(len(cand))[:max_cand])
     lift_sim = np.array([sim.shake_test(T, w).success for T, w in zip(cand.T_obj_tcp, cand.width)], bool) \
         if sim_lift else None
+    contacts = [close_contacts(sim, T, w) for T, w in zip(cand.T_obj_tcp, cand.width)] \
+        if grip_model == "all" else None
     c1, c2, _ = finger_contacts(obj.mesh, cand.T_obj_tcp)
     rolls = np.linspace(0, 2 * np.pi, n_rolls, endpoint=False)
     rows = []
@@ -80,6 +87,8 @@ def process(job) -> list[dict]:
         if lift_sim is not None:
             lm = np.where(lift_sim, np.clip(lm, 0.1, 1.0), -1.0)
         reports = [fc.evaluate(T, w, rolls) for T, w in zip(cand.T_obj_tcp, cand.width)]
+        if contacts is not None:
+            apply_to_reports(reports, contacts, obj, np.stack([show_pose(cfg, obj, r) for r in rolls]))
         S = aware_scores(reports, lm, n_rolls)
         np.savez_compressed(
             OUT / f"{asset}__{tag}.npz", T_obj_tcp=cand.T_obj_tcp.astype(np.float32),
@@ -107,6 +116,8 @@ def main() -> int:
     p.add_argument("--split", choices=["all", "train", "test"], default="all")
     p.add_argument("--sim-lift", action="store_true", help="check 1 from the simulated shake test (part 3)")
     p.add_argument("--max-candidates", type=int, default=0, help="cap per object (0: no cap)")
+    p.add_argument("--grip-model", choices=["point", "all"], default="point",
+                   help="stability at the targets: two-pad point model or every contact (part 3)")
     p.add_argument("--prune", action="store_true",
                    help="drop objects with no feasible grasp in any scene (not pickable from the table)")
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
@@ -123,7 +134,7 @@ def main() -> int:
         else:
             scenes = [(f"yaw{int(y)}", float(y), None, None) for y in args.yaws]
         jobs.append((n, scenes, args.pairs, args.rolls, 1000 + oset["objects"].index(n), args.sim_lift,
-                     args.max_candidates))
+                     args.max_candidates, args.grip_model))
     n_sc = args.random_scenes or len(args.yaws)
     print(f"{len(jobs)} objects x {n_sc} scenes x {args.rolls} targets, {args.workers} workers -> {OUT}")
     t0, rows = time.perf_counter(), []

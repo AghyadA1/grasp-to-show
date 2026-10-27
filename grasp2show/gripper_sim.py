@@ -186,3 +186,87 @@ class GripperSim:
         slip_deg = float(np.degrees(rotation_angle(dT[:3, :3])))
         ok = touching >= self._fingers and slip_mm < self.DROP_MM
         return ShakeResult(bool(ok), True, slip_mm, slip_deg)
+
+
+@dataclass
+class ContactSet:
+    """Every gripper-object contact after closing, in the object frame.
+
+    p (K, 3) points; n (K, 3) unit normals along which the gripper pushes the object; mu (K,)
+    sliding and mu_t (K,) torsional friction (MuJoCo's, per contact); part (K,): 0 finger, 1 palm;
+    c (K, 3): for finger contacts, the closing direction of that finger (zeros for the palm).
+    """
+    p: np.ndarray
+    n: np.ndarray
+    mu: np.ndarray
+    mu_t: np.ndarray
+    part: np.ndarray
+    c: np.ndarray
+
+    def __len__(self) -> int:
+        return len(self.p)
+
+
+def _contact_set(sim: GripperSim) -> ContactSet:
+    m, d = sim.model, sim.data
+    T_obj = sim._obj_pose()
+    R, t = T_obj[:3, :3], T_obj[:3, 3]
+    left, right = m.body("g_left_finger").id, m.body("g_right_finger").id
+    y = sim._tcp_pose()[:3, 1]
+    gap = d.xpos[right] - d.xpos[left]
+    c_left = y if gap @ y > 0 else -y                    # the left finger closes towards the right one
+    rows = []
+    for con in d.contact[: d.ncon]:
+        b1, b2 = m.geom_bodyid[con.geom1], m.geom_bodyid[con.geom2]
+        if sim._obj_body not in (b1, b2):
+            continue
+        other = b2 if b1 == sim._obj_body else b1
+        if other not in sim._gripper_bodies:
+            continue
+        nrm = con.frame[:3] if b2 == sim._obj_body else -con.frame[:3]   # force on the object
+        cdir = c_left if other == left else (-c_left if other == right else np.zeros(3))
+        rows.append((R.T @ (con.pos - t), R.T @ nrm, con.friction[0], con.friction[2],
+                     0 if other in sim._fingers else 1, R.T @ cdir))
+    if not rows:
+        z = np.zeros((0, 3))
+        return ContactSet(z, z, np.zeros(0), np.zeros(0), np.zeros(0, int), z)
+    p, n, mu, mt, part, c = (np.array(x) for x in zip(*rows))
+    return ContactSet(p, n, mu, mt, part.astype(int), c)
+
+
+def close_contacts(sim: GripperSim, T_obj_tcp: np.ndarray, width: float) -> ContactSet | None:
+    """Close the fingers on the object (no gravity) and return every contact, or None if the
+    two fingers do not both touch it."""
+    m, d = sim.model, sim.data
+    sim._reset(np.eye(3), T_obj_tcp, min(width + 0.02, sim.cfg.gripper.max_width))
+    d.ctrl[0] = 0.0
+    for _ in range(max(round(sim.T_CLOSE / m.opt.timestep), 1)):
+        mujoco.mj_step(m, d)
+    touching, _ = sim._contacts()
+    if not touching >= sim._fingers:
+        return None
+    return _contact_set(sim)
+
+
+def hold_test(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, R_world_obj: np.ndarray,
+              duration: float = 1.0) -> tuple[bool, float, float]:
+    """Ground truth for the hold check at any orientation: close (no gravity) with the object
+    at R_world_obj, switch gravity on, keep the hand still for `duration`. Returns (held,
+    slip_mm, slip_deg); held = both fingers still on and slip < GripperSim.DROP_MM."""
+    m, d = sim.model, sim.data
+    T0 = make_T(R_world_obj, np.zeros(3)) @ T_obj_tcp
+    sim._reset(R_world_obj, T0, min(width + 0.02, sim.cfg.gripper.max_width))
+    d.ctrl[0] = 0.0
+    for _ in range(max(round(sim.T_CLOSE / m.opt.timestep), 1)):
+        mujoco.mj_step(m, d)
+    touching, _ = sim._contacts()
+    if not touching >= sim._fingers:
+        return False, np.nan, np.nan
+    ref = inv_T(sim._tcp_pose()) @ sim._obj_pose()
+    m.opt.gravity[:] = [0, 0, -9.81]
+    for _ in range(max(round(duration / m.opt.timestep), 1)):
+        mujoco.mj_step(m, d)
+    touching, _ = sim._contacts()
+    dT = inv_T(ref) @ inv_T(sim._tcp_pose()) @ sim._obj_pose()
+    slip_mm = float(np.linalg.norm(dT[:3, 3]) * 1e3)
+    return bool(touching >= sim._fingers and slip_mm < sim.DROP_MM), slip_mm, float(np.degrees(rotation_angle(dT[:3, :3])))

@@ -116,12 +116,16 @@ def main() -> int:
     p.add_argument("--split", choices=["all", "train", "test"], default="all")
     p.add_argument("--sim-lift", action="store_true", help="check 1 from the simulated shake test (part 3)")
     p.add_argument("--max-candidates", type=int, default=0, help="cap per object (0: no cap)")
+    p.add_argument("--out", type=Path, default=None, help="output folder (default data/dense[_<set>])")
     p.add_argument("--grip-model", choices=["point", "all"], default="point",
                    help="stability at the targets: two-pad point model or every contact (part 3)")
     p.add_argument("--prune", action="store_true",
                    help="drop objects with no feasible grasp in any scene (not pickable from the table)")
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     args = p.parse_args()
+    global OUT
+    if args.out is not None:
+        OUT = args.out
     oset = load_object_set()
     names = (oset["objects"] if args.split == "all" else oset[args.split])[: args.objects]
     OUT.mkdir(parents=True, exist_ok=True)

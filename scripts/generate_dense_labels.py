@@ -9,9 +9,14 @@ fails, else the smallest normalised margin, as in the target-aware policy (grasp
 The per-point labels (best grasp touching each surface point) are derived from these files at
 training time, so the painting radius can change without recomputing anything.
 
+With --random-scenes K (part 3), each object gets K scenes instead of the fixed yaws: a random
+start rotation and place on the table and a random scanner pose (config.random_camera); the
+scanner pose is stored with the labels, since the targets depend on it.
+
 Usage:  python scripts/generate_dense_labels.py                  # 40 objects x 4 yaws
         python scripts/generate_dense_labels.py --objects 2 --yaws 0 --pairs 100   (quick check)
-Outputs: data/dense/<object>__yaw<deg>.npz, data/dense/summary.json
+        G2S_OBJECT_SET=v2 python scripts/generate_dense_labels.py --random-scenes 8   (part 3)
+Outputs: data/dense[_v2]/<object>__yaw<deg>.npz or <object>__s<k>.npz, summary.json
 """
 from __future__ import annotations
 
@@ -27,7 +32,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from grasp2show.config import ObjectConfig, SceneConfig
+from grasp2show.config import CameraConfig, ObjectConfig, SceneConfig, random_camera
 from grasp2show.experiment import lift_margins
 from grasp2show.feasibility import FeasibilityChecker
 from grasp2show.grasp_sampler import candidates_from_pairs, sample_antipodal
@@ -38,11 +43,12 @@ from grasp2show.scene import build_scene
 from grasp2show.stability import finger_contacts
 from grasp2show.task import show_pose
 
-OUT = ROOT / "data" / "dense"
+OUT = ROOT / "data" / ("dense" if os.environ.get("G2S_OBJECT_SET", "v1") == "v1" else
+                       f"dense_{os.environ['G2S_OBJECT_SET']}")
 
 
 def process(job) -> list[dict]:
-    asset, yaws, n_pairs, n_rolls, seed = job
+    asset, scenes, n_pairs, n_rolls, seed = job
     t0 = time.perf_counter()
     cfg0 = SceneConfig(obj=ObjectConfig(asset=asset))
     obj = object_from_config(cfg0.obj)
@@ -54,18 +60,22 @@ def process(job) -> list[dict]:
     c1, c2, _ = finger_contacts(obj.mesh, cand.T_obj_tcp)
     rolls = np.linspace(0, 2 * np.pi, n_rolls, endpoint=False)
     rows = []
-    for yaw in yaws:
-        cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw)))
+    for tag, yaw, xy, cam in scenes:
+        extra = {} if xy is None else {"start_xy": tuple(xy)}
+        cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw), **extra),
+                          camera=cam if cam is not None else CameraConfig())
         fc = FeasibilityChecker(build_scene(cfg, obj), cfg)
         lm = lift_margins(obj, cand.T_obj_tcp, fc.stab)
         reports = [fc.evaluate(T, w, rolls) for T, w in zip(cand.T_obj_tcp, cand.width)]
         S = aware_scores(reports, lm, n_rolls)
         np.savez_compressed(
-            OUT / f"{asset}__yaw{int(yaw)}.npz", T_obj_tcp=cand.T_obj_tcp.astype(np.float32),
+            OUT / f"{asset}__{tag}.npz", T_obj_tcp=cand.T_obj_tcp.astype(np.float32),
             width=cand.width.astype(np.float32), c1=c1.astype(np.float32), c2=c2.astype(np.float32),
             lift_margin=lm.astype(np.float32), S=S.astype(np.float32), rolls=rolls, yaw=yaw,
-            T_start=fc.T_start, T_target=np.stack([show_pose(cfg, obj, r) for r in rolls]))
-        rows.append({"object": asset, "yaw": yaw, "candidates": len(cand),
+            T_start=fc.T_start, T_target=np.stack([show_pose(cfg, obj, r) for r in rolls]),
+            cam_pos=np.asarray(cfg.camera.pos), cam_look_at=np.asarray(cfg.camera.look_at),
+            start_xy=np.asarray(cfg.obj.start_xy))
+        rows.append({"object": asset, "scene": tag, "yaw": round(yaw, 1), "candidates": len(cand),
                      "feasible_any_target": round(float((S.max(1) > 0).mean()), 3),
                      "feasible_per_target": round(float((S > 0).mean()), 3)})
     rows[-1]["seconds"] = round(time.perf_counter() - t0, 1)
@@ -78,12 +88,25 @@ def main() -> int:
     p.add_argument("--yaws", type=float, nargs="+", default=[0, 90, 180, 270])
     p.add_argument("--pairs", type=int, default=400, help="antipodal pairs per object (x 8 approach angles)")
     p.add_argument("--rolls", type=int, default=12)
+    p.add_argument("--random-scenes", type=int, default=0,
+                   help="K random scenes per object (start pose + scanner pose) instead of --yaws")
+    p.add_argument("--split", choices=["all", "train", "test"], default="all")
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     args = p.parse_args()
-    names = load_object_set()["objects"][: args.objects]
+    oset = load_object_set()
+    names = (oset["objects"] if args.split == "all" else oset[args.split])[: args.objects]
     OUT.mkdir(parents=True, exist_ok=True)
-    jobs = [(n, args.yaws, args.pairs, args.rolls, 1000 + i) for i, n in enumerate(names)]
-    print(f"{len(jobs)} objects x {len(args.yaws)} start poses x {args.rolls} targets, {args.workers} workers")
+    jobs = []
+    for i, n in enumerate(names):
+        if args.random_scenes:
+            r = np.random.default_rng(5000 + oset["objects"].index(n))
+            scenes = [(f"s{k}", float(r.uniform(0, 360)), (float(r.uniform(0.40, 0.60)), float(r.uniform(-0.30, 0.0))),
+                       random_camera(r)) for k in range(args.random_scenes)]
+        else:
+            scenes = [(f"yaw{int(y)}", float(y), None, None) for y in args.yaws]
+        jobs.append((n, scenes, args.pairs, args.rolls, 1000 + oset["objects"].index(n)))
+    n_sc = args.random_scenes or len(args.yaws)
+    print(f"{len(jobs)} objects x {n_sc} scenes x {args.rolls} targets, {args.workers} workers -> {OUT}")
     t0, rows = time.perf_counter(), []
     with Pool(args.workers) as pool:
         for k, rs in enumerate(pool.imap_unordered(process, jobs), 1):

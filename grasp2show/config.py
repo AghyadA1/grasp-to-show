@@ -47,6 +47,22 @@ class CameraConfig:
     height: int = 480
 
 
+def random_camera(rng) -> CameraConfig:
+    """A random scanner pose (part 3: the robot must show the code to a camera that moves).
+
+    Look-at point: the default one moved by up to +-10 cm in x and y and +-8 cm in height.
+    The camera looks at it from a distance of 24-36 cm, from a direction within 60 deg of the
+    default one (+y, facing the robot's side of the table) horizontally and between 10 deg
+    below and 35 deg above the horizontal (the default is 16 deg above).
+    """
+    d0 = CameraConfig()
+    at = np.asarray(d0.look_at) + rng.uniform([-0.10, -0.10, -0.08], [0.10, 0.10, 0.08])
+    az, el = np.radians(rng.uniform(-60, 60)), np.radians(rng.uniform(-10, 35))
+    dist = rng.uniform(0.24, 0.36)
+    pos = at + dist * np.array([np.sin(az) * np.cos(el), np.cos(az) * np.cos(el), np.sin(el)])
+    return CameraConfig(pos=tuple(np.round(pos, 4)), look_at=tuple(np.round(at, 4)))
+
+
 @dataclass
 class GripperConfig:
     """Force-limited position gripper, like Franka's grasp(width, speed, force).

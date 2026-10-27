@@ -27,7 +27,7 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from .config import ObjectConfig, SceneConfig
+from .config import CameraConfig, ObjectConfig, SceneConfig
 from .episode import PickAndShow
 from .feasibility import FeasibilityChecker, GraspReport, twin_of
 from .objects import ObjectModel, object_from_config
@@ -132,10 +132,11 @@ class Scenario:
     """One object at one start pose: feasibility reports and episode execution."""
 
     def __init__(self, asset: str, yaw_deg: float, grasps: dict, n_rolls: int = 12,
-                 start_xy: tuple[float, float] | None = None):
+                 start_xy: tuple[float, float] | None = None, camera: CameraConfig | None = None):
         self.asset, self.yaw_deg = asset, yaw_deg
         extra = {} if start_xy is None else {"start_xy": tuple(start_xy)}
-        self.cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw_deg), **extra))
+        cam = {} if camera is None else {"camera": camera}
+        self.cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw_deg), **extra), **cam)
         self.obj = object_from_config(self.cfg.obj)
         self.scene = build_scene(self.cfg, self.obj)
         self.fc = FeasibilityChecker(self.scene, self.cfg)

@@ -92,8 +92,8 @@ class DenseSet:
 def load_dense(root: Path, clouds, cam_pos, radius: float = 0.008) -> DenseSet:
     """All (object, start yaw, target) samples with per-point labels on the clouds' points."""
     rows = {k: [] for k in DenseSet.__dataclass_fields__}
-    for f in sorted(root.glob("*__yaw*.npz")):
-        name = f.name.split("__yaw")[0]
+    for f in sorted(root.glob("*__*.npz")):
+        name = f.name.split("__")[0]
         if name not in clouds.names:
             continue
         o = clouds.names.index(name)
@@ -101,7 +101,8 @@ def load_dense(root: Path, clouds, cam_pos, radius: float = 0.008) -> DenseSet:
         score, params, stab = point_labels(clouds.feats[o, :, :3], d, radius)
         for r in range(score.shape[0]):
             rows["obj"].append(o)
-            rows["cond"].append(condition(d["T_start"], d["T_target"][r], cam_pos, clouds.mass[o], clouds.com[o]))
+            cam = d.get("cam_pos", cam_pos)                             # part 3: the scanner moves
+            rows["cond"].append(condition(d["T_start"], d["T_target"][r], cam, clouds.mass[o], clouds.com[o]))
             rows["score"].append(score[r])
             rows["params"].append(params[r])
             rows["stab"].append(stab)

@@ -36,7 +36,6 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import generate_dense_labels as gdl
 from run_experiments import wilson
 
-from grasp2show.config import CameraConfig
 from grasp2show.experiment import Choice, Scenario, choose
 from grasp2show.objects import load_object_set
 from grasp2show.task import show_pose
@@ -77,7 +76,7 @@ def kinematic_choices(sc: Scenario, order: list[tuple[int, int]]) -> list[Choice
 
 
 def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k: int, min_sep: float = 0.01,
-                 start_xy: tuple[float, float] | None = None, with_scores: bool = False):
+                 start_xy: tuple[float, float] | None = None, with_scores: bool = False, camera=None):
     """Top-k (grasp, target) pairs from the network: T_obj_tcp (k,4,4), width (k,), roll index (k,),
     milliseconds (and, with_scores, the predicted success probability of each pair, (k,))."""
     import torch
@@ -90,11 +89,12 @@ def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k:
     net, clouds = _load(model_path, clouds_path)
     o = clouds.names.index(asset)
     extra = {} if start_xy is None else {"start_xy": tuple(start_xy)}
-    cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw), **extra))
+    cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw), **extra),
+                      **({} if camera is None else {"camera": camera}))
     obj = object_from_config(cfg.obj)
     rolls = np.linspace(0, 2 * np.pi, 12, endpoint=False)
     T0 = start_pose(cfg, obj)
-    cond = np.stack([condition(T0, show_pose(cfg, obj, r), CameraConfig().pos, clouds.mass[o], clouds.com[o])
+    cond = np.stack([condition(T0, show_pose(cfg, obj, r), cfg.camera.pos, clouds.mass[o], clouds.com[o])
                      for r in rolls])
     t = time.perf_counter()
     with torch.no_grad():

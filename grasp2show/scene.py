@@ -97,6 +97,12 @@ class Scene(NamedTuple):
     obj: ObjectModel
 
 
+def _away(pos, look_at) -> np.ndarray:
+    """Horizontal unit vector from the look-at point towards the camera (where its pole stands)."""
+    v = np.asarray(pos[:2], float) - np.asarray(look_at[:2], float)
+    return v / max(np.linalg.norm(v), 1e-9)
+
+
 def build_scene(cfg: SceneConfig | None = None, obj: ObjectModel | None = None) -> Scene:
     cfg = cfg or SceneConfig()
     spec = robot_spec(cfg)
@@ -142,7 +148,8 @@ def build_scene(cfg: SceneConfig | None = None, obj: ObjectModel | None = None) 
                    pos=list(c.pos), quat=mat_to_quat(_cam_frame(c.pos, c.look_at)),
                    rgba=[0.1, 0.1, 0.12, 1], contype=0, conaffinity=0)
     world.add_geom(name="scanner_pole", type=mujoco.mjtGeom.mjGEOM_CYLINDER,
-                   size=[0.008, (c.pos[2] - 0.02) / 2, 0], pos=[c.pos[0], c.pos[1] + 0.03, (c.pos[2] - 0.02) / 2],
+                   size=[0.008, (c.pos[2] - 0.02) / 2, 0],
+                   pos=[*(np.asarray(c.pos[:2]) + 0.03 * _away(c.pos, c.look_at)), (c.pos[2] - 0.02) / 2],
                    rgba=[0.3, 0.3, 0.32, 1], contype=0, conaffinity=0)
 
     ov_pos, ov_at = (1.45, -0.85, 0.85), (0.42, 0.05, 0.25)

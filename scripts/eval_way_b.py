@@ -77,8 +77,9 @@ def kinematic_choices(sc: Scenario, order: list[tuple[int, int]]) -> list[Choice
 
 
 def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k: int, min_sep: float = 0.01,
-                 start_xy: tuple[float, float] | None = None):
-    """Top-k (grasp, target) pairs from the network: T_obj_tcp (k,4,4), width (k,), roll index (k,)."""
+                 start_xy: tuple[float, float] | None = None, with_scores: bool = False):
+    """Top-k (grasp, target) pairs from the network: T_obj_tcp (k,4,4), width (k,), roll index (k,),
+    milliseconds (and, with_scores, the predicted success probability of each pair, (k,))."""
     import torch
 
     from grasp2show.config import ObjectConfig, SceneConfig
@@ -118,7 +119,10 @@ def way_b_grasps(asset: str, yaw: float, model_path: Path, clouds_path: Path, k:
 
     sim = GripperSim(cfg, obj)
     keep = [i for i in range(len(T)) if not sim.in_collision(T[i], float(W[i]))][:k]
-    return T[keep], np.asarray(W)[keep], np.array([picks[i][0] for i in keep], int), ms
+    out = T[keep], np.asarray(W)[keep], np.array([picks[i][0] for i in keep], int), ms
+    if with_scores:
+        return (*out, np.array([q[picks[i]] for i in keep]))
+    return out
 
 
 def run(job):

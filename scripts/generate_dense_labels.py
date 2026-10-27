@@ -60,7 +60,7 @@ OUT = ROOT / "data" / ("dense" if os.environ.get("G2S_OBJECT_SET", "v1") == "v1"
 
 
 def process(job) -> list[dict]:
-    asset, scenes, n_pairs, n_rolls, seed, sim_lift, max_cand, grip_model = job
+    asset, scenes, n_pairs, n_rolls, seed, sim_lift, max_cand, grip_model, out = job
     t0 = time.perf_counter()
     cfg0 = SceneConfig(obj=ObjectConfig(asset=asset))
     obj = object_from_config(cfg0.obj)
@@ -91,7 +91,7 @@ def process(job) -> list[dict]:
             apply_to_reports(reports, contacts, obj, np.stack([show_pose(cfg, obj, r) for r in rolls]))
         S = aware_scores(reports, lm, n_rolls)
         np.savez_compressed(
-            OUT / f"{asset}__{tag}.npz", T_obj_tcp=cand.T_obj_tcp.astype(np.float32),
+            Path(out) / f"{asset}__{tag}.npz", T_obj_tcp=cand.T_obj_tcp.astype(np.float32),
             width=cand.width.astype(np.float32), c1=c1.astype(np.float32), c2=c2.astype(np.float32),
             lift_margin=lm.astype(np.float32), S=S.astype(np.float32), rolls=rolls, yaw=yaw,
             T_start=fc.T_start, T_target=np.stack([show_pose(cfg, obj, r) for r in rolls]),
@@ -138,7 +138,7 @@ def main() -> int:
         else:
             scenes = [(f"yaw{int(y)}", float(y), None, None) for y in args.yaws]
         jobs.append((n, scenes, args.pairs, args.rolls, 1000 + oset["objects"].index(n), args.sim_lift,
-                     args.max_candidates, args.grip_model))
+                     args.max_candidates, args.grip_model, str(OUT)))
     n_sc = args.random_scenes or len(args.yaws)
     print(f"{len(jobs)} objects x {n_sc} scenes x {args.rolls} targets, {args.workers} workers -> {OUT}")
     t0, rows = time.perf_counter(), []

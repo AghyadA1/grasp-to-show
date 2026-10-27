@@ -701,6 +701,34 @@ other weak link is the teacher: the stability check at the presentation pose is 
 point-contact model. Next: a grip model with every finger contact (pads, sides, tips, palm),
 which also makes hooking a handle a strong grasp, then hanging grasps and swing-aware carries.
 
+### A grip model with every contact
+
+The point-contact model sees two finger pads touching at one point each. A finger closing on a
+mug's rim touches along a line; an irregular object touches the side of a finger or the palm.
+`grasp2show/grip_model.py` takes every contact the simulated gripper makes after closing
+(`gripper_sim.close_contacts`: points, normals, MuJoCo's friction per contact) and solves a small
+linear program: how many times the load (weight, or inertial loads during a carry) can contact
+forces inside their friction cones hold, with the gripper's one motor pushing the two coupled
+fingers with exactly 2 × 20 N along their closing directions, while the coupling, the finger
+structure and the palm carry everything else for free. About 4 ms per grasp and load.
+
+Validated against simulated hold tests (`scripts/validate_grip_model.py`: 1022 tests, 60 objects
+evenly from the three shape classes, a random orientation per test, friction 0.15–0.6 and mass
+× 0.5–4 to get both outcomes, no fitted parameters):
+
+![grip model](media/grip_model_validation.png)
+
+| AUC: which grasps drop | all | box | rounded | irregular |
+|---|---|---|---|---|
+| two-pad point model | 0.92 | 0.94 | 0.91 | 0.87 |
+| **every contact** | **0.96** | **0.95** | **0.96** | **0.92** |
+
+Calibration: of the grasps with u < 0.5, 99 % hold; 0.5–0.75: 77 %; 0.75–1: 47 %; above 1.5,
+almost none. The model is somewhat optimistic near u = 1 (the simulator's soft contacts creep),
+so the planning limit u ≤ 0.7 keeps its role. Only 1 % of the sampled grasps touched the palm:
+the antipodal sampler proposes pinches. Hooking needs its own grasps (closed fingers through a
+handle), next.
+
 ## C++ kernels
 
 `cpp/` is an optional C++17 package (nanobind bindings, no other dependencies) with the two hot

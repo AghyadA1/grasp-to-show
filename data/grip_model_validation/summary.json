@@ -1,0 +1,50 @@
+{
+ "all": {
+  "n": 1022,
+  "held": 0.588,
+  "u_point": {
+   "auc_not_held": 0.924,
+   "balanced_accuracy": 0.862
+  },
+  "u_all": {
+   "auc_not_held": 0.958,
+   "balanced_accuracy": 0.879
+  }
+ },
+ "box": {
+  "n": 400,
+  "held": 0.767,
+  "u_point": {
+   "auc_not_held": 0.944,
+   "balanced_accuracy": 0.915
+  },
+  "u_all": {
+   "auc_not_held": 0.954,
+   "balanced_accuracy": 0.85
+  }
+ },
+ "rounded": {
+  "n": 308,
+  "held": 0.659,
+  "u_point": {
+   "auc_not_held": 0.913,
+   "balanced_accuracy": 0.822
+  },
+  "u_all": {
+   "auc_not_held": 0.96,
+   "balanced_accuracy": 0.882
+  }
+ },
+ "irregular": {
+  "n": 314,
+  "held": 0.29,
+  "u_point": {
+   "auc_not_held": 0.871,
+   "balanced_accuracy": 0.787
+  },
+  "u_all": {
+   "auc_not_held": 0.924,
+   "balanced_accuracy": 0.842
+  }
+ }
+}

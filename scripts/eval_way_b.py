@@ -45,7 +45,10 @@ _net = {}
 
 
 def _load(model_path: Path, clouds_path: Path):
-    if not _net:
+    """The network with the object clouds of `clouds_path` (any object set: the clouds are inputs,
+    so a network trained on one set can be run on another). Cached per (model, clouds)."""
+    key = (str(model_path), str(clouds_path))
+    if key not in _net:
         import torch
 
         from grasp2show.learn.data import load_clouds
@@ -55,9 +58,10 @@ def _load(model_path: Path, clouds_path: Path):
         ck = torch.load(model_path, map_location="cpu", weights_only=False)
         clouds = load_clouds(clouds_path)
         net = HeatmapNet(torch.as_tensor(clouds.feats))
-        net.load_state_dict(ck["state_dict"])
-        _net.update(net=net.eval(), clouds=clouds)
-    return _net["net"], _net["clouds"]
+        state = {k: v for k, v in ck["state_dict"].items() if k != "clouds"}
+        net.load_state_dict(state, strict=False)
+        _net[key] = (net.eval(), clouds)
+    return _net[key]
 
 
 def kinematic_choices(sc: Scenario, order: list[tuple[int, int]]) -> list[Choice]:

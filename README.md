@@ -616,6 +616,20 @@ simulation (the ±5 mm leverage margin and the axial cap leave room); its one fa
 with 3 mm slip. Every failure of the slowed-down straight motion is a heavy object slipping in the
 hand (up to 47 cm): moving differently matters exactly where the grasp is the limit.
 
+### The network and the optimiser, case by case
+
+Same grasp, same start and end; each video shows how each path is made (the optimiser's search:
+60 rounds of 32 trial paths, ~15–25 s; the network: one pass, ~3–7 ms) and then both carries in
+full simulation with the grip use of each (`scripts/demo_net_vs_optimiser.py`).
+
+| case | object | carry: optimiser / network | video |
+|---|---|---|---|
+| about the same | Nestlé Nips box, 0.16 kg, μ 0.25 | 2.18 s / 2.14 s | [mp4](media/net_vs_opt_00089_Nestle_Nips_Hard_Can.mp4) |
+| the network wins (the straight path is impossible; the optimiser's detour is slow) | Skinny Cow box, 0.38 kg, μ 0.29 | 8.90 s / 1.98 s | [mp4](media/net_vs_opt_00017_Nestle_Skinny_Cow_Dr.mp4) |
+| the optimiser wins (grip far from its limit: the robot's limits bind, and the network keeps a margin) | Philips bulb box, 0.22 kg, μ 0.44 | 0.59 s / 0.83 s | [mp4](media/net_vs_opt_00058_Philips_EcoVantage_4.mp4) |
+
+![network vs optimiser](media/net_vs_opt_00017_Nestle_Skinny_Cow_Dr.gif)
+
 ### Choosing the grasp together with the motion
 
 Way B ranks grasps by how likely they are to show the code; the robot used to take the first one it

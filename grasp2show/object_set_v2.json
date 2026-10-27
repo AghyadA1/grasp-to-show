@@ -1,0 +1,7655 @@
+{
+ "source": "https://github.com/kevinzakka/mujoco_scanned_objects (Google Scanned Objects, CC-BY 4.0)",
+ "criteria": {
+  "antipodal_pairs_min": 10,
+  "antipodal_tries": 400,
+  "max_side_max_m": 0.3,
+  "min_side_min_m": 0.01,
+  "qr_min_side_m": 0.03,
+  "qr_flat_tol_face_m": 0.002,
+  "qr_flat_tol_curved_m": 0.004,
+  "classes": {
+   "box": [
+    0.85,
+    9
+   ],
+   "rounded": [
+    0.6,
+    0.85
+   ],
+   "irregular": [
+    0,
+    0.6
+   ]
+  },
+  "new_per_class": {
+   "box": 25,
+   "rounded": 50,
+   "irregular": 50
+  },
+  "test_fraction": 0.25,
+  "seed": 0
+ },
+ "n_candidates": 1030,
+ "n_passing": 441,
+ "objects": [
+  "3D_Dollhouse_Refrigerator",
+  "3D_Dollhouse_Sink",
+  "3D_Dollhouse_Sofa",
+  "ACE_Coffee_Mug_Kristen_16_oz_cup",
+  "Air_Hogs_Wind_Flyers_Set_Airplane_Red",
+  "Aroma_Stainless_Steel_Milk_Frother_2_Cup",
+  "Avengers_Thor_PLlrpYniaeB",
+  "BEDROOM_NEO",
+  "BIA_Porcelain_Ramekin_With_Glazed_Rim_35_45_oz_cup",
+  "BUILD_A_ROBOT",
+  "BlackBlack_Nintendo_3DSXL",
+  "Black_and_Decker_TR3500SD_2Slice_Toaster",
+  "BlueBlack_Nintendo_3DSXL",
+  "Blue_Jasmine_Includes_Digital_Copy_UltraViolet_DVD",
+  "Brother_LC_1053PKS_Ink_Cartridge_CyanMagentaYellow_1pack",
+  "Brother_Printing_Cartridge_PC501",
+  "CHILDRENS_ROOM_NEO",
+  "Canon_225226_Ink_Cartridges_BlackColor_Cyan_Magenta_Yellow_6_count",
+  "Canon_Pixma_Ink_Cartridge_8",
+  "Cascadia_8_Color_AquariusHibscsBearingSeaBlk_Size_50",
+  "Cole_Hardware_Antislip_Surfacing_White_2_x_60",
+  "Cole_Hardware_Dishtowel_Red",
+  "Cole_Hardware_Flower_Pot_1025",
+  "Cole_Hardware_Mug_Classic_Blue",
+  "Cole_Hardware_Saucer_Glazed_6",
+  "Court_Attitude",
+  "Crayola_Bonus_64_Crayons",
+  "Crayola_Crayons_120_crayons",
+  "Crayola_Crayons_24_count",
+  "Crayola_Model_Magic_Modeling_Material_White_3_oz",
+  "Crayola_Washable_Fingerpaint_Red_Blue_Yellow_3_count_8_fl_oz_bottes_each",
+  "Crazy_Shadow_2",
+  "Crosley_Alarm_Clock_Vintage_Metal",
+  "Crunch_Girl_Scouts_Candy_Bars_Peanut_Butter_Creme_78_oz_box",
+  "D_ROSE_773_II_Kqclsph05pE",
+  "Dell_Ink_Cartridge",
+  "Dixie_10_ounce_Bowls_35_ct",
+  "Down_To_Earth_Ceramic_Orchid_Pot_Asst_Blue",
+  "Eat_to_Live_The_Amazing_NutrientRich_Program_for_Fast_and_Sustained_Weight_Loss_Revised_Edition_Book",
+  "Ecoforms_Plant_Container_12_Pot_Nova",
+  "Embark_Lunch_Cooler_Blue",
+  "Epson_273XL_Ink_Cartridge_Magenta",
+  "Epson_Ink_Cartridge_Black_200",
+  "Epson_T5803_Ink_Cartridge_Magenta_1pack",
+  "Epson_UltraChrome_T0548_Ink_Cartridge_Matte_Black_1pack",
+  "F10_TRX_FG_ssscuo9tGxb",
+  "F10_TRX_TF_rH7tmKCdUJq",
+  "HP_Card_Invitation_Kit",
+  "Horse_Dreams_Pencil_Case",
+  "House_of_Cards_The_Complete_First_Season_4_Discs_DVD",
+  "JarroSil_Activated_Silicon_5exdZHIeLAp",
+  "Just_For_Men_Mustache_Beard_Brushin_Hair_Color_Gel_Kit_Jet_Black_M60",
+  "Just_For_Men_ShampooIn_Haircolor_Jet_Black_60",
+  "Just_For_Men_ShampooIn_Haircolor_Light_Brown_25",
+  "Just_For_Men_Shampoo_In_Haircolor_Darkest_Brown_50",
+  "KITCHEN_SET_CLASSIC_40HwCHfeG0H",
+  "Kid_Icarus_Uprising_Nintendo_3DS_Game",
+  "LEUCIPPUS_ADIPURE",
+  "Leap_Frog_Paint_Dabber_Dot_Art_5_paint_bottles",
+  "MEAT_SET",
+  "Marc_Anthony_Strictly_Curls_Curl_Envy_Perfect_Curl_Cream_6_fl_oz_bottle",
+  "Markings_Letter_Holder",
+  "Mens_Bahama_in_Khaki_Oyster_xU2jeqYwhQJ",
+  "Mens_Billfish_Slip_On_in_Coffee_nK6AJJAHOae",
+  "Mens_Gold_Cup_ASV_2Eye_Boat_Shoe_in_Cognac_Leather",
+  "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_EjPnk3E8fCs",
+  "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_GkQBKqABeQN",
+  "Mens_Gold_Cup_ASV_Dress_Casual_Venetian_in_Dark_Brown_Leather",
+  "Mens_Tremont_Kiltie_Tassel_Loafer_in_Black_Amaretto_FT0I9OjSA6O",
+  "Nescafe_Momento_Mocha_Specialty_Coffee_Mix_8_ct",
+  "Nescafe_Tasters_Choice_Instant_Coffee_Decaf_House_Blend_Light_7_oz",
+  "Nestl_Skinny_Cow_Heavenly_Crisp_Candy_Bar_Chocolate_Raspberry_6_pack_462_oz_total",
+  "Nestle_Nips_Hard_Candy_Peanut_Butter",
+  "Nestle_Raisinets_Milk_Chocolate_35_oz_992_g",
+  "Nestle_Skinny_Cow_Dreamy_Clusters_Candy_Dark_Chocolate_6_pack_1_oz_pouches",
+  "Nickelodeon_The_Spongebob_Movie_PopAPart_Spongebob",
+  "Nintendo_2DS_Crimson_Red",
+  "Nordic_Ware_Original_Bundt_Pan",
+  "Now_Designs_Snack_Bags_Bicycle_2_count",
+  "OVAL_XYLOPHONE",
+  "OWL_SORTER",
+  "Office_Depot_Canon_CLI_221BK_Ink_Cartridge_Black_2946B001",
+  "Office_Depot_Canon_PGI35_Remanufactured_Ink_Cartridge_Black",
+  "Office_Depot_Canon_PGI5BK_Remanufactured_Ink_Cartridge_Black",
+  "Office_Depot_Dell_Series_1_Remanufactured_Ink_Cartridge_Black",
+  "Office_Depot_HP_2_Remanufactured_Ink_Cartridges_Color_Cyan_Magenta_Yellow_3_count",
+  "Office_Depot_HP_564XL_Ink_Cartridge_Black_CN684WN",
+  "Office_Depot_HP_71_Remanufactured_Ink_Cartridge_Black",
+  "Office_Depot_HP_950XL_Ink_Cartridge_Black_CN045AN",
+  "Office_Depot_HP_98_Remanufactured_Ink_Cartridge_Black",
+  "Olive_Kids_Birdie_Munch_n_Lunch",
+  "Olive_Kids_Butterfly_Garden_Munch_n_Lunch_Bag",
+  "Olive_Kids_Dinosaur_Land_Munch_n_Lunch",
+  "Olive_Kids_Game_On_Lunch_Box",
+  "Olive_Kids_Paisley_Pencil_Case",
+  "PUNCH_DROP_TjicLPMqLvz",
+  "Paul_Frank_Dot_Lunch_Box",
+  "Pennington_Electric_Pot_Cabana_4",
+  "Perricoen_MD_No_Concealer_Concealer",
+  "Perricone_MD_AcylGlutathione_Eye_Lid_Serum",
+  "Perricone_MD_Chia_Serum",
+  "Perricone_MD_Face_Finishing_Moisturizer",
+  "Perricone_MD_Hypoallergenic_Gentle_Cleanser",
+  "Perricone_MD_No_Foundation_Foundation_No_1",
+  "Perricone_MD_No_Foundation_Serum",
+  "Perricone_MD_No_Lipstick_Lipstick",
+  "Perricone_MD_Photo_Plasma",
+  "Perricone_MD_The_Crease_Cure_Duo",
+  "Perricone_MD_Vitamin_C_Ester_15",
+  "Persona_Q_Shadow_of_the_Labyrinth_Nintendo_3DS",
+  "Philips_EcoVantage_43_W_Light_Bulbs_Natural_Light_2_pack",
+  "Phillips_Caplets_Size_24",
+  "Phillips_Stool_Softener_Liquid_Gels_30_liquid_gels",
+  "Pinwheel_Pencil_Case",
+  "Pokmon_Conquest_Nintendo_DS_Game",
+  "Pokmon_X_Nintendo_3DS_Game",
+  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS",
+  "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total",
+  "Predator_LZ_TRX_FG",
+  "RJ_Rabbit_Easter_Basket_Blue",
+  "ReadytoUse_Rolled_Fondant_Pure_White_24_oz_box",
+  "Reebok_BREAKPOINT_MID",
+  "Reebok_FUELTRAIN",
+  "Reebok_R_CROSSFIT_OLY_UFORM",
+  "Reebok_TURBO_RC",
+  "Reef_Star_Cushion_Flipflops_Size_8_Black",
+  "Room_Essentials_Mug_White_Yellow",
+  "SAMOA",
+  "SHAPE_MATCHING",
+  "Sapota_Threshold_4_Ceramic_Round_Planter_Red",
+  "Seagate_Archive_HDD_8_TB_Internal_hard_drive_SATA_6Gbs_35_ST8000AS0002",
+  "Shurtape_Tape_Purple_CP28",
+  "Simon_Swipe_Game",
+  "Sony_Acid_Music_Studio",
+  "Sony_Downloadable_Loops",
+  "Sperry_TopSider_pSUFPWQXPp3",
+  "Sperry_TopSider_tNB9t6YBUf3",
+  "Squirt_Strain_Fruit_Basket",
+  "Super_Mario_3D_World_Wii_U_Game",
+  "Super_Mario_Kart_Super_Nintendo_Entertainment_System",
+  "Tag_Dishtowel_Basket_Weave_Red_18_x_26",
+  "Tag_Dishtowel_Green",
+  "Threshold_Hand_Towel_Blue_Medallion_16_x_27",
+  "Threshold_Porcelain_Coffee_Mug_All_Over_Bead_White",
+  "Threshold_Porcelain_Pitcher_White",
+  "Threshold_Porcelain_Teapot_White",
+  "Threshold_Ramekin_White_Porcelain",
+  "Threshold_Salad_Plate_Square_Rim_Porcelain",
+  "Timberland_Mens_Earthkeepers_Newmarket_6Inch_Cupsole_Boot",
+  "Top_Paw_Dog_Bowl_Blue_Paw_Bone_Ceramic_25_fl_oz_total",
+  "Travel_Smart_Neck_Rest_Inflatable",
+  "UGG_Bailey_Button_Womens_Boots_Black_7",
+  "UGG_Cambridge_Womens_Black_7",
+  "US_Army_Stash_Lunch_Bag",
+  "VANS_FIRE_ROASTED_VEGGIE_CRACKERS_GLUTEN_FREE",
+  "Victor_Reversible_Bookend",
+  "Whey_Protein_Vanilla",
+  "Wilton_Easy_Layers_Cake_Pan_Set",
+  "Wilton_PreCut_Parchment_Sheets_10_x_15_24_sheets",
+  "Womens_Authentic_Original_Boat_Shoe_in_Classic_Brown_Leather_48Nh7VuMwW6",
+  "Womens_Hikerfish_Boot_in_Black_Leopard_ridcCWsv8rW",
+  "Womens_Sparkle_Suede_Angelfish_in_Grey_Sparkle_Suede_Silver",
+  "Womens_Sparkle_Suede_Bahama_in_Silver_Sparkle_Suede_Grey_Patent_x9rclU7EJXx",
+  "Womens_Suede_Bahama_in_Graphite_Suede_cUAjIMhWSO9",
+  "Womens_Teva_Capistrano_Bootie_ldjRT9yZ5Ht"
+ ],
+ "train": [
+  "3D_Dollhouse_Refrigerator",
+  "3D_Dollhouse_Sink",
+  "3D_Dollhouse_Sofa",
+  "Air_Hogs_Wind_Flyers_Set_Airplane_Red",
+  "Avengers_Thor_PLlrpYniaeB",
+  "BEDROOM_NEO",
+  "BUILD_A_ROBOT",
+  "BlackBlack_Nintendo_3DSXL",
+  "BlueBlack_Nintendo_3DSXL",
+  "Brother_Printing_Cartridge_PC501",
+  "Canon_225226_Ink_Cartridges_BlackColor_Cyan_Magenta_Yellow_6_count",
+  "Cascadia_8_Color_AquariusHibscsBearingSeaBlk_Size_50",
+  "Cole_Hardware_Antislip_Surfacing_White_2_x_60",
+  "Cole_Hardware_Dishtowel_Red",
+  "Cole_Hardware_Flower_Pot_1025",
+  "Cole_Hardware_Mug_Classic_Blue",
+  "Cole_Hardware_Saucer_Glazed_6",
+  "Court_Attitude",
+  "Crayola_Bonus_64_Crayons",
+  "Crayola_Crayons_24_count",
+  "Crayola_Model_Magic_Modeling_Material_White_3_oz",
+  "Crayola_Washable_Fingerpaint_Red_Blue_Yellow_3_count_8_fl_oz_bottes_each",
+  "Crazy_Shadow_2",
+  "Crosley_Alarm_Clock_Vintage_Metal",
+  "Crunch_Girl_Scouts_Candy_Bars_Peanut_Butter_Creme_78_oz_box",
+  "D_ROSE_773_II_Kqclsph05pE",
+  "Dell_Ink_Cartridge",
+  "Dixie_10_ounce_Bowls_35_ct",
+  "Down_To_Earth_Ceramic_Orchid_Pot_Asst_Blue",
+  "Eat_to_Live_The_Amazing_NutrientRich_Program_for_Fast_and_Sustained_Weight_Loss_Revised_Edition_Book",
+  "Embark_Lunch_Cooler_Blue",
+  "Epson_273XL_Ink_Cartridge_Magenta",
+  "Epson_Ink_Cartridge_Black_200",
+  "Epson_T5803_Ink_Cartridge_Magenta_1pack",
+  "F10_TRX_TF_rH7tmKCdUJq",
+  "HP_Card_Invitation_Kit",
+  "Horse_Dreams_Pencil_Case",
+  "JarroSil_Activated_Silicon_5exdZHIeLAp",
+  "Just_For_Men_Mustache_Beard_Brushin_Hair_Color_Gel_Kit_Jet_Black_M60",
+  "Just_For_Men_ShampooIn_Haircolor_Jet_Black_60",
+  "Just_For_Men_Shampoo_In_Haircolor_Darkest_Brown_50",
+  "Kid_Icarus_Uprising_Nintendo_3DS_Game",
+  "LEUCIPPUS_ADIPURE",
+  "Leap_Frog_Paint_Dabber_Dot_Art_5_paint_bottles",
+  "Marc_Anthony_Strictly_Curls_Curl_Envy_Perfect_Curl_Cream_6_fl_oz_bottle",
+  "Mens_Bahama_in_Khaki_Oyster_xU2jeqYwhQJ",
+  "Mens_Billfish_Slip_On_in_Coffee_nK6AJJAHOae",
+  "Mens_Gold_Cup_ASV_2Eye_Boat_Shoe_in_Cognac_Leather",
+  "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_EjPnk3E8fCs",
+  "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_GkQBKqABeQN",
+  "Mens_Gold_Cup_ASV_Dress_Casual_Venetian_in_Dark_Brown_Leather",
+  "Mens_Tremont_Kiltie_Tassel_Loafer_in_Black_Amaretto_FT0I9OjSA6O",
+  "Nescafe_Momento_Mocha_Specialty_Coffee_Mix_8_ct",
+  "Nescafe_Tasters_Choice_Instant_Coffee_Decaf_House_Blend_Light_7_oz",
+  "Nestl_Skinny_Cow_Heavenly_Crisp_Candy_Bar_Chocolate_Raspberry_6_pack_462_oz_total",
+  "Nestle_Raisinets_Milk_Chocolate_35_oz_992_g",
+  "Nickelodeon_The_Spongebob_Movie_PopAPart_Spongebob",
+  "Nintendo_2DS_Crimson_Red",
+  "Nordic_Ware_Original_Bundt_Pan",
+  "Now_Designs_Snack_Bags_Bicycle_2_count",
+  "OVAL_XYLOPHONE",
+  "OWL_SORTER",
+  "Office_Depot_Canon_CLI_221BK_Ink_Cartridge_Black_2946B001",
+  "Office_Depot_Canon_PGI35_Remanufactured_Ink_Cartridge_Black",
+  "Office_Depot_HP_564XL_Ink_Cartridge_Black_CN684WN",
+  "Office_Depot_HP_950XL_Ink_Cartridge_Black_CN045AN",
+  "Office_Depot_HP_98_Remanufactured_Ink_Cartridge_Black",
+  "Olive_Kids_Birdie_Munch_n_Lunch",
+  "Olive_Kids_Butterfly_Garden_Munch_n_Lunch_Bag",
+  "Olive_Kids_Dinosaur_Land_Munch_n_Lunch",
+  "Olive_Kids_Game_On_Lunch_Box",
+  "PUNCH_DROP_TjicLPMqLvz",
+  "Perricoen_MD_No_Concealer_Concealer",
+  "Perricone_MD_Chia_Serum",
+  "Perricone_MD_Face_Finishing_Moisturizer",
+  "Perricone_MD_Hypoallergenic_Gentle_Cleanser",
+  "Perricone_MD_No_Foundation_Foundation_No_1",
+  "Perricone_MD_No_Foundation_Serum",
+  "Perricone_MD_No_Lipstick_Lipstick",
+  "Perricone_MD_Photo_Plasma",
+  "Perricone_MD_Vitamin_C_Ester_15",
+  "Phillips_Stool_Softener_Liquid_Gels_30_liquid_gels",
+  "Pinwheel_Pencil_Case",
+  "Pokmon_Conquest_Nintendo_DS_Game",
+  "Pokmon_X_Nintendo_3DS_Game",
+  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS",
+  "Predator_LZ_TRX_FG",
+  "ReadytoUse_Rolled_Fondant_Pure_White_24_oz_box",
+  "Reebok_BREAKPOINT_MID",
+  "Reebok_FUELTRAIN",
+  "Reebok_R_CROSSFIT_OLY_UFORM",
+  "Reef_Star_Cushion_Flipflops_Size_8_Black",
+  "Room_Essentials_Mug_White_Yellow",
+  "SHAPE_MATCHING",
+  "Sapota_Threshold_4_Ceramic_Round_Planter_Red",
+  "Seagate_Archive_HDD_8_TB_Internal_hard_drive_SATA_6Gbs_35_ST8000AS0002",
+  "Shurtape_Tape_Purple_CP28",
+  "Simon_Swipe_Game",
+  "Sony_Acid_Music_Studio",
+  "Sony_Downloadable_Loops",
+  "Sperry_TopSider_pSUFPWQXPp3",
+  "Sperry_TopSider_tNB9t6YBUf3",
+  "Super_Mario_3D_World_Wii_U_Game",
+  "Super_Mario_Kart_Super_Nintendo_Entertainment_System",
+  "Tag_Dishtowel_Basket_Weave_Red_18_x_26",
+  "Tag_Dishtowel_Green",
+  "Threshold_Hand_Towel_Blue_Medallion_16_x_27",
+  "Threshold_Porcelain_Coffee_Mug_All_Over_Bead_White",
+  "Threshold_Porcelain_Pitcher_White",
+  "Threshold_Porcelain_Teapot_White",
+  "Threshold_Ramekin_White_Porcelain",
+  "Threshold_Salad_Plate_Square_Rim_Porcelain",
+  "Timberland_Mens_Earthkeepers_Newmarket_6Inch_Cupsole_Boot",
+  "Top_Paw_Dog_Bowl_Blue_Paw_Bone_Ceramic_25_fl_oz_total",
+  "Travel_Smart_Neck_Rest_Inflatable",
+  "UGG_Cambridge_Womens_Black_7",
+  "US_Army_Stash_Lunch_Bag",
+  "VANS_FIRE_ROASTED_VEGGIE_CRACKERS_GLUTEN_FREE",
+  "Whey_Protein_Vanilla",
+  "Wilton_Easy_Layers_Cake_Pan_Set",
+  "Womens_Authentic_Original_Boat_Shoe_in_Classic_Brown_Leather_48Nh7VuMwW6",
+  "Womens_Hikerfish_Boot_in_Black_Leopard_ridcCWsv8rW",
+  "Womens_Sparkle_Suede_Angelfish_in_Grey_Sparkle_Suede_Silver",
+  "Womens_Sparkle_Suede_Bahama_in_Silver_Sparkle_Suede_Grey_Patent_x9rclU7EJXx",
+  "Womens_Suede_Bahama_in_Graphite_Suede_cUAjIMhWSO9"
+ ],
+ "test": [
+  "ACE_Coffee_Mug_Kristen_16_oz_cup",
+  "Aroma_Stainless_Steel_Milk_Frother_2_Cup",
+  "BIA_Porcelain_Ramekin_With_Glazed_Rim_35_45_oz_cup",
+  "Black_and_Decker_TR3500SD_2Slice_Toaster",
+  "Blue_Jasmine_Includes_Digital_Copy_UltraViolet_DVD",
+  "Brother_LC_1053PKS_Ink_Cartridge_CyanMagentaYellow_1pack",
+  "CHILDRENS_ROOM_NEO",
+  "Canon_Pixma_Ink_Cartridge_8",
+  "Crayola_Crayons_120_crayons",
+  "Ecoforms_Plant_Container_12_Pot_Nova",
+  "Epson_UltraChrome_T0548_Ink_Cartridge_Matte_Black_1pack",
+  "F10_TRX_FG_ssscuo9tGxb",
+  "House_of_Cards_The_Complete_First_Season_4_Discs_DVD",
+  "Just_For_Men_ShampooIn_Haircolor_Light_Brown_25",
+  "KITCHEN_SET_CLASSIC_40HwCHfeG0H",
+  "MEAT_SET",
+  "Markings_Letter_Holder",
+  "Nestle_Nips_Hard_Candy_Peanut_Butter",
+  "Nestle_Skinny_Cow_Dreamy_Clusters_Candy_Dark_Chocolate_6_pack_1_oz_pouches",
+  "Office_Depot_Canon_PGI5BK_Remanufactured_Ink_Cartridge_Black",
+  "Office_Depot_Dell_Series_1_Remanufactured_Ink_Cartridge_Black",
+  "Office_Depot_HP_2_Remanufactured_Ink_Cartridges_Color_Cyan_Magenta_Yellow_3_count",
+  "Office_Depot_HP_71_Remanufactured_Ink_Cartridge_Black",
+  "Olive_Kids_Paisley_Pencil_Case",
+  "Paul_Frank_Dot_Lunch_Box",
+  "Pennington_Electric_Pot_Cabana_4",
+  "Perricone_MD_AcylGlutathione_Eye_Lid_Serum",
+  "Perricone_MD_The_Crease_Cure_Duo",
+  "Persona_Q_Shadow_of_the_Labyrinth_Nintendo_3DS",
+  "Philips_EcoVantage_43_W_Light_Bulbs_Natural_Light_2_pack",
+  "Phillips_Caplets_Size_24",
+  "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total",
+  "RJ_Rabbit_Easter_Basket_Blue",
+  "Reebok_TURBO_RC",
+  "SAMOA",
+  "Squirt_Strain_Fruit_Basket",
+  "UGG_Bailey_Button_Womens_Boots_Black_7",
+  "Victor_Reversible_Bookend",
+  "Wilton_PreCut_Parchment_Sheets_10_x_15_24_sheets",
+  "Womens_Teva_Capistrano_Bootie_ldjRT9yZ5Ht"
+ ],
+ "stats": {
+  "3D_Dollhouse_Refrigerator": {
+   "extents_cm": [
+    7.2,
+    7.8,
+    20.9
+   ],
+   "boxiness": 0.934,
+   "class": "box",
+   "antipodal_pairs": 330,
+   "qr_kind": "face",
+   "mass_kg_est": 0.329,
+   "handle_name": false
+  },
+  "3D_Dollhouse_Sink": {
+   "extents_cm": [
+    7.3,
+    8.4,
+    13.0
+   ],
+   "boxiness": 0.837,
+   "class": "rounded",
+   "antipodal_pairs": 341,
+   "qr_kind": "face",
+   "mass_kg_est": 0.2,
+   "handle_name": false
+  },
+  "3D_Dollhouse_Sofa": {
+   "extents_cm": [
+    8.6,
+    10.1,
+    21.0
+   ],
+   "boxiness": 0.796,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.435,
+   "handle_name": false
+  },
+  "ACE_Coffee_Mug_Kristen_16_oz_cup": {
+   "extents_cm": [
+    9.0,
+    11.9,
+    13.4
+   ],
+   "boxiness": 0.58,
+   "class": "irregular",
+   "antipodal_pairs": 30,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.249,
+   "handle_name": true
+  },
+  "Air_Hogs_Wind_Flyers_Set_Airplane_Red": {
+   "extents_cm": [
+    5.0,
+    24.4,
+    24.8
+   ],
+   "boxiness": 0.487,
+   "class": "irregular",
+   "antipodal_pairs": 98,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.439,
+   "handle_name": false
+  },
+  "Aroma_Stainless_Steel_Milk_Frother_2_Cup": {
+   "extents_cm": [
+    13.7,
+    14.7,
+    16.0
+   ],
+   "boxiness": 0.559,
+   "class": "irregular",
+   "antipodal_pairs": 136,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.544,
+   "handle_name": true
+  },
+  "Avengers_Thor_PLlrpYniaeB": {
+   "extents_cm": [
+    13.0,
+    28.1,
+    28.3
+   ],
+   "boxiness": 0.933,
+   "class": "box",
+   "antipodal_pairs": 62,
+   "qr_kind": "face",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "BEDROOM_NEO": {
+   "extents_cm": [
+    17.1,
+    24.7,
+    26.3
+   ],
+   "boxiness": 0.52,
+   "class": "irregular",
+   "antipodal_pairs": 57,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "BIA_Porcelain_Ramekin_With_Glazed_Rim_35_45_oz_cup": {
+   "extents_cm": [
+    4.3,
+    8.9,
+    8.9
+   ],
+   "boxiness": 0.695,
+   "class": "rounded",
+   "antipodal_pairs": 79,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.07,
+   "handle_name": true
+  },
+  "BUILD_A_ROBOT": {
+   "extents_cm": [
+    12.8,
+    13.2,
+    29.2
+   ],
+   "boxiness": 0.408,
+   "class": "irregular",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.604,
+   "handle_name": false
+  },
+  "BlackBlack_Nintendo_3DSXL": {
+   "extents_cm": [
+    5.6,
+    15.5,
+    15.9
+   ],
+   "boxiness": 0.572,
+   "class": "irregular",
+   "antipodal_pairs": 387,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.235,
+   "handle_name": false
+  },
+  "Black_and_Decker_TR3500SD_2Slice_Toaster": {
+   "extents_cm": [
+    16.8,
+    18.9,
+    29.5
+   ],
+   "boxiness": 0.713,
+   "class": "rounded",
+   "antipodal_pairs": 213,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "BlueBlack_Nintendo_3DSXL": {
+   "extents_cm": [
+    5.7,
+    15.6,
+    15.8
+   ],
+   "boxiness": 0.569,
+   "class": "irregular",
+   "antipodal_pairs": 379,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.239,
+   "handle_name": false
+  },
+  "Blue_Jasmine_Includes_Digital_Copy_UltraViolet_DVD": {
+   "extents_cm": [
+    1.6,
+    13.8,
+    19.3
+   ],
+   "boxiness": 0.939,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.12,
+   "handle_name": false
+  },
+  "Brother_LC_1053PKS_Ink_Cartridge_CyanMagentaYellow_1pack": {
+   "extents_cm": [
+    5.4,
+    9.9,
+    14.6
+   ],
+   "boxiness": 0.846,
+   "class": "rounded",
+   "antipodal_pairs": 391,
+   "qr_kind": "face",
+   "mass_kg_est": 0.196,
+   "handle_name": false
+  },
+  "Brother_Printing_Cartridge_PC501": {
+   "extents_cm": [
+    5.7,
+    11.9,
+    25.6
+   ],
+   "boxiness": 0.952,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.491,
+   "handle_name": false
+  },
+  "CHILDRENS_ROOM_NEO": {
+   "extents_cm": [
+    14.1,
+    14.2,
+    20.2
+   ],
+   "boxiness": 0.702,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.85,
+   "handle_name": false
+  },
+  "Canon_225226_Ink_Cartridges_BlackColor_Cyan_Magenta_Yellow_6_count": {
+   "extents_cm": [
+    7.1,
+    14.7,
+    16.9
+   ],
+   "boxiness": 0.839,
+   "class": "rounded",
+   "antipodal_pairs": 198,
+   "qr_kind": "face",
+   "mass_kg_est": 0.441,
+   "handle_name": false
+  },
+  "Canon_Pixma_Ink_Cartridge_8": {
+   "extents_cm": [
+    2.5,
+    9.2,
+    11.5
+   ],
+   "boxiness": 0.678,
+   "class": "rounded",
+   "antipodal_pairs": 316,
+   "qr_kind": "face",
+   "mass_kg_est": 0.054,
+   "handle_name": false
+  },
+  "Cascadia_8_Color_AquariusHibscsBearingSeaBlk_Size_50": {
+   "extents_cm": [
+    10.1,
+    12.1,
+    25.4
+   ],
+   "boxiness": 0.504,
+   "class": "irregular",
+   "antipodal_pairs": 323,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.47,
+   "handle_name": false
+  },
+  "Cole_Hardware_Antislip_Surfacing_White_2_x_60": {
+   "extents_cm": [
+    5.5,
+    15.6,
+    15.6
+   ],
+   "boxiness": 0.78,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.313,
+   "handle_name": false
+  },
+  "Cole_Hardware_Dishtowel_Red": {
+   "extents_cm": [
+    2.6,
+    17.0,
+    23.7
+   ],
+   "boxiness": 0.818,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.258,
+   "handle_name": false
+  },
+  "Cole_Hardware_Flower_Pot_1025": {
+   "extents_cm": [
+    21.4,
+    24.6,
+    25.0
+   ],
+   "boxiness": 0.546,
+   "class": "irregular",
+   "antipodal_pairs": 239,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "Cole_Hardware_Mug_Classic_Blue": {
+   "extents_cm": [
+    9.4,
+    12.5,
+    15.4
+   ],
+   "boxiness": 0.64,
+   "class": "rounded",
+   "antipodal_pairs": 147,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.348,
+   "handle_name": true
+  },
+  "Cole_Hardware_Saucer_Glazed_6": {
+   "extents_cm": [
+    2.8,
+    16.0,
+    16.0
+   ],
+   "boxiness": 0.673,
+   "class": "rounded",
+   "antipodal_pairs": 77,
+   "qr_kind": "face",
+   "mass_kg_est": 0.146,
+   "handle_name": false
+  },
+  "Court_Attitude": {
+   "extents_cm": [
+    12.0,
+    17.5,
+    28.8
+   ],
+   "boxiness": 0.491,
+   "class": "irregular",
+   "antipodal_pairs": 313,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.894,
+   "handle_name": false
+  },
+  "Crayola_Bonus_64_Crayons": {
+   "extents_cm": [
+    4.3,
+    12.7,
+    14.7
+   ],
+   "boxiness": 0.938,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.225,
+   "handle_name": false
+  },
+  "Crayola_Crayons_120_crayons": {
+   "extents_cm": [
+    6.7,
+    13.6,
+    23.0
+   ],
+   "boxiness": 0.973,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.611,
+   "handle_name": false
+  },
+  "Crayola_Crayons_24_count": {
+   "extents_cm": [
+    2.9,
+    7.3,
+    11.6
+   ],
+   "boxiness": 0.891,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.066,
+   "handle_name": false
+  },
+  "Crayola_Model_Magic_Modeling_Material_White_3_oz": {
+   "extents_cm": [
+    4.8,
+    12.7,
+    21.7
+   ],
+   "boxiness": 0.879,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.351,
+   "handle_name": false
+  },
+  "Crayola_Washable_Fingerpaint_Red_Blue_Yellow_3_count_8_fl_oz_bottes_each": {
+   "extents_cm": [
+    6.5,
+    14.6,
+    17.6
+   ],
+   "boxiness": 0.951,
+   "class": "box",
+   "antipodal_pairs": 331,
+   "qr_kind": "face",
+   "mass_kg_est": 0.475,
+   "handle_name": false
+  },
+  "Crazy_Shadow_2": {
+   "extents_cm": [
+    11.2,
+    17.1,
+    29.7
+   ],
+   "boxiness": 0.473,
+   "class": "irregular",
+   "antipodal_pairs": 290,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.804,
+   "handle_name": false
+  },
+  "Crosley_Alarm_Clock_Vintage_Metal": {
+   "extents_cm": [
+    5.0,
+    10.9,
+    16.3
+   ],
+   "boxiness": 0.601,
+   "class": "rounded",
+   "antipodal_pairs": 327,
+   "qr_kind": "face",
+   "mass_kg_est": 0.161,
+   "handle_name": false
+  },
+  "Crunch_Girl_Scouts_Candy_Bars_Peanut_Butter_Creme_78_oz_box": {
+   "extents_cm": [
+    6.2,
+    13.9,
+    16.4
+   ],
+   "boxiness": 0.93,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.392,
+   "handle_name": false
+  },
+  "D_ROSE_773_II_Kqclsph05pE": {
+   "extents_cm": [
+    11.2,
+    17.1,
+    29.7
+   ],
+   "boxiness": 0.457,
+   "class": "irregular",
+   "antipodal_pairs": 306,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.785,
+   "handle_name": false
+  },
+  "Dell_Ink_Cartridge": {
+   "extents_cm": [
+    5.2,
+    10.3,
+    14.1
+   ],
+   "boxiness": 0.728,
+   "class": "rounded",
+   "antipodal_pairs": 287,
+   "qr_kind": "face",
+   "mass_kg_est": 0.165,
+   "handle_name": false
+  },
+  "Dixie_10_ounce_Bowls_35_ct": {
+   "extents_cm": [
+    7.8,
+    15.2,
+    15.2
+   ],
+   "boxiness": 0.667,
+   "class": "rounded",
+   "antipodal_pairs": 372,
+   "qr_kind": "face",
+   "mass_kg_est": 0.361,
+   "handle_name": false
+  },
+  "Down_To_Earth_Ceramic_Orchid_Pot_Asst_Blue": {
+   "extents_cm": [
+    11.8,
+    13.2,
+    13.3
+   ],
+   "boxiness": 0.824,
+   "class": "rounded",
+   "antipodal_pairs": 11,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.514,
+   "handle_name": false
+  },
+  "Eat_to_Live_The_Amazing_NutrientRich_Program_for_Fast_and_Sustained_Weight_Loss_Revised_Edition_Book": {
+   "extents_cm": [
+    5.1,
+    14.0,
+    21.0
+   ],
+   "boxiness": 0.726,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.323,
+   "handle_name": false
+  },
+  "Ecoforms_Plant_Container_12_Pot_Nova": {
+   "extents_cm": [
+    28.5,
+    29.7,
+    29.7
+   ],
+   "boxiness": 0.542,
+   "class": "irregular",
+   "antipodal_pairs": 27,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "Embark_Lunch_Cooler_Blue": {
+   "extents_cm": [
+    19.5,
+    20.0,
+    29.5
+   ],
+   "boxiness": 0.749,
+   "class": "rounded",
+   "antipodal_pairs": 14,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "Epson_273XL_Ink_Cartridge_Magenta": {
+   "extents_cm": [
+    2.6,
+    7.6,
+    16.0
+   ],
+   "boxiness": 0.858,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.08,
+   "handle_name": false
+  },
+  "Epson_Ink_Cartridge_Black_200": {
+   "extents_cm": [
+    2.4,
+    11.3,
+    11.4
+   ],
+   "boxiness": 0.798,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.074,
+   "handle_name": false
+  },
+  "Epson_T5803_Ink_Cartridge_Magenta_1pack": {
+   "extents_cm": [
+    3.7,
+    8.4,
+    10.2
+   ],
+   "boxiness": 0.957,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.092,
+   "handle_name": false
+  },
+  "Epson_UltraChrome_T0548_Ink_Cartridge_Matte_Black_1pack": {
+   "extents_cm": [
+    2.3,
+    11.4,
+    11.5
+   ],
+   "boxiness": 0.812,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.074,
+   "handle_name": false
+  },
+  "F10_TRX_FG_ssscuo9tGxb": {
+   "extents_cm": [
+    9.3,
+    10.3,
+    28.3
+   ],
+   "boxiness": 0.547,
+   "class": "irregular",
+   "antipodal_pairs": 339,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.446,
+   "handle_name": false
+  },
+  "F10_TRX_TF_rH7tmKCdUJq": {
+   "extents_cm": [
+    9.8,
+    10.5,
+    29.0
+   ],
+   "boxiness": 0.543,
+   "class": "irregular",
+   "antipodal_pairs": 239,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.484,
+   "handle_name": false
+  },
+  "HP_Card_Invitation_Kit": {
+   "extents_cm": [
+    3.9,
+    15.2,
+    19.6
+   ],
+   "boxiness": 0.953,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.328,
+   "handle_name": false
+  },
+  "Horse_Dreams_Pencil_Case": {
+   "extents_cm": [
+    8.8,
+    8.9,
+    21.8
+   ],
+   "boxiness": 0.735,
+   "class": "rounded",
+   "antipodal_pairs": 113,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.377,
+   "handle_name": false
+  },
+  "House_of_Cards_The_Complete_First_Season_4_Discs_DVD": {
+   "extents_cm": [
+    2.2,
+    14.3,
+    19.1
+   ],
+   "boxiness": 0.937,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.172,
+   "handle_name": false
+  },
+  "JarroSil_Activated_Silicon_5exdZHIeLAp": {
+   "extents_cm": [
+    4.7,
+    6.0,
+    9.2
+   ],
+   "boxiness": 0.959,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.074,
+   "handle_name": false
+  },
+  "Just_For_Men_Mustache_Beard_Brushin_Hair_Color_Gel_Kit_Jet_Black_M60": {
+   "extents_cm": [
+    4.4,
+    7.9,
+    14.4
+   ],
+   "boxiness": 0.958,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.144,
+   "handle_name": false
+  },
+  "Just_For_Men_ShampooIn_Haircolor_Jet_Black_60": {
+   "extents_cm": [
+    4.7,
+    7.8,
+    15.6
+   ],
+   "boxiness": 0.959,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.165,
+   "handle_name": false
+  },
+  "Just_For_Men_ShampooIn_Haircolor_Light_Brown_25": {
+   "extents_cm": [
+    4.7,
+    7.8,
+    15.7
+   ],
+   "boxiness": 0.96,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.166,
+   "handle_name": false
+  },
+  "Just_For_Men_Shampoo_In_Haircolor_Darkest_Brown_50": {
+   "extents_cm": [
+    4.6,
+    7.8,
+    15.7
+   ],
+   "boxiness": 0.969,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.164,
+   "handle_name": false
+  },
+  "KITCHEN_SET_CLASSIC_40HwCHfeG0H": {
+   "extents_cm": [
+    15.1,
+    16.7,
+    18.6
+   ],
+   "boxiness": 0.489,
+   "class": "irregular",
+   "antipodal_pairs": 349,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.686,
+   "handle_name": false
+  },
+  "Kid_Icarus_Uprising_Nintendo_3DS_Game": {
+   "extents_cm": [
+    3.2,
+    12.8,
+    14.2
+   ],
+   "boxiness": 0.952,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.164,
+   "handle_name": false
+  },
+  "LEUCIPPUS_ADIPURE": {
+   "extents_cm": [
+    10.3,
+    11.0,
+    26.9
+   ],
+   "boxiness": 0.484,
+   "class": "irregular",
+   "antipodal_pairs": 292,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.444,
+   "handle_name": false
+  },
+  "Leap_Frog_Paint_Dabber_Dot_Art_5_paint_bottles": {
+   "extents_cm": [
+    4.7,
+    23.1,
+    23.4
+   ],
+   "boxiness": 0.978,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.748,
+   "handle_name": false
+  },
+  "MEAT_SET": {
+   "extents_cm": [
+    4.0,
+    16.2,
+    25.8
+   ],
+   "boxiness": 0.58,
+   "class": "irregular",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.293,
+   "handle_name": false
+  },
+  "Marc_Anthony_Strictly_Curls_Curl_Envy_Perfect_Curl_Cream_6_fl_oz_bottle": {
+   "extents_cm": [
+    5.5,
+    8.1,
+    22.3
+   ],
+   "boxiness": 0.951,
+   "class": "box",
+   "antipodal_pairs": 393,
+   "qr_kind": "face",
+   "mass_kg_est": 0.282,
+   "handle_name": false
+  },
+  "Markings_Letter_Holder": {
+   "extents_cm": [
+    10.0,
+    14.1,
+    19.8
+   ],
+   "boxiness": 0.762,
+   "class": "rounded",
+   "antipodal_pairs": 139,
+   "qr_kind": "face",
+   "mass_kg_est": 0.636,
+   "handle_name": false
+  },
+  "Mens_Bahama_in_Khaki_Oyster_xU2jeqYwhQJ": {
+   "extents_cm": [
+    8.9,
+    10.3,
+    28.6
+   ],
+   "boxiness": 0.565,
+   "class": "irregular",
+   "antipodal_pairs": 275,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.445,
+   "handle_name": false
+  },
+  "Mens_Billfish_Slip_On_in_Coffee_nK6AJJAHOae": {
+   "extents_cm": [
+    12.1,
+    12.5,
+    28.6
+   ],
+   "boxiness": 0.413,
+   "class": "irregular",
+   "antipodal_pairs": 344,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.535,
+   "handle_name": false
+  },
+  "Mens_Gold_Cup_ASV_2Eye_Boat_Shoe_in_Cognac_Leather": {
+   "extents_cm": [
+    9.9,
+    10.5,
+    29.4
+   ],
+   "boxiness": 0.586,
+   "class": "irregular",
+   "antipodal_pairs": 327,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.538,
+   "handle_name": false
+  },
+  "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_EjPnk3E8fCs": {
+   "extents_cm": [
+    9.8,
+    10.1,
+    29.1
+   ],
+   "boxiness": 0.574,
+   "class": "irregular",
+   "antipodal_pairs": 312,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.497,
+   "handle_name": false
+  },
+  "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_GkQBKqABeQN": {
+   "extents_cm": [
+    9.8,
+    10.2,
+    29.1
+   ],
+   "boxiness": 0.569,
+   "class": "irregular",
+   "antipodal_pairs": 342,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.498,
+   "handle_name": false
+  },
+  "Mens_Gold_Cup_ASV_Dress_Casual_Venetian_in_Dark_Brown_Leather": {
+   "extents_cm": [
+    10.5,
+    10.6,
+    29.5
+   ],
+   "boxiness": 0.552,
+   "class": "irregular",
+   "antipodal_pairs": 313,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.547,
+   "handle_name": false
+  },
+  "Mens_Tremont_Kiltie_Tassel_Loafer_in_Black_Amaretto_FT0I9OjSA6O": {
+   "extents_cm": [
+    9.0,
+    10.5,
+    29.5
+   ],
+   "boxiness": 0.558,
+   "class": "irregular",
+   "antipodal_pairs": 250,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.469,
+   "handle_name": false
+  },
+  "Nescafe_Momento_Mocha_Specialty_Coffee_Mix_8_ct": {
+   "extents_cm": [
+    6.4,
+    9.0,
+    16.1
+   ],
+   "boxiness": 0.96,
+   "class": "box",
+   "antipodal_pairs": 351,
+   "qr_kind": "face",
+   "mass_kg_est": 0.269,
+   "handle_name": false
+  },
+  "Nescafe_Tasters_Choice_Instant_Coffee_Decaf_House_Blend_Light_7_oz": {
+   "extents_cm": [
+    7.9,
+    9.6,
+    18.6
+   ],
+   "boxiness": 0.814,
+   "class": "rounded",
+   "antipodal_pairs": 35,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.344,
+   "handle_name": false
+  },
+  "Nestl_Skinny_Cow_Heavenly_Crisp_Candy_Bar_Chocolate_Raspberry_6_pack_462_oz_total": {
+   "extents_cm": [
+    4.9,
+    11.1,
+    16.3
+   ],
+   "boxiness": 0.958,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.256,
+   "handle_name": false
+  },
+  "Nestle_Nips_Hard_Candy_Peanut_Butter": {
+   "extents_cm": [
+    4.3,
+    8.8,
+    15.4
+   ],
+   "boxiness": 0.935,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.162,
+   "handle_name": false
+  },
+  "Nestle_Raisinets_Milk_Chocolate_35_oz_992_g": {
+   "extents_cm": [
+    2.0,
+    8.2,
+    16.2
+   ],
+   "boxiness": 0.914,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.075,
+   "handle_name": false
+  },
+  "Nestle_Skinny_Cow_Dreamy_Clusters_Candy_Dark_Chocolate_6_pack_1_oz_pouches": {
+   "extents_cm": [
+    5.8,
+    13.8,
+    16.4
+   ],
+   "boxiness": 0.958,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.381,
+   "handle_name": false
+  },
+  "Nickelodeon_The_Spongebob_Movie_PopAPart_Spongebob": {
+   "extents_cm": [
+    11.7,
+    13.2,
+    22.3
+   ],
+   "boxiness": 0.419,
+   "class": "irregular",
+   "antipodal_pairs": 221,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.435,
+   "handle_name": false
+  },
+  "Nintendo_2DS_Crimson_Red": {
+   "extents_cm": [
+    2.1,
+    12.8,
+    14.4
+   ],
+   "boxiness": 0.781,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.089,
+   "handle_name": false
+  },
+  "Nordic_Ware_Original_Bundt_Pan": {
+   "extents_cm": [
+    9.8,
+    26.1,
+    26.1
+   ],
+   "boxiness": 0.647,
+   "class": "rounded",
+   "antipodal_pairs": 13,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.289,
+   "handle_name": false
+  },
+  "Now_Designs_Snack_Bags_Bicycle_2_count": {
+   "extents_cm": [
+    2.1,
+    19.0,
+    20.2
+   ],
+   "boxiness": 0.762,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.188,
+   "handle_name": false
+  },
+  "OVAL_XYLOPHONE": {
+   "extents_cm": [
+    7.1,
+    20.9,
+    28.1
+   ],
+   "boxiness": 0.654,
+   "class": "rounded",
+   "antipodal_pairs": 391,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.821,
+   "handle_name": false
+  },
+  "OWL_SORTER": {
+   "extents_cm": [
+    10.4,
+    17.8,
+    19.7
+   ],
+   "boxiness": 0.505,
+   "class": "irregular",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.552,
+   "handle_name": false
+  },
+  "Office_Depot_Canon_CLI_221BK_Ink_Cartridge_Black_2946B001": {
+   "extents_cm": [
+    4.9,
+    8.5,
+    11.8
+   ],
+   "boxiness": 0.953,
+   "class": "box",
+   "antipodal_pairs": 379,
+   "qr_kind": "face",
+   "mass_kg_est": 0.142,
+   "handle_name": false
+  },
+  "Office_Depot_Canon_PGI35_Remanufactured_Ink_Cartridge_Black": {
+   "extents_cm": [
+    4.9,
+    8.6,
+    11.8
+   ],
+   "boxiness": 0.947,
+   "class": "box",
+   "antipodal_pairs": 395,
+   "qr_kind": "face",
+   "mass_kg_est": 0.142,
+   "handle_name": false
+  },
+  "Office_Depot_Canon_PGI5BK_Remanufactured_Ink_Cartridge_Black": {
+   "extents_cm": [
+    4.9,
+    8.6,
+    11.8
+   ],
+   "boxiness": 0.952,
+   "class": "box",
+   "antipodal_pairs": 385,
+   "qr_kind": "face",
+   "mass_kg_est": 0.141,
+   "handle_name": false
+  },
+  "Office_Depot_Dell_Series_1_Remanufactured_Ink_Cartridge_Black": {
+   "extents_cm": [
+    5.0,
+    8.5,
+    11.8
+   ],
+   "boxiness": 0.944,
+   "class": "box",
+   "antipodal_pairs": 392,
+   "qr_kind": "face",
+   "mass_kg_est": 0.142,
+   "handle_name": false
+  },
+  "Office_Depot_HP_2_Remanufactured_Ink_Cartridges_Color_Cyan_Magenta_Yellow_3_count": {
+   "extents_cm": [
+    5.0,
+    8.5,
+    14.7
+   ],
+   "boxiness": 0.858,
+   "class": "box",
+   "antipodal_pairs": 330,
+   "qr_kind": "face",
+   "mass_kg_est": 0.16,
+   "handle_name": false
+  },
+  "Office_Depot_HP_564XL_Ink_Cartridge_Black_CN684WN": {
+   "extents_cm": [
+    4.9,
+    8.5,
+    11.8
+   ],
+   "boxiness": 0.948,
+   "class": "box",
+   "antipodal_pairs": 383,
+   "qr_kind": "face",
+   "mass_kg_est": 0.141,
+   "handle_name": false
+  },
+  "Office_Depot_HP_71_Remanufactured_Ink_Cartridge_Black": {
+   "extents_cm": [
+    4.9,
+    8.6,
+    11.8
+   ],
+   "boxiness": 0.945,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.142,
+   "handle_name": false
+  },
+  "Office_Depot_HP_950XL_Ink_Cartridge_Black_CN045AN": {
+   "extents_cm": [
+    4.9,
+    8.5,
+    11.7
+   ],
+   "boxiness": 0.954,
+   "class": "box",
+   "antipodal_pairs": 384,
+   "qr_kind": "face",
+   "mass_kg_est": 0.141,
+   "handle_name": false
+  },
+  "Office_Depot_HP_98_Remanufactured_Ink_Cartridge_Black": {
+   "extents_cm": [
+    4.9,
+    8.5,
+    14.7
+   ],
+   "boxiness": 0.868,
+   "class": "box",
+   "antipodal_pairs": 337,
+   "qr_kind": "face",
+   "mass_kg_est": 0.159,
+   "handle_name": false
+  },
+  "Olive_Kids_Birdie_Munch_n_Lunch": {
+   "extents_cm": [
+    15.7,
+    23.0,
+    27.3
+   ],
+   "boxiness": 0.731,
+   "class": "rounded",
+   "antipodal_pairs": 49,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "Olive_Kids_Butterfly_Garden_Munch_n_Lunch_Bag": {
+   "extents_cm": [
+    16.0,
+    22.3,
+    26.9
+   ],
+   "boxiness": 0.753,
+   "class": "rounded",
+   "antipodal_pairs": 37,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "Olive_Kids_Dinosaur_Land_Munch_n_Lunch": {
+   "extents_cm": [
+    15.4,
+    22.0,
+    26.7
+   ],
+   "boxiness": 0.74,
+   "class": "rounded",
+   "antipodal_pairs": 51,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "Olive_Kids_Game_On_Lunch_Box": {
+   "extents_cm": [
+    10.3,
+    21.9,
+    27.4
+   ],
+   "boxiness": 0.745,
+   "class": "rounded",
+   "antipodal_pairs": 14,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.391,
+   "handle_name": false
+  },
+  "Olive_Kids_Paisley_Pencil_Case": {
+   "extents_cm": [
+    8.6,
+    8.9,
+    21.4
+   ],
+   "boxiness": 0.746,
+   "class": "rounded",
+   "antipodal_pairs": 120,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.366,
+   "handle_name": false
+  },
+  "PUNCH_DROP_TjicLPMqLvz": {
+   "extents_cm": [
+    13.9,
+    18.0,
+    19.7
+   ],
+   "boxiness": 0.612,
+   "class": "rounded",
+   "antipodal_pairs": 290,
+   "qr_kind": "face",
+   "mass_kg_est": 0.908,
+   "handle_name": false
+  },
+  "Paul_Frank_Dot_Lunch_Box": {
+   "extents_cm": [
+    10.6,
+    23.2,
+    26.4
+   ],
+   "boxiness": 0.734,
+   "class": "rounded",
+   "antipodal_pairs": 11,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.421,
+   "handle_name": false
+  },
+  "Pennington_Electric_Pot_Cabana_4": {
+   "extents_cm": [
+    9.7,
+    10.3,
+    10.4
+   ],
+   "boxiness": 0.602,
+   "class": "rounded",
+   "antipodal_pairs": 75,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.187,
+   "handle_name": false
+  },
+  "Perricoen_MD_No_Concealer_Concealer": {
+   "extents_cm": [
+    4.3,
+    5.0,
+    11.1
+   ],
+   "boxiness": 0.966,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.07,
+   "handle_name": false
+  },
+  "Perricone_MD_AcylGlutathione_Eye_Lid_Serum": {
+   "extents_cm": [
+    5.6,
+    7.9,
+    10.8
+   ],
+   "boxiness": 0.962,
+   "class": "box",
+   "antipodal_pairs": 296,
+   "qr_kind": "face",
+   "mass_kg_est": 0.137,
+   "handle_name": false
+  },
+  "Perricone_MD_Chia_Serum": {
+   "extents_cm": [
+    4.2,
+    6.0,
+    12.0
+   ],
+   "boxiness": 0.97,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.088,
+   "handle_name": false
+  },
+  "Perricone_MD_Face_Finishing_Moisturizer": {
+   "extents_cm": [
+    6.0,
+    6.1,
+    7.4
+   ],
+   "boxiness": 0.965,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.078,
+   "handle_name": false
+  },
+  "Perricone_MD_Hypoallergenic_Gentle_Cleanser": {
+   "extents_cm": [
+    6.5,
+    8.2,
+    15.5
+   ],
+   "boxiness": 0.947,
+   "class": "box",
+   "antipodal_pairs": 322,
+   "qr_kind": "face",
+   "mass_kg_est": 0.235,
+   "handle_name": false
+  },
+  "Perricone_MD_No_Foundation_Foundation_No_1": {
+   "extents_cm": [
+    4.3,
+    6.1,
+    12.1
+   ],
+   "boxiness": 0.973,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.093,
+   "handle_name": false
+  },
+  "Perricone_MD_No_Foundation_Serum": {
+   "extents_cm": [
+    4.3,
+    6.2,
+    12.2
+   ],
+   "boxiness": 0.967,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.094,
+   "handle_name": false
+  },
+  "Perricone_MD_No_Lipstick_Lipstick": {
+   "extents_cm": [
+    4.3,
+    5.0,
+    7.9
+   ],
+   "boxiness": 0.965,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.05,
+   "handle_name": false
+  },
+  "Perricone_MD_Photo_Plasma": {
+   "extents_cm": [
+    6.4,
+    10.5,
+    10.5
+   ],
+   "boxiness": 0.945,
+   "class": "box",
+   "antipodal_pairs": 361,
+   "qr_kind": "face",
+   "mass_kg_est": 0.201,
+   "handle_name": false
+  },
+  "Perricone_MD_The_Crease_Cure_Duo": {
+   "extents_cm": [
+    6.4,
+    11.9,
+    16.9
+   ],
+   "boxiness": 0.963,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.369,
+   "handle_name": false
+  },
+  "Perricone_MD_Vitamin_C_Ester_15": {
+   "extents_cm": [
+    6.3,
+    8.1,
+    13.0
+   ],
+   "boxiness": 0.971,
+   "class": "box",
+   "antipodal_pairs": 333,
+   "qr_kind": "face",
+   "mass_kg_est": 0.193,
+   "handle_name": false
+  },
+  "Persona_Q_Shadow_of_the_Labyrinth_Nintendo_3DS": {
+   "extents_cm": [
+    2.5,
+    12.7,
+    14.1
+   ],
+   "boxiness": 0.934,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.128,
+   "handle_name": false
+  },
+  "Philips_EcoVantage_43_W_Light_Bulbs_Natural_Light_2_pack": {
+   "extents_cm": [
+    6.7,
+    10.7,
+    10.8
+   ],
+   "boxiness": 0.951,
+   "class": "box",
+   "antipodal_pairs": 312,
+   "qr_kind": "face",
+   "mass_kg_est": 0.219,
+   "handle_name": false
+  },
+  "Phillips_Caplets_Size_24": {
+   "extents_cm": [
+    4.4,
+    7.9,
+    8.6
+   ],
+   "boxiness": 0.954,
+   "class": "box",
+   "antipodal_pairs": 370,
+   "qr_kind": "face",
+   "mass_kg_est": 0.086,
+   "handle_name": false
+  },
+  "Phillips_Stool_Softener_Liquid_Gels_30_liquid_gels": {
+   "extents_cm": [
+    4.4,
+    7.9,
+    8.7
+   ],
+   "boxiness": 0.969,
+   "class": "box",
+   "antipodal_pairs": 360,
+   "qr_kind": "face",
+   "mass_kg_est": 0.088,
+   "handle_name": false
+  },
+  "Pinwheel_Pencil_Case": {
+   "extents_cm": [
+    8.8,
+    9.0,
+    21.7
+   ],
+   "boxiness": 0.736,
+   "class": "rounded",
+   "antipodal_pairs": 45,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.377,
+   "handle_name": false
+  },
+  "Pokmon_Conquest_Nintendo_DS_Game": {
+   "extents_cm": [
+    1.7,
+    12.4,
+    13.8
+   ],
+   "boxiness": 0.942,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.083,
+   "handle_name": false
+  },
+  "Pokmon_X_Nintendo_3DS_Game": {
+   "extents_cm": [
+    1.5,
+    12.5,
+    13.7
+   ],
+   "boxiness": 0.939,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.07,
+   "handle_name": false
+  },
+  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS": {
+   "extents_cm": [
+    3.1,
+    13.0,
+    14.2
+   ],
+   "boxiness": 0.94,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.163,
+   "handle_name": false
+  },
+  "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total": {
+   "extents_cm": [
+    2.6,
+    8.4,
+    15.1
+   ],
+   "boxiness": 0.832,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.083,
+   "handle_name": false
+  },
+  "Predator_LZ_TRX_FG": {
+   "extents_cm": [
+    9.6,
+    12.0,
+    28.4
+   ],
+   "boxiness": 0.52,
+   "class": "irregular",
+   "antipodal_pairs": 296,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.509,
+   "handle_name": false
+  },
+  "RJ_Rabbit_Easter_Basket_Blue": {
+   "extents_cm": [
+    16.1,
+    20.7,
+    23.4
+   ],
+   "boxiness": 0.567,
+   "class": "irregular",
+   "antipodal_pairs": 46,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.331,
+   "handle_name": true
+  },
+  "ReadytoUse_Rolled_Fondant_Pure_White_24_oz_box": {
+   "extents_cm": [
+    4.7,
+    12.1,
+    16.9
+   ],
+   "boxiness": 0.963,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.28,
+   "handle_name": false
+  },
+  "Reebok_BREAKPOINT_MID": {
+   "extents_cm": [
+    9.0,
+    14.0,
+    24.8
+   ],
+   "boxiness": 0.484,
+   "class": "irregular",
+   "antipodal_pairs": 341,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.451,
+   "handle_name": false
+  },
+  "Reebok_FUELTRAIN": {
+   "extents_cm": [
+    10.0,
+    11.8,
+    27.3
+   ],
+   "boxiness": 0.501,
+   "class": "irregular",
+   "antipodal_pairs": 248,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.484,
+   "handle_name": false
+  },
+  "Reebok_R_CROSSFIT_OLY_UFORM": {
+   "extents_cm": [
+    10.6,
+    12.7,
+    29.2
+   ],
+   "boxiness": 0.512,
+   "class": "irregular",
+   "antipodal_pairs": 348,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.604,
+   "handle_name": false
+  },
+  "Reebok_TURBO_RC": {
+   "extents_cm": [
+    11.0,
+    12.5,
+    29.6
+   ],
+   "boxiness": 0.532,
+   "class": "irregular",
+   "antipodal_pairs": 336,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.65,
+   "handle_name": false
+  },
+  "Reef_Star_Cushion_Flipflops_Size_8_Black": {
+   "extents_cm": [
+    5.5,
+    9.8,
+    25.9
+   ],
+   "boxiness": 0.548,
+   "class": "irregular",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.23,
+   "handle_name": false
+  },
+  "Room_Essentials_Mug_White_Yellow": {
+   "extents_cm": [
+    10.2,
+    10.4,
+    12.7
+   ],
+   "boxiness": 0.565,
+   "class": "irregular",
+   "antipodal_pairs": 79,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.229,
+   "handle_name": true
+  },
+  "SAMOA": {
+   "extents_cm": [
+    9.8,
+    13.2,
+    29.3
+   ],
+   "boxiness": 0.548,
+   "class": "irregular",
+   "antipodal_pairs": 256,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.62,
+   "handle_name": false
+  },
+  "SHAPE_MATCHING": {
+   "extents_cm": [
+    3.4,
+    18.9,
+    25.4
+   ],
+   "boxiness": 0.6,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.292,
+   "handle_name": false
+  },
+  "Sapota_Threshold_4_Ceramic_Round_Planter_Red": {
+   "extents_cm": [
+    9.6,
+    10.6,
+    10.9
+   ],
+   "boxiness": 0.598,
+   "class": "irregular",
+   "antipodal_pairs": 15,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.2,
+   "handle_name": false
+  },
+  "Seagate_Archive_HDD_8_TB_Internal_hard_drive_SATA_6Gbs_35_ST8000AS0002": {
+   "extents_cm": [
+    2.7,
+    10.2,
+    14.7
+   ],
+   "boxiness": 0.97,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.117,
+   "handle_name": false
+  },
+  "Shurtape_Tape_Purple_CP28": {
+   "extents_cm": [
+    4.9,
+    11.7,
+    11.7
+   ],
+   "boxiness": 0.785,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.157,
+   "handle_name": false
+  },
+  "Simon_Swipe_Game": {
+   "extents_cm": [
+    4.7,
+    22.8,
+    22.9
+   ],
+   "boxiness": 0.555,
+   "class": "irregular",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.41,
+   "handle_name": false
+  },
+  "Sony_Acid_Music_Studio": {
+   "extents_cm": [
+    3.3,
+    14.0,
+    19.5
+   ],
+   "boxiness": 0.962,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.259,
+   "handle_name": false
+  },
+  "Sony_Downloadable_Loops": {
+   "extents_cm": [
+    3.3,
+    13.9,
+    19.4
+   ],
+   "boxiness": 0.942,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.25,
+   "handle_name": false
+  },
+  "Sperry_TopSider_pSUFPWQXPp3": {
+   "extents_cm": [
+    8.8,
+    19.2,
+    24.0
+   ],
+   "boxiness": 0.502,
+   "class": "irregular",
+   "antipodal_pairs": 184,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.611,
+   "handle_name": false
+  },
+  "Sperry_TopSider_tNB9t6YBUf3": {
+   "extents_cm": [
+    8.8,
+    19.1,
+    24.1
+   ],
+   "boxiness": 0.499,
+   "class": "irregular",
+   "antipodal_pairs": 239,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.608,
+   "handle_name": false
+  },
+  "Squirt_Strain_Fruit_Basket": {
+   "extents_cm": [
+    7.6,
+    11.4,
+    12.5
+   ],
+   "boxiness": 0.52,
+   "class": "irregular",
+   "antipodal_pairs": 272,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.169,
+   "handle_name": true
+  },
+  "Super_Mario_3D_World_Wii_U_Game": {
+   "extents_cm": [
+    1.6,
+    13.7,
+    19.1
+   ],
+   "boxiness": 0.961,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.121,
+   "handle_name": false
+  },
+  "Super_Mario_Kart_Super_Nintendo_Entertainment_System": {
+   "extents_cm": [
+    2.1,
+    8.8,
+    13.6
+   ],
+   "boxiness": 0.921,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.069,
+   "handle_name": false
+  },
+  "Tag_Dishtowel_Basket_Weave_Red_18_x_26": {
+   "extents_cm": [
+    3.5,
+    17.1,
+    23.3
+   ],
+   "boxiness": 0.745,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.307,
+   "handle_name": false
+  },
+  "Tag_Dishtowel_Green": {
+   "extents_cm": [
+    3.4,
+    17.2,
+    23.0
+   ],
+   "boxiness": 0.748,
+   "class": "rounded",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.298,
+   "handle_name": false
+  },
+  "Threshold_Hand_Towel_Blue_Medallion_16_x_27": {
+   "extents_cm": [
+    4.9,
+    18.2,
+    21.3
+   ],
+   "boxiness": 0.852,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.483,
+   "handle_name": false
+  },
+  "Threshold_Porcelain_Coffee_Mug_All_Over_Bead_White": {
+   "extents_cm": [
+    9.7,
+    11.5,
+    12.0
+   ],
+   "boxiness": 0.615,
+   "class": "rounded",
+   "antipodal_pairs": 31,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.246,
+   "handle_name": true
+  },
+  "Threshold_Porcelain_Pitcher_White": {
+   "extents_cm": [
+    16.9,
+    21.8,
+    27.8
+   ],
+   "boxiness": 0.561,
+   "class": "irregular",
+   "antipodal_pairs": 102,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": true
+  },
+  "Threshold_Porcelain_Teapot_White": {
+   "extents_cm": [
+    13.5,
+    17.7,
+    19.3
+   ],
+   "boxiness": 0.574,
+   "class": "irregular",
+   "antipodal_pairs": 43,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.796,
+   "handle_name": true
+  },
+  "Threshold_Ramekin_White_Porcelain": {
+   "extents_cm": [
+    5.2,
+    11.1,
+    11.3
+   ],
+   "boxiness": 0.673,
+   "class": "rounded",
+   "antipodal_pairs": 264,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.131,
+   "handle_name": false
+  },
+  "Threshold_Salad_Plate_Square_Rim_Porcelain": {
+   "extents_cm": [
+    3.3,
+    21.2,
+    21.2
+   ],
+   "boxiness": 0.784,
+   "class": "rounded",
+   "antipodal_pairs": 56,
+   "qr_kind": "face",
+   "mass_kg_est": 0.346,
+   "handle_name": false
+  },
+  "Timberland_Mens_Earthkeepers_Newmarket_6Inch_Cupsole_Boot": {
+   "extents_cm": [
+    10.6,
+    21.1,
+    29.4
+   ],
+   "boxiness": 0.476,
+   "class": "irregular",
+   "antipodal_pairs": 176,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.94,
+   "handle_name": false
+  },
+  "Top_Paw_Dog_Bowl_Blue_Paw_Bone_Ceramic_25_fl_oz_total": {
+   "extents_cm": [
+    5.9,
+    15.2,
+    15.3
+   ],
+   "boxiness": 0.772,
+   "class": "rounded",
+   "antipodal_pairs": 26,
+   "qr_kind": "face",
+   "mass_kg_est": 0.32,
+   "handle_name": false
+  },
+  "Travel_Smart_Neck_Rest_Inflatable": {
+   "extents_cm": [
+    4.0,
+    10.6,
+    17.3
+   ],
+   "boxiness": 0.877,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.194,
+   "handle_name": false
+  },
+  "UGG_Bailey_Button_Womens_Boots_Black_7": {
+   "extents_cm": [
+    10.8,
+    23.8,
+    27.3
+   ],
+   "boxiness": 0.589,
+   "class": "irregular",
+   "antipodal_pairs": 152,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.245,
+   "handle_name": false
+  },
+  "UGG_Cambridge_Womens_Black_7": {
+   "extents_cm": [
+    10.9,
+    22.2,
+    27.5
+   ],
+   "boxiness": 0.583,
+   "class": "irregular",
+   "antipodal_pairs": 247,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.165,
+   "handle_name": false
+  },
+  "US_Army_Stash_Lunch_Bag": {
+   "extents_cm": [
+    15.5,
+    22.5,
+    27.4
+   ],
+   "boxiness": 0.768,
+   "class": "rounded",
+   "antipodal_pairs": 52,
+   "qr_kind": "curved",
+   "mass_kg_est": 1.5,
+   "handle_name": false
+  },
+  "VANS_FIRE_ROASTED_VEGGIE_CRACKERS_GLUTEN_FREE": {
+   "extents_cm": [
+    5.9,
+    14.0,
+    20.9
+   ],
+   "boxiness": 0.953,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.492,
+   "handle_name": false
+  },
+  "Victor_Reversible_Bookend": {
+   "extents_cm": [
+    10.9,
+    23.4,
+    23.5
+   ],
+   "boxiness": 0.751,
+   "class": "rounded",
+   "antipodal_pairs": 188,
+   "qr_kind": "face",
+   "mass_kg_est": 1.344,
+   "handle_name": false
+  },
+  "Whey_Protein_Vanilla": {
+   "extents_cm": [
+    12.1,
+    12.2,
+    16.9
+   ],
+   "boxiness": 0.745,
+   "class": "rounded",
+   "antipodal_pairs": 10,
+   "qr_kind": "face",
+   "mass_kg_est": 0.56,
+   "handle_name": false
+  },
+  "Wilton_Easy_Layers_Cake_Pan_Set": {
+   "extents_cm": [
+    4.6,
+    17.5,
+    19.1
+   ],
+   "boxiness": 0.925,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.426,
+   "handle_name": false
+  },
+  "Wilton_PreCut_Parchment_Sheets_10_x_15_24_sheets": {
+   "extents_cm": [
+    5.3,
+    5.3,
+    27.3
+   ],
+   "boxiness": 0.963,
+   "class": "box",
+   "antipodal_pairs": 400,
+   "qr_kind": "face",
+   "mass_kg_est": 0.223,
+   "handle_name": false
+  },
+  "Womens_Authentic_Original_Boat_Shoe_in_Classic_Brown_Leather_48Nh7VuMwW6": {
+   "extents_cm": [
+    7.4,
+    8.8,
+    24.7
+   ],
+   "boxiness": 0.615,
+   "class": "rounded",
+   "antipodal_pairs": 335,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.297,
+   "handle_name": false
+  },
+  "Womens_Hikerfish_Boot_in_Black_Leopard_ridcCWsv8rW": {
+   "extents_cm": [
+    9.0,
+    18.8,
+    24.9
+   ],
+   "boxiness": 0.547,
+   "class": "irregular",
+   "antipodal_pairs": 164,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.687,
+   "handle_name": false
+  },
+  "Womens_Sparkle_Suede_Angelfish_in_Grey_Sparkle_Suede_Silver": {
+   "extents_cm": [
+    7.4,
+    8.9,
+    24.2
+   ],
+   "boxiness": 0.608,
+   "class": "rounded",
+   "antipodal_pairs": 328,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.289,
+   "handle_name": false
+  },
+  "Womens_Sparkle_Suede_Bahama_in_Silver_Sparkle_Suede_Grey_Patent_x9rclU7EJXx": {
+   "extents_cm": [
+    8.5,
+    8.7,
+    25.0
+   ],
+   "boxiness": 0.553,
+   "class": "irregular",
+   "antipodal_pairs": 274,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.305,
+   "handle_name": false
+  },
+  "Womens_Suede_Bahama_in_Graphite_Suede_cUAjIMhWSO9": {
+   "extents_cm": [
+    8.4,
+    8.7,
+    25.5
+   ],
+   "boxiness": 0.548,
+   "class": "irregular",
+   "antipodal_pairs": 275,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.31,
+   "handle_name": false
+  },
+  "Womens_Teva_Capistrano_Bootie_ldjRT9yZ5Ht": {
+   "extents_cm": [
+    9.9,
+    19.1,
+    29.3
+   ],
+   "boxiness": 0.496,
+   "class": "irregular",
+   "antipodal_pairs": 164,
+   "qr_kind": "curved",
+   "mass_kg_est": 0.82,
+   "handle_name": false
+  }
+ },
+ "qr": {
+  "3D_Dollhouse_Refrigerator": {
+   "T_obj_qr": [
+    [
+     -0.00623,
+     -0.999929,
+     -0.010163,
+     -0.000214
+    ],
+    [
+     0.999936,
+     -0.006134,
+     -0.009524,
+     0.035841
+    ],
+    [
+     0.009461,
+     -0.010221,
+     0.999903,
+     0.105255
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0001
+  },
+  "3D_Dollhouse_Sink": {
+   "T_obj_qr": [
+    [
+     0.006189,
+     0.999887,
+     0.013709,
+     -0.000229
+    ],
+    [
+     0.999931,
+     -0.006324,
+     0.009854,
+     0.036361
+    ],
+    [
+     0.00994,
+     0.013647,
+     -0.999857,
+     0.065987
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00029
+  },
+  "3D_Dollhouse_Sofa": {
+   "T_obj_qr": [
+    [
+     0.00516,
+     -0.999987,
+     0.000181,
+     -0.002677
+    ],
+    [
+     0.99937,
+     0.005163,
+     0.035116,
+     0.041445
+    ],
+    [
+     -0.035117,
+     0.0,
+     0.999383,
+     0.062433
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00012
+  },
+  "ACE_Coffee_Mug_Kristen_16_oz_cup": {
+   "T_obj_qr": [
+    [
+     -0.327456,
+     0.944636,
+     -0.02086,
+     -0.031096
+    ],
+    [
+     -0.942725,
+     -0.32812,
+     -0.060054,
+     -0.039422
+    ],
+    [
+     -0.063574,
+     0.0,
+     0.997977,
+     0.089401
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.0038
+  },
+  "Air_Hogs_Wind_Flyers_Set_Airplane_Red": {
+   "T_obj_qr": [
+    [
+     0.056503,
+     -0.984512,
+     -0.165961,
+     -0.040953
+    ],
+    [
+     0.317301,
+     0.175316,
+     -0.931979,
+     -0.036327
+    ],
+    [
+     0.94664,
+     0.0,
+     0.322292,
+     0.040222
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00377
+  },
+  "Aroma_Stainless_Steel_Milk_Frother_2_Cup": {
+   "T_obj_qr": [
+    [
+     0.521615,
+     0.853125,
+     -0.009768,
+     -0.014248
+    ],
+    [
+     -0.852975,
+     0.521707,
+     0.015973,
+     -0.065195
+    ],
+    [
+     0.018723,
+     -0.0,
+     0.999825,
+     0.086884
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00361
+  },
+  "Avengers_Thor_PLlrpYniaeB": {
+   "T_obj_qr": [
+    [
+     0.001376,
+     0.007171,
+     -0.999973,
+     0.001035
+    ],
+    [
+     0.999981,
+     0.005998,
+     0.001419,
+     0.133478
+    ],
+    [
+     0.006008,
+     -0.999956,
+     -0.007162,
+     0.066644
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00069
+  },
+  "BEDROOM_NEO": {
+   "T_obj_qr": [
+    [
+     0.999862,
+     -0.001346,
+     0.016585,
+     0.129779
+    ],
+    [
+     0.001346,
+     0.999999,
+     2.2e-05,
+     0.041684
+    ],
+    [
+     -0.016585,
+     0.0,
+     0.999862,
+     0.030786
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00062
+  },
+  "BIA_Porcelain_Ramekin_With_Glazed_Rim_35_45_oz_cup": {
+   "T_obj_qr": [
+    [
+     0.021562,
+     -0.850541,
+     -0.525466,
+     -0.007509
+    ],
+    [
+     0.034873,
+     0.525908,
+     -0.849826,
+     0.002585
+    ],
+    [
+     0.999159,
+     0.0,
+     0.041,
+     0.008701
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00252
+  },
+  "BUILD_A_ROBOT": {
+   "T_obj_qr": [
+    [
+     0.027025,
+     -0.999631,
+     -0.002837,
+     -0.007468
+    ],
+    [
+     0.99417,
+     0.027174,
+     -0.104348,
+     0.041236
+    ],
+    [
+     0.104387,
+     0.0,
+     0.994537,
+     0.036966
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00018
+  },
+  "BlackBlack_Nintendo_3DSXL": {
+   "T_obj_qr": [
+    [
+     -0.012102,
+     -0.999895,
+     -0.007912,
+     0.01235
+    ],
+    [
+     0.836906,
+     -0.014459,
+     0.547156,
+     0.047171
+    ],
+    [
+     -0.547213,
+     0.0,
+     0.836993,
+     0.051035
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 9e-05
+  },
+  "Black_and_Decker_TR3500SD_2Slice_Toaster": {
+   "T_obj_qr": [
+    [
+     0.998037,
+     0.012064,
+     -0.061453,
+     0.07821
+    ],
+    [
+     -0.012041,
+     0.999927,
+     0.000741,
+     -0.02638
+    ],
+    [
+     0.061457,
+     -0.0,
+     0.99811,
+     0.123233
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00107
+  },
+  "BlueBlack_Nintendo_3DSXL": {
+   "T_obj_qr": [
+    [
+     -0.010168,
+     -0.999929,
+     -0.006134,
+     -0.002769
+    ],
+    [
+     0.856186,
+     -0.011875,
+     0.516531,
+     0.046921
+    ],
+    [
+     -0.516568,
+     0.0,
+     0.856246,
+     0.052179
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00019
+  },
+  "Blue_Jasmine_Includes_Digital_Copy_UltraViolet_DVD": {
+   "T_obj_qr": [
+    [
+     0.006376,
+     -0.999978,
+     -0.001728,
+     0.000167
+    ],
+    [
+     -0.005717,
+     0.001691,
+     -0.999982,
+     8.1e-05
+    ],
+    [
+     0.999963,
+     0.006385,
+     -0.005706,
+     0.016073
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00136
+  },
+  "Brother_LC_1053PKS_Ink_Cartridge_CyanMagentaYellow_1pack": {
+   "T_obj_qr": [
+    [
+     -0.007844,
+     0.999969,
+     -0.000525,
+     -0.000208
+    ],
+    [
+     0.999639,
+     0.007855,
+     0.025709,
+     0.025189
+    ],
+    [
+     0.025712,
+     -0.000324,
+     -0.999669,
+     0.073164
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00072
+  },
+  "Brother_Printing_Cartridge_PC501": {
+   "T_obj_qr": [
+    [
+     0.00449,
+     0.006691,
+     -0.999968,
+     0.000205
+    ],
+    [
+     -0.999981,
+     -0.004249,
+     -0.004518,
+     -0.027689
+    ],
+    [
+     -0.004279,
+     0.999969,
+     0.006672,
+     0.060162
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00084
+  },
+  "CHILDRENS_ROOM_NEO": {
+   "T_obj_qr": [
+    [
+     0.999958,
+     0.008797,
+     0.002518,
+     0.070829
+    ],
+    [
+     -0.008797,
+     0.999961,
+     -2.2e-05,
+     -0.053707
+    ],
+    [
+     -0.002518,
+     -0.0,
+     0.999997,
+     0.054669
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00025
+  },
+  "Canon_225226_Ink_Cartridges_BlackColor_Cyan_Magenta_Yellow_6_count": {
+   "T_obj_qr": [
+    [
+     0.999903,
+     0.00632,
+     0.012431,
+     0.084477
+    ],
+    [
+     -0.006003,
+     0.99966,
+     -0.025388,
+     -0.001292
+    ],
+    [
+     -0.012588,
+     0.025311,
+     0.9996,
+     0.072398
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00034
+  },
+  "Canon_Pixma_Ink_Cartridge_8": {
+   "T_obj_qr": [
+    [
+     0.999435,
+     -0.011273,
+     0.031669,
+     0.013278
+    ],
+    [
+     0.011291,
+     0.999936,
+     -0.000383,
+     0.000204
+    ],
+    [
+     -0.031663,
+     0.000741,
+     0.999498,
+     0.057068
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00135
+  },
+  "Cascadia_8_Color_AquariusHibscsBearingSeaBlk_Size_50": {
+   "T_obj_qr": [
+    [
+     0.996293,
+     0.053389,
+     0.067454,
+     0.046996
+    ],
+    [
+     -0.053267,
+     0.998574,
+     -0.003606,
+     0.020386
+    ],
+    [
+     -0.06755,
+     -0.0,
+     0.997716,
+     0.065991
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00337
+  },
+  "Cole_Hardware_Antislip_Surfacing_White_2_x_60": {
+   "T_obj_qr": [
+    [
+     0.999855,
+     -0.007477,
+     -0.015308,
+     0.078292
+    ],
+    [
+     0.007476,
+     0.999972,
+     -0.000114,
+     0.002469
+    ],
+    [
+     0.015308,
+     0.0,
+     0.999883,
+     0.031572
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00298
+  },
+  "Cole_Hardware_Dishtowel_Red": {
+   "T_obj_qr": [
+    [
+     -0.003474,
+     0.889231,
+     0.457446,
+     -0.023691
+    ],
+    [
+     -0.006753,
+     -0.457459,
+     0.889205,
+     0.048595
+    ],
+    [
+     0.999971,
+     0.0,
+     0.007594,
+     0.01474
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00366
+  },
+  "Cole_Hardware_Flower_Pot_1025": {
+   "T_obj_qr": [
+    [
+     0.974584,
+     -0.027378,
+     0.222341,
+     0.109062
+    ],
+    [
+     0.026693,
+     0.999625,
+     0.00609,
+     0.002428
+    ],
+    [
+     -0.222425,
+     0.0,
+     0.97495,
+     0.140112
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00331
+  },
+  "Cole_Hardware_Mug_Classic_Blue": {
+   "T_obj_qr": [
+    [
+     -0.034441,
+     0.451038,
+     0.89184,
+     -0.023335
+    ],
+    [
+     -0.017405,
+     -0.892505,
+     0.450702,
+     -0.007156
+    ],
+    [
+     0.999255,
+     0.0,
+     0.038589,
+     0.01076
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00204
+  },
+  "Cole_Hardware_Saucer_Glazed_6": {
+   "T_obj_qr": [
+    [
+     -0.011975,
+     -0.445966,
+     -0.89497,
+     2.3e-05
+    ],
+    [
+     -0.004751,
+     0.895049,
+     -0.445942,
+     0.000162
+    ],
+    [
+     0.999917,
+     -0.001088,
+     -0.012837,
+     0.011069
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00121
+  },
+  "Court_Attitude": {
+   "T_obj_qr": [
+    [
+     0.031963,
+     -0.013004,
+     -0.999404,
+     -0.010235
+    ],
+    [
+     0.000416,
+     0.999915,
+     -0.012998,
+     0.055864
+    ],
+    [
+     0.999489,
+     0.0,
+     0.031966,
+     0.037204
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00179
+  },
+  "Crayola_Bonus_64_Crayons": {
+   "T_obj_qr": [
+    [
+     -0.002257,
+     0.003801,
+     0.99999,
+     -0.000121
+    ],
+    [
+     0.999997,
+     0.001368,
+     0.002252,
+     0.020874
+    ],
+    [
+     -0.00136,
+     0.999992,
+     -0.003804,
+     0.063562
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00028
+  },
+  "Crayola_Crayons_120_crayons": {
+   "T_obj_qr": [
+    [
+     0.002203,
+     0.005336,
+     -0.999983,
+     0.000262
+    ],
+    [
+     -0.999982,
+     0.005678,
+     -0.002172,
+     -0.033231
+    ],
+    [
+     0.005666,
+     0.99997,
+     0.005348,
+     0.068658
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00035
+  },
+  "Crayola_Crayons_24_count": {
+   "T_obj_qr": [
+    [
+     -0.000628,
+     -0.999897,
+     0.014326,
+     0.000239
+    ],
+    [
+     0.999985,
+     -0.000706,
+     -0.005416,
+     0.013929
+    ],
+    [
+     0.005426,
+     0.014322,
+     0.999883,
+     0.05807
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00039
+  },
+  "Crayola_Model_Magic_Modeling_Material_White_3_oz": {
+   "T_obj_qr": [
+    [
+     0.006029,
+     0.999938,
+     0.009355,
+     0.000849
+    ],
+    [
+     -0.999356,
+     0.006356,
+     -0.035326,
+     -0.023986
+    ],
+    [
+     -0.035383,
+     -0.009136,
+     0.999332,
+     0.107601
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00104
+  },
+  "Crayola_Washable_Fingerpaint_Red_Blue_Yellow_3_count_8_fl_oz_bottes_each": {
+   "T_obj_qr": [
+    [
+     0.00344,
+     -0.01385,
+     0.999898,
+     -0.000315
+    ],
+    [
+     0.999948,
+     -0.009506,
+     -0.003572,
+     0.032057
+    ],
+    [
+     0.009554,
+     0.999859,
+     0.013817,
+     0.074416
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00053
+  },
+  "Crazy_Shadow_2": {
+   "T_obj_qr": [
+    [
+     0.972941,
+     0.156397,
+     -0.170074,
+     0.047343
+    ],
+    [
+     -0.154061,
+     0.987694,
+     0.02693,
+     0.018133
+    ],
+    [
+     0.172193,
+     -0.0,
+     0.985063,
+     0.074298
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00359
+  },
+  "Crosley_Alarm_Clock_Vintage_Metal": {
+   "T_obj_qr": [
+    [
+     0.001395,
+     -0.999999,
+     -0.000951,
+     -0.000651
+    ],
+    [
+     -0.998513,
+     -0.001341,
+     -0.05449,
+     -0.01607
+    ],
+    [
+     0.054488,
+     0.001025,
+     -0.998514,
+     0.081688
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00126
+  },
+  "Crunch_Girl_Scouts_Candy_Bars_Peanut_Butter_Creme_78_oz_box": {
+   "T_obj_qr": [
+    [
+     -0.005677,
+     0.999905,
+     -0.012563,
+     -0.000168
+    ],
+    [
+     0.999801,
+     0.005915,
+     0.019059,
+     0.031423
+    ],
+    [
+     0.019132,
+     -0.012452,
+     -0.999739,
+     0.082335
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00063
+  },
+  "D_ROSE_773_II_Kqclsph05pE": {
+   "T_obj_qr": [
+    [
+     -0.928593,
+     -0.337026,
+     0.155332,
+     -0.020368
+    ],
+    [
+     0.332407,
+     -0.941495,
+     -0.055604,
+     0.112763
+    ],
+    [
+     0.164985,
+     0.0,
+     0.986296,
+     0.050351
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00399
+  },
+  "Dell_Ink_Cartridge": {
+   "T_obj_qr": [
+    [
+     0.001973,
+     -0.999974,
+     0.006917,
+     0.000509
+    ],
+    [
+     0.999888,
+     0.002076,
+     0.014848,
+     0.025985
+    ],
+    [
+     -0.014862,
+     0.006887,
+     0.999866,
+     0.069754
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00137
+  },
+  "Dixie_10_ounce_Bowls_35_ct": {
+   "T_obj_qr": [
+    [
+     -0.014093,
+     0.795439,
+     -0.605869,
+     6e-05
+    ],
+    [
+     -0.018665,
+     0.605615,
+     0.795539,
+     0.000378
+    ],
+    [
+     0.999726,
+     0.02252,
+     0.006311,
+     0.042981
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00096
+  },
+  "Down_To_Earth_Ceramic_Orchid_Pot_Asst_Blue": {
+   "T_obj_qr": [
+    [
+     -0.00084,
+     -1.0,
+     0.000327,
+     0.009523
+    ],
+    [
+     0.931709,
+     -0.000901,
+     -0.363205,
+     -0.044806
+    ],
+    [
+     0.363206,
+     0.0,
+     0.931709,
+     0.038298
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00241
+  },
+  "Eat_to_Live_The_Amazing_NutrientRich_Program_for_Fast_and_Sustained_Weight_Loss_Revised_Edition_Book": {
+   "T_obj_qr": [
+    [
+     -0.00676,
+     0.999971,
+     0.003531,
+     -0.000619
+    ],
+    [
+     -0.999934,
+     -0.006727,
+     -0.009326,
+     -0.024725
+    ],
+    [
+     -0.009302,
+     -0.003594,
+     0.99995,
+     0.104985
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0019
+  },
+  "Ecoforms_Plant_Container_12_Pot_Nova": {
+   "T_obj_qr": [
+    [
+     0.648824,
+     0.750497,
+     0.125621,
+     0.082994
+    ],
+    [
+     -0.736814,
+     0.660873,
+     -0.142657,
+     -0.09452
+    ],
+    [
+     -0.190083,
+     -0.0,
+     0.981768,
+     0.160997
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00281
+  },
+  "Embark_Lunch_Cooler_Blue": {
+   "T_obj_qr": [
+    [
+     -0.041157,
+     -0.999152,
+     -0.00124,
+     -0.0503
+    ],
+    [
+     0.998698,
+     -0.041176,
+     0.030101,
+     0.098937
+    ],
+    [
+     -0.030126,
+     0.0,
+     0.999546,
+     0.031255
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00328
+  },
+  "Epson_273XL_Ink_Cartridge_Magenta": {
+   "T_obj_qr": [
+    [
+     0.009233,
+     -0.999956,
+     -0.001413,
+     0.000124
+    ],
+    [
+     -0.999113,
+     -0.009284,
+     0.041062,
+     -0.013436
+    ],
+    [
+     -0.041073,
+     0.001033,
+     -0.999156,
+     0.079462
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00075
+  },
+  "Epson_Ink_Cartridge_Black_200": {
+   "T_obj_qr": [
+    [
+     -0.031152,
+     -0.999512,
+     0.002273,
+     0.001183
+    ],
+    [
+     0.996861,
+     -0.031235,
+     -0.072744,
+     0.011278
+    ],
+    [
+     0.07278,
+     0.0,
+     0.997348,
+     0.057492
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00161
+  },
+  "Epson_T5803_Ink_Cartridge_Magenta_1pack": {
+   "T_obj_qr": [
+    [
+     -0.01113,
+     0.012565,
+     0.999859,
+     -0.000202
+    ],
+    [
+     0.999712,
+     0.021397,
+     0.010859,
+     0.018451
+    ],
+    [
+     -0.021257,
+     0.999692,
+     -0.012799,
+     0.041911
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00038
+  },
+  "Epson_UltraChrome_T0548_Ink_Cartridge_Matte_Black_1pack": {
+   "T_obj_qr": [
+    [
+     3e-05,
+     0.012077,
+     0.999927,
+     -0.000327
+    ],
+    [
+     0.999996,
+     -0.002807,
+     4e-06,
+     0.009229
+    ],
+    [
+     0.002807,
+     0.999923,
+     -0.012077,
+     0.057808
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00078
+  },
+  "F10_TRX_FG_ssscuo9tGxb": {
+   "T_obj_qr": [
+    [
+     -0.121177,
+     -0.153319,
+     0.980719,
+     0.007549
+    ],
+    [
+     0.018801,
+     -0.988177,
+     -0.152162,
+     0.071111
+    ],
+    [
+     0.992453,
+     0.0,
+     0.122627,
+     0.034081
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00399
+  },
+  "F10_TRX_TF_rH7tmKCdUJq": {
+   "T_obj_qr": [
+    [
+     0.991593,
+     0.019099,
+     0.127976,
+     0.041528
+    ],
+    [
+     -0.018942,
+     0.999818,
+     -0.002445,
+     0.056183
+    ],
+    [
+     -0.127999,
+     -0.0,
+     0.991774,
+     0.048545
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00386
+  },
+  "HP_Card_Invitation_Kit": {
+   "T_obj_qr": [
+    [
+     0.004395,
+     0.999951,
+     -0.008819,
+     8.6e-05
+    ],
+    [
+     -0.999802,
+     0.004223,
+     -0.019467,
+     -0.019479
+    ],
+    [
+     -0.019429,
+     0.008902,
+     0.999772,
+     0.098075
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00091
+  },
+  "Horse_Dreams_Pencil_Case": {
+   "T_obj_qr": [
+    [
+     -0.06885,
+     -0.997613,
+     -0.005309,
+     0.032686
+    ],
+    [
+     0.99466,
+     -0.069054,
+     0.0767,
+     0.036051
+    ],
+    [
+     -0.076884,
+     0.0,
+     0.99704,
+     0.036228
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00335
+  },
+  "House_of_Cards_The_Complete_First_Season_4_Discs_DVD": {
+   "T_obj_qr": [
+    [
+     0.002564,
+     -0.999986,
+     -0.004614,
+     9.9e-05
+    ],
+    [
+     -0.999947,
+     -0.002518,
+     -0.010025,
+     -0.010613
+    ],
+    [
+     0.010014,
+     0.004639,
+     -0.999939,
+     0.095768
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00038
+  },
+  "JarroSil_Activated_Silicon_5exdZHIeLAp": {
+   "T_obj_qr": [
+    [
+     -0.003293,
+     -0.999874,
+     0.015543,
+     0.000347
+    ],
+    [
+     0.999965,
+     -0.003412,
+     -0.007684,
+     0.023357
+    ],
+    [
+     0.007736,
+     0.015517,
+     0.99985,
+     0.04654
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00104
+  },
+  "Just_For_Men_Mustache_Beard_Brushin_Hair_Color_Gel_Kit_Jet_Black_M60": {
+   "T_obj_qr": [
+    [
+     -0.003829,
+     0.999974,
+     -0.006059,
+     -2.9e-05
+    ],
+    [
+     0.999813,
+     0.003944,
+     0.018941,
+     0.02187
+    ],
+    [
+     0.018964,
+     -0.005986,
+     -0.999802,
+     0.072456
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0006
+  },
+  "Just_For_Men_ShampooIn_Haircolor_Jet_Black_60": {
+   "T_obj_qr": [
+    [
+     0.003265,
+     -0.999854,
+     -0.016802,
+     0.000172
+    ],
+    [
+     -0.999836,
+     -0.003563,
+     0.017735,
+     -0.023367
+    ],
+    [
+     -0.017792,
+     0.016742,
+     -0.999702,
+     0.077631
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00048
+  },
+  "Just_For_Men_ShampooIn_Haircolor_Light_Brown_25": {
+   "T_obj_qr": [
+    [
+     0.003875,
+     0.999959,
+     -0.008145,
+     -0.00022
+    ],
+    [
+     0.999945,
+     -0.003796,
+     0.009783,
+     0.02296
+    ],
+    [
+     0.009752,
+     -0.008183,
+     -0.999919,
+     0.078829
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00064
+  },
+  "Just_For_Men_Shampoo_In_Haircolor_Darkest_Brown_50": {
+   "T_obj_qr": [
+    [
+     -0.002204,
+     -0.999987,
+     0.004548,
+     1.8e-05
+    ],
+    [
+     0.999922,
+     -0.00226,
+     -0.0123,
+     0.023088
+    ],
+    [
+     0.01231,
+     0.00452,
+     0.999914,
+     0.078644
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00046
+  },
+  "KITCHEN_SET_CLASSIC_40HwCHfeG0H": {
+   "T_obj_qr": [
+    [
+     -0.006869,
+     -0.999976,
+     0.000155,
+     -0.014686
+    ],
+    [
+     0.999721,
+     -0.006871,
+     -0.022593,
+     0.078876
+    ],
+    [
+     0.022594,
+     0.0,
+     0.999745,
+     0.076445
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00026
+  },
+  "Kid_Icarus_Uprising_Nintendo_3DS_Game": {
+   "T_obj_qr": [
+    [
+     -0.000289,
+     0.004153,
+     0.999991,
+     -0.00012
+    ],
+    [
+     0.999951,
+     -0.009919,
+     0.00033,
+     0.015304
+    ],
+    [
+     0.009921,
+     0.999942,
+     -0.00415,
+     0.064471
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00044
+  },
+  "LEUCIPPUS_ADIPURE": {
+   "T_obj_qr": [
+    [
+     -0.927622,
+     -0.348762,
+     0.133728,
+     -0.023466
+    ],
+    [
+     0.345194,
+     -0.937211,
+     -0.049764,
+     0.085614
+    ],
+    [
+     0.142687,
+     0.0,
+     0.989768,
+     0.050664
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00312
+  },
+  "Leap_Frog_Paint_Dabber_Dot_Art_5_paint_bottles": {
+   "T_obj_qr": [
+    [
+     -0.004366,
+     0.014547,
+     -0.999885,
+     -0.001155
+    ],
+    [
+     -0.998942,
+     -0.045844,
+     0.003695,
+     -0.021652
+    ],
+    [
+     -0.045785,
+     0.998843,
+     0.014731,
+     0.115243
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00039
+  },
+  "MEAT_SET": {
+   "T_obj_qr": [
+    [
+     0.001501,
+     0.922671,
+     -0.385586,
+     0.048092
+    ],
+    [
+     -0.003591,
+     0.385589,
+     0.922664,
+     -0.049115
+    ],
+    [
+     0.999992,
+     -0.0,
+     0.003892,
+     0.015095
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00105
+  },
+  "Marc_Anthony_Strictly_Curls_Curl_Envy_Perfect_Curl_Cream_6_fl_oz_bottle": {
+   "T_obj_qr": [
+    [
+     0.013204,
+     0.999639,
+     0.023411,
+     0.00027
+    ],
+    [
+     0.999859,
+     -0.012958,
+     -0.010654,
+     0.027648
+    ],
+    [
+     -0.010347,
+     0.023549,
+     -0.999669,
+     0.111459
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00087
+  },
+  "Markings_Letter_Holder": {
+   "T_obj_qr": [
+    [
+     -0.999997,
+     0.002378,
+     0.000578,
+     -0.04756
+    ],
+    [
+     0.000567,
+     -0.004438,
+     0.99999,
+     -0.000414
+    ],
+    [
+     0.00238,
+     0.999987,
+     0.004437,
+     0.070658
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00177
+  },
+  "Mens_Bahama_in_Khaki_Oyster_xU2jeqYwhQJ": {
+   "T_obj_qr": [
+    [
+     -0.111145,
+     0.719696,
+     0.685336,
+     0.012053
+    ],
+    [
+     -0.115212,
+     -0.69429,
+     0.710414,
+     0.010978
+    ],
+    [
+     0.987103,
+     0.0,
+     0.160085,
+     0.02639
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00399
+  },
+  "Mens_Billfish_Slip_On_in_Coffee_nK6AJJAHOae": {
+   "T_obj_qr": [
+    [
+     -0.007519,
+     0.995931,
+     0.08981,
+     0.008325
+    ],
+    [
+     -0.083085,
+     -0.090124,
+     0.992459,
+     0.012851
+    ],
+    [
+     0.996514,
+     0.0,
+     0.083425,
+     0.02038
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00157
+  },
+  "Mens_Gold_Cup_ASV_2Eye_Boat_Shoe_in_Cognac_Leather": {
+   "T_obj_qr": [
+    [
+     -0.023537,
+     0.97133,
+     0.236566,
+     0.013019
+    ],
+    [
+     -0.096168,
+     -0.237734,
+     0.966558,
+     0.055993
+    ],
+    [
+     0.995087,
+     0.0,
+     0.099006,
+     0.028843
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.0039
+  },
+  "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_EjPnk3E8fCs": {
+   "T_obj_qr": [
+    [
+     -0.014495,
+     0.990534,
+     0.136498,
+     0.002421
+    ],
+    [
+     -0.104601,
+     -0.137266,
+     0.984996,
+     -0.008613
+    ],
+    [
+     0.994409,
+     0.0,
+     0.1056,
+     0.02419
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00335
+  },
+  "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_GkQBKqABeQN": {
+   "T_obj_qr": [
+    [
+     0.960985,
+     -0.036283,
+     0.27421,
+     0.045875
+    ],
+    [
+     0.03489,
+     0.999342,
+     0.009956,
+     0.016659
+    ],
+    [
+     -0.27439,
+     0.0,
+     0.961618,
+     0.039656
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00329
+  },
+  "Mens_Gold_Cup_ASV_Dress_Casual_Venetian_in_Dark_Brown_Leather": {
+   "T_obj_qr": [
+    [
+     -0.908776,
+     -0.305114,
+     0.284661,
+     -0.022138
+    ],
+    [
+     0.291164,
+     -0.952316,
+     -0.091203,
+     0.104662
+    ],
+    [
+     0.298915,
+     0.0,
+     0.95428,
+     0.063098
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00383
+  },
+  "Mens_Tremont_Kiltie_Tassel_Loafer_in_Black_Amaretto_FT0I9OjSA6O": {
+   "T_obj_qr": [
+    [
+     0.010607,
+     0.996533,
+     -0.082522,
+     0.001586
+    ],
+    [
+     -0.127047,
+     0.083201,
+     0.988401,
+     0.023478
+    ],
+    [
+     0.99184,
+     -0.0,
+     0.127489,
+     0.022782
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00346
+  },
+  "Nescafe_Momento_Mocha_Specialty_Coffee_Mix_8_ct": {
+   "T_obj_qr": [
+    [
+     -0.009267,
+     -0.999908,
+     0.009944,
+     -0.000158
+    ],
+    [
+     0.999955,
+     -0.009245,
+     0.002325,
+     0.032078
+    ],
+    [
+     -0.002233,
+     0.009965,
+     0.999948,
+     0.080552
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0006
+  },
+  "Nescafe_Tasters_Choice_Instant_Coffee_Decaf_House_Blend_Light_7_oz": {
+   "T_obj_qr": [
+    [
+     0.013653,
+     -0.999907,
+     -2.4e-05,
+     -0.00019
+    ],
+    [
+     0.999905,
+     0.013653,
+     -0.001723,
+     0.038593
+    ],
+    [
+     0.001723,
+     0.0,
+     0.999999,
+     0.128763
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00252
+  },
+  "Nestl_Skinny_Cow_Heavenly_Crisp_Candy_Bar_Chocolate_Raspberry_6_pack_462_oz_total": {
+   "T_obj_qr": [
+    [
+     -0.007646,
+     -0.999935,
+     0.008486,
+     -0.000168
+    ],
+    [
+     0.999927,
+     -0.007725,
+     -0.009295,
+     0.02444
+    ],
+    [
+     0.00936,
+     0.008414,
+     0.999921,
+     0.082338
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00028
+  },
+  "Nestle_Nips_Hard_Candy_Peanut_Butter": {
+   "T_obj_qr": [
+    [
+     0.009204,
+     0.999957,
+     -0.001121,
+     0.000203
+    ],
+    [
+     0.99976,
+     -0.009224,
+     -0.019872,
+     0.021129
+    ],
+    [
+     -0.019881,
+     -0.000938,
+     -0.999802,
+     0.076036
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00107
+  },
+  "Nestle_Raisinets_Milk_Chocolate_35_oz_992_g": {
+   "T_obj_qr": [
+    [
+     -0.002902,
+     0.004779,
+     0.999984,
+     2.1e-05
+    ],
+    [
+     0.998808,
+     -0.048709,
+     0.003132,
+     0.009899
+    ],
+    [
+     0.048723,
+     0.998802,
+     -0.004632,
+     0.041672
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00094
+  },
+  "Nestle_Skinny_Cow_Dreamy_Clusters_Candy_Dark_Chocolate_6_pack_1_oz_pouches": {
+   "T_obj_qr": [
+    [
+     0.999966,
+     -0.001861,
+     0.008072,
+     0.068108
+    ],
+    [
+     0.001935,
+     0.999956,
+     -0.009162,
+     0.000415
+    ],
+    [
+     -0.008054,
+     0.009177,
+     0.999925,
+     0.081921
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00042
+  },
+  "Nickelodeon_The_Spongebob_Movie_PopAPart_Spongebob": {
+   "T_obj_qr": [
+    [
+     -0.033464,
+     -0.999436,
+     -0.002809,
+     0.019933
+    ],
+    [
+     0.995934,
+     -0.033582,
+     0.083589,
+     0.001469
+    ],
+    [
+     -0.083636,
+     0.0,
+     0.996496,
+     0.081487
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00349
+  },
+  "Nintendo_2DS_Crimson_Red": {
+   "T_obj_qr": [
+    [
+     0.006734,
+     0.996493,
+     -0.083406,
+     -0.008819
+    ],
+    [
+     -0.080189,
+     0.083678,
+     0.993261,
+     0.02113
+    ],
+    [
+     0.996757,
+     -0.0,
+     0.080472,
+     0.018832
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00156
+  },
+  "Nordic_Ware_Original_Bundt_Pan": {
+   "T_obj_qr": [
+    [
+     -0.752587,
+     0.646473,
+     -0.125245,
+     -0.087662
+    ],
+    [
+     -0.637702,
+     -0.762937,
+     -0.106126,
+     -0.083682
+    ],
+    [
+     -0.164162,
+     0.0,
+     0.986433,
+     0.058577
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00396
+  },
+  "Now_Designs_Snack_Bags_Bicycle_2_count": {
+   "T_obj_qr": [
+    [
+     0.005175,
+     -0.989952,
+     -0.141306,
+     0.001738
+    ],
+    [
+     0.036234,
+     0.141401,
+     -0.989289,
+     -0.041515
+    ],
+    [
+     0.99933,
+     0.0,
+     0.036602,
+     0.015881
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00287
+  },
+  "OVAL_XYLOPHONE": {
+   "T_obj_qr": [
+    [
+     0.042415,
+     0.392257,
+     -0.918877,
+     0.004082
+    ],
+    [
+     -0.018087,
+     0.919856,
+     0.391839,
+     -0.034663
+    ],
+    [
+     0.998936,
+     -0.0,
+     0.04611,
+     0.008998
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00242
+  },
+  "OWL_SORTER": {
+   "T_obj_qr": [
+    [
+     -0.525284,
+     -0.847474,
+     -0.076573,
+     0.051443
+    ],
+    [
+     0.838611,
+     -0.530836,
+     0.122248,
+     -0.00429
+    ],
+    [
+     -0.14425,
+     0.0,
+     0.989541,
+     0.117009
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.0038
+  },
+  "Office_Depot_Canon_CLI_221BK_Ink_Cartridge_Black_2946B001": {
+   "T_obj_qr": [
+    [
+     0.00064,
+     -0.999993,
+     0.003639,
+     9e-05
+    ],
+    [
+     0.999799,
+     0.000567,
+     -0.02005,
+     0.024636
+    ],
+    [
+     0.020047,
+     0.003651,
+     0.999792,
+     0.059455
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00077
+  },
+  "Office_Depot_Canon_PGI35_Remanufactured_Ink_Cartridge_Black": {
+   "T_obj_qr": [
+    [
+     0.004721,
+     0.999977,
+     0.004854,
+     -0.000262
+    ],
+    [
+     -0.999982,
+     0.004738,
+     -0.003648,
+     -0.024455
+    ],
+    [
+     -0.003671,
+     -0.004837,
+     0.999982,
+     0.059072
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00056
+  },
+  "Office_Depot_Canon_PGI5BK_Remanufactured_Ink_Cartridge_Black": {
+   "T_obj_qr": [
+    [
+     0.000751,
+     0.99996,
+     0.008955,
+     6.9e-05
+    ],
+    [
+     -1.0,
+     0.000748,
+     0.000379,
+     -0.024591
+    ],
+    [
+     0.000373,
+     -0.008955,
+     0.99996,
+     0.058993
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00072
+  },
+  "Office_Depot_Dell_Series_1_Remanufactured_Ink_Cartridge_Black": {
+   "T_obj_qr": [
+    [
+     0.003604,
+     0.999863,
+     -0.016126,
+     0.000405
+    ],
+    [
+     0.999991,
+     -0.00364,
+     -0.002249,
+     0.024889
+    ],
+    [
+     -0.002307,
+     -0.016118,
+     -0.999867,
+     0.05865
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00067
+  },
+  "Office_Depot_HP_2_Remanufactured_Ink_Cartridges_Color_Cyan_Magenta_Yellow_3_count": {
+   "T_obj_qr": [
+    [
+     0.003621,
+     -0.999968,
+     0.007076,
+     0.000347
+    ],
+    [
+     0.999974,
+     0.003576,
+     -0.00632,
+     0.024768
+    ],
+    [
+     0.006294,
+     0.007098,
+     0.999955,
+     0.073848
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00061
+  },
+  "Office_Depot_HP_564XL_Ink_Cartridge_Black_CN684WN": {
+   "T_obj_qr": [
+    [
+     -0.005237,
+     0.999946,
+     -0.009007,
+     -0.000318
+    ],
+    [
+     0.999927,
+     0.005138,
+     -0.010964,
+     0.024285
+    ],
+    [
+     -0.010917,
+     -0.009064,
+     -0.999899,
+     0.058601
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00057
+  },
+  "Office_Depot_HP_71_Remanufactured_Ink_Cartridge_Black": {
+   "T_obj_qr": [
+    [
+     -0.003718,
+     0.999981,
+     0.004926,
+     9.6e-05
+    ],
+    [
+     -0.999836,
+     -0.003805,
+     0.017718,
+     -0.024984
+    ],
+    [
+     0.017737,
+     -0.004859,
+     0.999831,
+     0.059248
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0007
+  },
+  "Office_Depot_HP_950XL_Ink_Cartridge_Black_CN045AN": {
+   "T_obj_qr": [
+    [
+     -0.010372,
+     -0.999923,
+     -0.006882,
+     -0.000519
+    ],
+    [
+     -0.999907,
+     0.01031,
+     0.008975,
+     -0.024609
+    ],
+    [
+     -0.008904,
+     0.006975,
+     -0.999936,
+     0.058668
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0007
+  },
+  "Office_Depot_HP_98_Remanufactured_Ink_Cartridge_Black": {
+   "T_obj_qr": [
+    [
+     -0.009954,
+     0.999905,
+     -0.009584,
+     2.4e-05
+    ],
+    [
+     0.999949,
+     0.009973,
+     0.001873,
+     0.024509
+    ],
+    [
+     0.001968,
+     -0.009565,
+     -0.999952,
+     0.073848
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00053
+  },
+  "Olive_Kids_Birdie_Munch_n_Lunch": {
+   "T_obj_qr": [
+    [
+     0.010766,
+     0.999942,
+     -6.6e-05,
+     0.004312
+    ],
+    [
+     -0.999923,
+     0.010766,
+     0.006166,
+     -0.070199
+    ],
+    [
+     0.006166,
+     -0.0,
+     0.999981,
+     0.087899
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0018
+  },
+  "Olive_Kids_Butterfly_Garden_Munch_n_Lunch_Bag": {
+   "T_obj_qr": [
+    [
+     -0.005444,
+     0.999985,
+     -0.000242,
+     -0.012002
+    ],
+    [
+     -0.998998,
+     -0.005449,
+     -0.044431,
+     -0.068264
+    ],
+    [
+     -0.044431,
+     0.0,
+     0.999012,
+     0.077762
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.002
+  },
+  "Olive_Kids_Dinosaur_Land_Munch_n_Lunch": {
+   "T_obj_qr": [
+    [
+     0.039097,
+     -0.999218,
+     -0.005843,
+     0.021103
+    ],
+    [
+     0.988244,
+     0.039531,
+     -0.147687,
+     0.077911
+    ],
+    [
+     0.147803,
+     0.0,
+     0.989017,
+     0.107581
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00266
+  },
+  "Olive_Kids_Game_On_Lunch_Box": {
+   "T_obj_qr": [
+    [
+     0.002002,
+     0.999998,
+     -0.000106,
+     0.074933
+    ],
+    [
+     -0.998588,
+     0.002005,
+     0.053081,
+     -0.046507
+    ],
+    [
+     0.053081,
+     -0.0,
+     0.99859,
+     0.119456
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00143
+  },
+  "Olive_Kids_Paisley_Pencil_Case": {
+   "T_obj_qr": [
+    [
+     0.035622,
+     -0.999343,
+     -0.006692,
+     0.001384
+    ],
+    [
+     0.982162,
+     0.036245,
+     -0.184509,
+     0.041793
+    ],
+    [
+     0.18463,
+     0.0,
+     0.982808,
+     0.051936
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00364
+  },
+  "PUNCH_DROP_TjicLPMqLvz": {
+   "T_obj_qr": [
+    [
+     -0.002693,
+     -0.004722,
+     -0.999985,
+     0.000125
+    ],
+    [
+     0.999991,
+     -0.00322,
+     -0.002678,
+     0.097918
+    ],
+    [
+     -0.003207,
+     -0.999984,
+     0.004731,
+     0.069689
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00101
+  },
+  "Paul_Frank_Dot_Lunch_Box": {
+   "T_obj_qr": [
+    [
+     0.005676,
+     -0.999984,
+     -0.000268,
+     -0.039898
+    ],
+    [
+     0.998869,
+     0.005682,
+     -0.047198,
+     0.04154
+    ],
+    [
+     0.047199,
+     0.0,
+     0.998886,
+     0.112922
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00154
+  },
+  "Pennington_Electric_Pot_Cabana_4": {
+   "T_obj_qr": [
+    [
+     0.225718,
+     0.972904,
+     0.050099,
+     0.010752
+    ],
+    [
+     -0.94979,
+     0.231211,
+     -0.210808,
+     -0.038723
+    ],
+    [
+     -0.216679,
+     -0.0,
+     0.976243,
+     0.037302
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00393
+  },
+  "Perricoen_MD_No_Concealer_Concealer": {
+   "T_obj_qr": [
+    [
+     0.011585,
+     0.999656,
+     0.023528,
+     0.000449
+    ],
+    [
+     -0.999933,
+     0.011565,
+     0.000975,
+     -0.02145
+    ],
+    [
+     0.000702,
+     -0.023538,
+     0.999723,
+     0.055334
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.04031,
+   "flatness": 0.00078
+  },
+  "Perricone_MD_AcylGlutathione_Eye_Lid_Serum": {
+   "T_obj_qr": [
+    [
+     -0.012841,
+     -0.99983,
+     0.013202,
+     -0.000194
+    ],
+    [
+     0.999899,
+     -0.01276,
+     0.00619,
+     0.027664
+    ],
+    [
+     -0.00602,
+     0.013281,
+     0.999894,
+     0.053381
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00029
+  },
+  "Perricone_MD_Chia_Serum": {
+   "T_obj_qr": [
+    [
+     0.00178,
+     -0.999948,
+     0.010074,
+     -0.000161
+    ],
+    [
+     0.999941,
+     0.001672,
+     -0.010736,
+     0.020534
+    ],
+    [
+     0.010718,
+     0.010092,
+     0.999892,
+     0.060127
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00036
+  },
+  "Perricone_MD_Face_Finishing_Moisturizer": {
+   "T_obj_qr": [
+    [
+     -0.999948,
+     0.000344,
+     0.010238,
+     -0.029733
+    ],
+    [
+     -0.000376,
+     -0.999995,
+     -0.003208,
+     0.000167
+    ],
+    [
+     0.010237,
+     -0.003211,
+     0.999942,
+     0.037291
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00061
+  },
+  "Perricone_MD_Hypoallergenic_Gentle_Cleanser": {
+   "T_obj_qr": [
+    [
+     0.99977,
+     0.003052,
+     0.021243,
+     0.04029
+    ],
+    [
+     -0.003403,
+     0.999858,
+     0.016476,
+     0.00034
+    ],
+    [
+     -0.02119,
+     -0.016544,
+     0.999639,
+     0.076822
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00079
+  },
+  "Perricone_MD_No_Foundation_Foundation_No_1": {
+   "T_obj_qr": [
+    [
+     -0.010388,
+     0.999759,
+     -0.019354,
+     -0.000128
+    ],
+    [
+     0.999857,
+     0.010127,
+     -0.01354,
+     0.021353
+    ],
+    [
+     -0.013341,
+     -0.019492,
+     -0.999721,
+     0.060145
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00079
+  },
+  "Perricone_MD_No_Foundation_Serum": {
+   "T_obj_qr": [
+    [
+     -0.004226,
+     -0.999663,
+     0.025606,
+     -0.000117
+    ],
+    [
+     0.999987,
+     -0.004149,
+     0.003077,
+     0.021614
+    ],
+    [
+     -0.00297,
+     0.025619,
+     0.999667,
+     0.060938
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00061
+  },
+  "Perricone_MD_No_Lipstick_Lipstick": {
+   "T_obj_qr": [
+    [
+     -0.003675,
+     -0.999911,
+     0.012845,
+     -9.7e-05
+    ],
+    [
+     0.999977,
+     -0.003601,
+     0.005764,
+     0.021329
+    ],
+    [
+     -0.005717,
+     0.012866,
+     0.999901,
+     0.039435
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.04016,
+   "flatness": 0.00047
+  },
+  "Perricone_MD_Photo_Plasma": {
+   "T_obj_qr": [
+    [
+     0.004339,
+     0.012414,
+     0.999914,
+     1.1e-05
+    ],
+    [
+     0.999825,
+     -0.018265,
+     -0.004112,
+     0.030708
+    ],
+    [
+     0.018213,
+     0.999756,
+     -0.012491,
+     0.05302
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00033
+  },
+  "Perricone_MD_The_Crease_Cure_Duo": {
+   "T_obj_qr": [
+    [
+     0.000268,
+     -0.007325,
+     -0.999973,
+     -0.000345
+    ],
+    [
+     0.998981,
+     0.045135,
+     -6.3e-05,
+     0.030403
+    ],
+    [
+     0.045134,
+     -0.998954,
+     0.00733,
+     0.06094
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00039
+  },
+  "Perricone_MD_Vitamin_C_Ester_15": {
+   "T_obj_qr": [
+    [
+     0.999992,
+     0.001006,
+     0.003826,
+     0.039752
+    ],
+    [
+     -0.000974,
+     0.999966,
+     -0.008144,
+     0.000107
+    ],
+    [
+     -0.003835,
+     0.00814,
+     0.99996,
+     0.065088
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00034
+  },
+  "Persona_Q_Shadow_of_the_Labyrinth_Nintendo_3DS": {
+   "T_obj_qr": [
+    [
+     -8.9e-05,
+     -0.011634,
+     -0.999932,
+     -0.000211
+    ],
+    [
+     -0.99998,
+     -0.006245,
+     0.000162,
+     -0.013066
+    ],
+    [
+     -0.006246,
+     0.999913,
+     -0.011633,
+     0.064392
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0003
+  },
+  "Philips_EcoVantage_43_W_Light_Bulbs_Natural_Light_2_pack": {
+   "T_obj_qr": [
+    [
+     -0.008815,
+     -0.999912,
+     0.009875,
+     -0.000261
+    ],
+    [
+     0.99987,
+     -0.008681,
+     0.013571,
+     0.033356
+    ],
+    [
+     -0.013484,
+     0.009994,
+     0.999859,
+     0.053731
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00055
+  },
+  "Phillips_Caplets_Size_24": {
+   "T_obj_qr": [
+    [
+     0.009492,
+     -0.999953,
+     0.002025,
+     0.000109
+    ],
+    [
+     0.999867,
+     0.009465,
+     -0.013306,
+     0.021947
+    ],
+    [
+     0.013286,
+     0.002151,
+     0.999909,
+     0.043121
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00075
+  },
+  "Phillips_Stool_Softener_Liquid_Gels_30_liquid_gels": {
+   "T_obj_qr": [
+    [
+     -0.003926,
+     -0.999976,
+     -0.00573,
+     -0.000318
+    ],
+    [
+     -0.999954,
+     0.003975,
+     -0.008672,
+     -0.022251
+    ],
+    [
+     0.008694,
+     0.005696,
+     -0.999946,
+     0.043407
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00041
+  },
+  "Pinwheel_Pencil_Case": {
+   "T_obj_qr": [
+    [
+     -0.047967,
+     0.998846,
+     -0.002541,
+     0.066996
+    ],
+    [
+     -0.997447,
+     -0.048034,
+     -0.052833,
+     -0.038894
+    ],
+    [
+     -0.052894,
+     0.0,
+     0.9986,
+     0.041112
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00341
+  },
+  "Pokmon_Conquest_Nintendo_DS_Game": {
+   "T_obj_qr": [
+    [
+     0.002181,
+     0.000791,
+     -0.999997,
+     -0.000278
+    ],
+    [
+     -0.003623,
+     0.999993,
+     0.000783,
+     -5.3e-05
+    ],
+    [
+     0.999991,
+     0.003621,
+     0.002184,
+     0.017122
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00103
+  },
+  "Pokmon_X_Nintendo_3DS_Game": {
+   "T_obj_qr": [
+    [
+     0.005737,
+     -0.001304,
+     0.999983,
+     -0.000102
+    ],
+    [
+     4.7e-05,
+     -0.999999,
+     -0.001304,
+     -8e-06
+    ],
+    [
+     0.999984,
+     5.4e-05,
+     -0.005737,
+     0.014469
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00073
+  },
+  "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS": {
+   "T_obj_qr": [
+    [
+     0.002856,
+     0.008567,
+     0.999959,
+     -0.000164
+    ],
+    [
+     0.999496,
+     -0.031642,
+     -0.002584,
+     0.015399
+    ],
+    [
+     0.031619,
+     0.999463,
+     -0.008653,
+     0.06577
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0005
+  },
+  "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total": {
+   "T_obj_qr": [
+    [
+     -0.001532,
+     0.014284,
+     0.999897,
+     0.000149
+    ],
+    [
+     -0.997583,
+     -0.069484,
+     -0.000536,
+     -0.009402
+    ],
+    [
+     0.069469,
+     -0.997481,
+     0.014355,
+     0.041974
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00098
+  },
+  "Predator_LZ_TRX_FG": {
+   "T_obj_qr": [
+    [
+     0.007226,
+     -0.957366,
+     -0.288787,
+     -0.01097
+    ],
+    [
+     0.023949,
+     0.288877,
+     -0.957067,
+     0.038551
+    ],
+    [
+     0.999687,
+     0.0,
+     0.025016,
+     0.032239
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00245
+  },
+  "RJ_Rabbit_Easter_Basket_Blue": {
+   "T_obj_qr": [
+    [
+     -0.973842,
+     0.006983,
+     0.22712,
+     0.070261
+    ],
+    [
+     -0.0068,
+     -0.999976,
+     0.001586,
+     0.019621
+    ],
+    [
+     0.227125,
+     0.0,
+     0.973866,
+     0.062136
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00365
+  },
+  "ReadytoUse_Rolled_Fondant_Pure_White_24_oz_box": {
+   "T_obj_qr": [
+    [
+     0.000118,
+     0.999998,
+     0.001753,
+     -0.000192
+    ],
+    [
+     -0.999912,
+     0.000141,
+     -0.013228,
+     -0.02361
+    ],
+    [
+     -0.013229,
+     -0.001751,
+     0.999911,
+     0.08406
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00029
+  },
+  "Reebok_BREAKPOINT_MID": {
+   "T_obj_qr": [
+    [
+     0.993201,
+     0.084624,
+     -0.079941,
+     0.042074
+    ],
+    [
+     -0.084352,
+     0.996413,
+     0.006789,
+     0.063275
+    ],
+    [
+     0.080229,
+     -0.0,
+     0.996776,
+     0.078372
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00336
+  },
+  "Reebok_FUELTRAIN": {
+   "T_obj_qr": [
+    [
+     -0.905873,
+     -0.274505,
+     0.322554,
+     -0.01857
+    ],
+    [
+     0.258601,
+     -0.961586,
+     -0.09208,
+     0.087307
+    ],
+    [
+     0.33544,
+     0.0,
+     0.942062,
+     0.067254
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00363
+  },
+  "Reebok_R_CROSSFIT_OLY_UFORM": {
+   "T_obj_qr": [
+    [
+     -0.867327,
+     -0.443935,
+     0.22509,
+     -0.013864
+    ],
+    [
+     0.4297,
+     -0.896059,
+     -0.111517,
+     0.121879
+    ],
+    [
+     0.2512,
+     0.0,
+     0.967935,
+     0.067004
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00374
+  },
+  "Reebok_TURBO_RC": {
+   "T_obj_qr": [
+    [
+     0.023687,
+     0.994513,
+     -0.101898,
+     0.013586
+    ],
+    [
+     -0.22518,
+     0.104615,
+     0.968685,
+     0.047791
+    ],
+    [
+     0.974029,
+     -0.0,
+     0.226422,
+     0.042187
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00165
+  },
+  "Reef_Star_Cushion_Flipflops_Size_8_Black": {
+   "T_obj_qr": [
+    [
+     0.0096,
+     0.928255,
+     -0.371821,
+     -0.008364
+    ],
+    [
+     -0.02396,
+     0.371945,
+     0.927946,
+     -0.103341
+    ],
+    [
+     0.999667,
+     -0.0,
+     0.025812,
+     0.026068
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00092
+  },
+  "Room_Essentials_Mug_White_Yellow": {
+   "T_obj_qr": [
+    [
+     0.285344,
+     -0.957494,
+     0.042248,
+     -0.003033
+    ],
+    [
+     0.947168,
+     0.288455,
+     0.140239,
+     0.040529
+    ],
+    [
+     -0.146465,
+     0.0,
+     0.989216,
+     0.072989
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00321
+  },
+  "SAMOA": {
+   "T_obj_qr": [
+    [
+     0.962956,
+     0.054716,
+     0.264051,
+     0.049694
+    ],
+    [
+     -0.052768,
+     0.998502,
+     -0.01447,
+     0.03869
+    ],
+    [
+     -0.264447,
+     -0.0,
+     0.9644,
+     0.06153
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00365
+  },
+  "SHAPE_MATCHING": {
+   "T_obj_qr": [
+    [
+     0.002417,
+     0.999566,
+     -0.029354,
+     0.017298
+    ],
+    [
+     -0.082041,
+     0.029453,
+     0.996194,
+     0.035741
+    ],
+    [
+     0.996626,
+     -0.0,
+     0.082077,
+     0.018647
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0016
+  },
+  "Sapota_Threshold_4_Ceramic_Round_Planter_Red": {
+   "T_obj_qr": [
+    [
+     0.61297,
+     0.782944,
+     0.10614,
+     0.030774
+    ],
+    [
+     -0.771464,
+     0.622092,
+     -0.133585,
+     -0.041588
+    ],
+    [
+     -0.170618,
+     -0.0,
+     0.985337,
+     0.075745
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00314
+  },
+  "Seagate_Archive_HDD_8_TB_Internal_hard_drive_SATA_6Gbs_35_ST8000AS0002": {
+   "T_obj_qr": [
+    [
+     -0.002867,
+     0.999913,
+     -0.012848,
+     -0.000154
+    ],
+    [
+     -0.99987,
+     -0.00307,
+     -0.015849,
+     -0.013137
+    ],
+    [
+     -0.015887,
+     0.0128,
+     0.999792,
+     0.073874
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00029
+  },
+  "Shurtape_Tape_Purple_CP28": {
+   "T_obj_qr": [
+    [
+     0.990315,
+     0.136893,
+     -0.023162,
+     0.058296
+    ],
+    [
+     -0.136856,
+     0.990586,
+     0.003201,
+     -0.007916
+    ],
+    [
+     0.023382,
+     -0.0,
+     0.999727,
+     0.022414
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00262
+  },
+  "Simon_Swipe_Game": {
+   "T_obj_qr": [
+    [
+     0.011862,
+     -0.975507,
+     -0.21965,
+     -0.003545
+    ],
+    [
+     0.052604,
+     0.21997,
+     -0.974087,
+     0.091022
+    ],
+    [
+     0.998545,
+     0.0,
+     0.053925,
+     0.03378
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00376
+  },
+  "Sony_Acid_Music_Studio": {
+   "T_obj_qr": [
+    [
+     -0.002703,
+     0.999958,
+     0.008772,
+     0.000188
+    ],
+    [
+     -0.999749,
+     -0.002508,
+     -0.022241,
+     -0.015029
+    ],
+    [
+     -0.022218,
+     -0.00883,
+     0.999714,
+     0.097671
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00016
+  },
+  "Sony_Downloadable_Loops": {
+   "T_obj_qr": [
+    [
+     0.002902,
+     0.999972,
+     -0.006946,
+     -2.4e-05
+    ],
+    [
+     0.999727,
+     -0.00274,
+     0.023223,
+     0.016421
+    ],
+    [
+     0.023203,
+     -0.007012,
+     -0.999706,
+     0.097613
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0004
+  },
+  "Sperry_TopSider_pSUFPWQXPp3": {
+   "T_obj_qr": [
+    [
+     -0.089393,
+     0.995619,
+     0.027421,
+     0.010918
+    ],
+    [
+     -0.951843,
+     -0.093505,
+     0.291978,
+     -0.025316
+    ],
+    [
+     0.293262,
+     0.0,
+     0.956032,
+     0.086861
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00359
+  },
+  "Sperry_TopSider_tNB9t6YBUf3": {
+   "T_obj_qr": [
+    [
+     -0.885842,
+     -0.459015,
+     -0.067742,
+     -0.011529
+    ],
+    [
+     0.457679,
+     -0.888428,
+     0.034999,
+     0.084823
+    ],
+    [
+     -0.076249,
+     0.0,
+     0.997089,
+     0.161317
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.0031
+  },
+  "Squirt_Strain_Fruit_Basket": {
+   "T_obj_qr": [
+    [
+     0.019008,
+     -0.999811,
+     0.004146,
+     0.006963
+    ],
+    [
+     0.976846,
+     0.019455,
+     0.213057,
+     0.028202
+    ],
+    [
+     -0.213097,
+     0.0,
+     0.977031,
+     0.029421
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00307
+  },
+  "Super_Mario_3D_World_Wii_U_Game": {
+   "T_obj_qr": [
+    [
+     0.006151,
+     0.999981,
+     0.000174,
+     -0.000124
+    ],
+    [
+     -0.003489,
+     -0.000153,
+     0.999994,
+     -1.3e-05
+    ],
+    [
+     0.999975,
+     -0.006152,
+     0.003488,
+     0.015555
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00155
+  },
+  "Super_Mario_Kart_Super_Nintendo_Entertainment_System": {
+   "T_obj_qr": [
+    [
+     -0.002888,
+     -0.007633,
+     -0.999967,
+     0.00012
+    ],
+    [
+     0.997707,
+     -0.067638,
+     -0.002365,
+     0.010025
+    ],
+    [
+     -0.067618,
+     -0.997681,
+     0.007811,
+     0.043786
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.0003
+  },
+  "Tag_Dishtowel_Basket_Weave_Red_18_x_26": {
+   "T_obj_qr": [
+    [
+     0.004021,
+     -0.997462,
+     -0.071081,
+     0.012905
+    ],
+    [
+     0.05634,
+     0.071195,
+     -0.99587,
+     -0.05717
+    ],
+    [
+     0.998404,
+     0.0,
+     0.056483,
+     0.014163
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00263
+  },
+  "Tag_Dishtowel_Green": {
+   "T_obj_qr": [
+    [
+     -0.149347,
+     0.352707,
+     0.923739,
+     -0.051701
+    ],
+    [
+     -0.056294,
+     -0.935734,
+     0.348186,
+     0.051663
+    ],
+    [
+     0.987181,
+     0.0,
+     0.159604,
+     0.020587
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00392
+  },
+  "Threshold_Hand_Towel_Blue_Medallion_16_x_27": {
+   "T_obj_qr": [
+    [
+     -0.042062,
+     0.936602,
+     0.34786,
+     0.006827
+    ],
+    [
+     -0.112432,
+     -0.350394,
+     0.92983,
+     -0.004579
+    ],
+    [
+     0.992769,
+     0.0,
+     0.120042,
+     0.041732
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00328
+  },
+  "Threshold_Porcelain_Coffee_Mug_All_Over_Bead_White": {
+   "T_obj_qr": [
+    [
+     0.293525,
+     -0.955951,
+     0.000688,
+     0.030741
+    ],
+    [
+     0.955948,
+     0.293526,
+     0.002242,
+     0.044277
+    ],
+    [
+     -0.002345,
+     0.0,
+     0.999997,
+     0.093912
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00347
+  },
+  "Threshold_Porcelain_Pitcher_White": {
+   "T_obj_qr": [
+    [
+     0.482094,
+     -0.864463,
+     -0.14244,
+     0.003073
+    ],
+    [
+     0.829034,
+     0.502696,
+     -0.244947,
+     0.063659
+    ],
+    [
+     0.283352,
+     0.0,
+     0.959016,
+     0.140538
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00373
+  },
+  "Threshold_Porcelain_Teapot_White": {
+   "T_obj_qr": [
+    [
+     0.702491,
+     -0.708852,
+     -0.06353,
+     0.058265
+    ],
+    [
+     0.705971,
+     0.705358,
+     -0.063845,
+     0.061185
+    ],
+    [
+     0.090068,
+     0.0,
+     0.995936,
+     0.042669
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.0034
+  },
+  "Threshold_Ramekin_White_Porcelain": {
+   "T_obj_qr": [
+    [
+     0.008644,
+     -0.971238,
+     -0.237955,
+     0.023188
+    ],
+    [
+     0.03526,
+     0.238112,
+     -0.970597,
+     -0.003046
+    ],
+    [
+     0.999341,
+     0.0,
+     0.036304,
+     0.053365
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00337
+  },
+  "Threshold_Salad_Plate_Square_Rim_Porcelain": {
+   "T_obj_qr": [
+    [
+     -0.010096,
+     0.00349,
+     -0.999943,
+     -0.00015
+    ],
+    [
+     -0.002743,
+     0.99999,
+     0.003518,
+     -0.000163
+    ],
+    [
+     0.999945,
+     0.002778,
+     -0.010086,
+     0.009789
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00035
+  },
+  "Timberland_Mens_Earthkeepers_Newmarket_6Inch_Cupsole_Boot": {
+   "T_obj_qr": [
+    [
+     -0.985413,
+     -0.109204,
+     0.130519,
+     -0.035058
+    ],
+    [
+     0.108259,
+     -0.994019,
+     -0.014339,
+     0.07003
+    ],
+    [
+     0.131305,
+     0.0,
+     0.991342,
+     0.061504
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00367
+  },
+  "Top_Paw_Dog_Bowl_Blue_Paw_Bone_Ceramic_25_fl_oz_total": {
+   "T_obj_qr": [
+    [
+     -0.007262,
+     -0.6574,
+     0.753507,
+     0.000391
+    ],
+    [
+     0.001377,
+     -0.753533,
+     -0.657409,
+     -0.000221
+    ],
+    [
+     0.999973,
+     -0.003737,
+     0.006377,
+     0.009212
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00127
+  },
+  "Travel_Smart_Neck_Rest_Inflatable": {
+   "T_obj_qr": [
+    [
+     -0.014456,
+     -0.999879,
+     -0.00566,
+     -0.000313
+    ],
+    [
+     -0.999839,
+     0.014515,
+     -0.01058,
+     -0.020215
+    ],
+    [
+     0.010661,
+     0.005506,
+     -0.999928,
+     0.086978
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00075
+  },
+  "UGG_Bailey_Button_Womens_Boots_Black_7": {
+   "T_obj_qr": [
+    [
+     0.991566,
+     -0.112315,
+     0.064671,
+     0.046474
+    ],
+    [
+     0.112077,
+     0.993673,
+     0.00731,
+     0.084174
+    ],
+    [
+     -0.065083,
+     0.0,
+     0.99788,
+     0.159258
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00391
+  },
+  "UGG_Cambridge_Womens_Black_7": {
+   "T_obj_qr": [
+    [
+     0.949206,
+     0.314647,
+     0.002088,
+     0.048938
+    ],
+    [
+     -0.314647,
+     0.949209,
+     -0.000692,
+     0.004599
+    ],
+    [
+     -0.0022,
+     -0.0,
+     0.999998,
+     0.055165
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00373
+  },
+  "US_Army_Stash_Lunch_Bag": {
+   "T_obj_qr": [
+    [
+     0.099799,
+     -0.994997,
+     -0.004674,
+     0.044237
+    ],
+    [
+     0.993907,
+     0.099909,
+     -0.04655,
+     0.078022
+    ],
+    [
+     0.046784,
+     0.0,
+     0.998905,
+     0.089239
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00184
+  },
+  "VANS_FIRE_ROASTED_VEGGIE_CRACKERS_GLUTEN_FREE": {
+   "T_obj_qr": [
+    [
+     0.00629,
+     -0.999908,
+     0.012021,
+     0.000394
+    ],
+    [
+     0.999902,
+     0.006139,
+     -0.012574,
+     0.029376
+    ],
+    [
+     0.012499,
+     0.012099,
+     0.999849,
+     0.104832
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00042
+  },
+  "Victor_Reversible_Bookend": {
+   "T_obj_qr": [
+    [
+     0.999916,
+     -0.004809,
+     -0.012013,
+     0.114471
+    ],
+    [
+     0.004795,
+     0.999988,
+     -0.001193,
+     0.000993
+    ],
+    [
+     0.012018,
+     0.001136,
+     0.999927,
+     0.119631
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00053
+  },
+  "Whey_Protein_Vanilla": {
+   "T_obj_qr": [
+    [
+     0.00666,
+     0.826256,
+     0.563256,
+     0.00071
+    ],
+    [
+     0.000967,
+     -0.563274,
+     0.82627,
+     -4e-05
+    ],
+    [
+     0.999977,
+     -0.004958,
+     -0.00455,
+     0.169021
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00067
+  },
+  "Wilton_Easy_Layers_Cake_Pan_Set": {
+   "T_obj_qr": [
+    [
+     -0.000172,
+     -0.009735,
+     0.999953,
+     -0.000391
+    ],
+    [
+     0.999284,
+     -0.037826,
+     -0.000196,
+     0.024088
+    ],
+    [
+     0.037826,
+     0.999237,
+     0.009735,
+     0.088866
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.045,
+   "flatness": 0.00039
+  },
+  "Wilton_PreCut_Parchment_Sheets_10_x_15_24_sheets": {
+   "T_obj_qr": [
+    [
+     0.000677,
+     -0.015513,
+     -0.999879,
+     -0.000186
+    ],
+    [
+     -0.999928,
+     -0.012008,
+     -0.000491,
+     -0.026099
+    ],
+    [
+     -0.011998,
+     0.999808,
+     -0.01552,
+     0.028285
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.04276,
+   "flatness": 0.00087
+  },
+  "Womens_Authentic_Original_Boat_Shoe_in_Classic_Brown_Leather_48Nh7VuMwW6": {
+   "T_obj_qr": [
+    [
+     -0.969098,
+     -0.231413,
+     -0.08542,
+     -0.028657
+    ],
+    [
+     0.230519,
+     -0.972856,
+     0.020319,
+     0.046298
+    ],
+    [
+     -0.087804,
+     0.0,
+     0.996138,
+     0.030544
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00344
+  },
+  "Womens_Hikerfish_Boot_in_Black_Leopard_ridcCWsv8rW": {
+   "T_obj_qr": [
+    [
+     0.988771,
+     -0.14545,
+     0.034303,
+     0.051939
+    ],
+    [
+     0.145362,
+     0.989366,
+     0.005043,
+     0.062447
+    ],
+    [
+     -0.034672,
+     0.0,
+     0.999399,
+     0.094376
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.0375,
+   "flatness": 0.00399
+  },
+  "Womens_Sparkle_Suede_Angelfish_in_Grey_Sparkle_Suede_Silver": {
+   "T_obj_qr": [
+    [
+     -0.025326,
+     0.812784,
+     0.582015,
+     -0.012093
+    ],
+    [
+     -0.035334,
+     -0.582566,
+     0.812015,
+     -0.078146
+    ],
+    [
+     0.999055,
+     0.0,
+     0.043473,
+     0.045148
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00397
+  },
+  "Womens_Sparkle_Suede_Bahama_in_Silver_Sparkle_Suede_Grey_Patent_x9rclU7EJXx": {
+   "T_obj_qr": [
+    [
+     0.03003,
+     -0.914393,
+     -0.403712,
+     0.043956
+    ],
+    [
+     0.06783,
+     0.404827,
+     -0.911874,
+     0.003701
+    ],
+    [
+     0.997245,
+     0.0,
+     0.07418,
+     0.022172
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00254
+  },
+  "Womens_Suede_Bahama_in_Graphite_Suede_cUAjIMhWSO9": {
+   "T_obj_qr": [
+    [
+     -0.033866,
+     0.171173,
+     0.984659,
+     0.01664
+    ],
+    [
+     -0.005884,
+     -0.985241,
+     0.171072,
+     0.008189
+    ],
+    [
+     0.999409,
+     0.0,
+     0.034373,
+     0.021088
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00273
+  },
+  "Womens_Teva_Capistrano_Bootie_ldjRT9yZ5Ht": {
+   "T_obj_qr": [
+    [
+     0.993649,
+     -0.096803,
+     -0.057373,
+     0.042976
+    ],
+    [
+     0.096642,
+     0.995304,
+     -0.00558,
+     0.066966
+    ],
+    [
+     0.057644,
+     0.0,
+     0.998337,
+     0.062213
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "side": 0.03,
+   "flatness": 0.00345
+  }
+ },
+ "classes": {
+  "box": [
+   "3D_Dollhouse_Refrigerator",
+   "Avengers_Thor_PLlrpYniaeB",
+   "Blue_Jasmine_Includes_Digital_Copy_UltraViolet_DVD",
+   "Brother_Printing_Cartridge_PC501",
+   "Crayola_Bonus_64_Crayons",
+   "Crayola_Crayons_120_crayons",
+   "Crayola_Crayons_24_count",
+   "Crayola_Model_Magic_Modeling_Material_White_3_oz",
+   "Crayola_Washable_Fingerpaint_Red_Blue_Yellow_3_count_8_fl_oz_bottes_each",
+   "Crunch_Girl_Scouts_Candy_Bars_Peanut_Butter_Creme_78_oz_box",
+   "Epson_273XL_Ink_Cartridge_Magenta",
+   "Epson_T5803_Ink_Cartridge_Magenta_1pack",
+   "HP_Card_Invitation_Kit",
+   "House_of_Cards_The_Complete_First_Season_4_Discs_DVD",
+   "JarroSil_Activated_Silicon_5exdZHIeLAp",
+   "Just_For_Men_Mustache_Beard_Brushin_Hair_Color_Gel_Kit_Jet_Black_M60",
+   "Just_For_Men_ShampooIn_Haircolor_Jet_Black_60",
+   "Just_For_Men_ShampooIn_Haircolor_Light_Brown_25",
+   "Just_For_Men_Shampoo_In_Haircolor_Darkest_Brown_50",
+   "Kid_Icarus_Uprising_Nintendo_3DS_Game",
+   "Leap_Frog_Paint_Dabber_Dot_Art_5_paint_bottles",
+   "Marc_Anthony_Strictly_Curls_Curl_Envy_Perfect_Curl_Cream_6_fl_oz_bottle",
+   "Nescafe_Momento_Mocha_Specialty_Coffee_Mix_8_ct",
+   "Nestl_Skinny_Cow_Heavenly_Crisp_Candy_Bar_Chocolate_Raspberry_6_pack_462_oz_total",
+   "Nestle_Nips_Hard_Candy_Peanut_Butter",
+   "Nestle_Raisinets_Milk_Chocolate_35_oz_992_g",
+   "Nestle_Skinny_Cow_Dreamy_Clusters_Candy_Dark_Chocolate_6_pack_1_oz_pouches",
+   "Office_Depot_Canon_CLI_221BK_Ink_Cartridge_Black_2946B001",
+   "Office_Depot_Canon_PGI35_Remanufactured_Ink_Cartridge_Black",
+   "Office_Depot_Canon_PGI5BK_Remanufactured_Ink_Cartridge_Black",
+   "Office_Depot_Dell_Series_1_Remanufactured_Ink_Cartridge_Black",
+   "Office_Depot_HP_2_Remanufactured_Ink_Cartridges_Color_Cyan_Magenta_Yellow_3_count",
+   "Office_Depot_HP_564XL_Ink_Cartridge_Black_CN684WN",
+   "Office_Depot_HP_71_Remanufactured_Ink_Cartridge_Black",
+   "Office_Depot_HP_950XL_Ink_Cartridge_Black_CN045AN",
+   "Office_Depot_HP_98_Remanufactured_Ink_Cartridge_Black",
+   "Perricoen_MD_No_Concealer_Concealer",
+   "Perricone_MD_AcylGlutathione_Eye_Lid_Serum",
+   "Perricone_MD_Chia_Serum",
+   "Perricone_MD_Face_Finishing_Moisturizer",
+   "Perricone_MD_Hypoallergenic_Gentle_Cleanser",
+   "Perricone_MD_No_Foundation_Foundation_No_1",
+   "Perricone_MD_No_Foundation_Serum",
+   "Perricone_MD_No_Lipstick_Lipstick",
+   "Perricone_MD_Photo_Plasma",
+   "Perricone_MD_The_Crease_Cure_Duo",
+   "Perricone_MD_Vitamin_C_Ester_15",
+   "Persona_Q_Shadow_of_the_Labyrinth_Nintendo_3DS",
+   "Philips_EcoVantage_43_W_Light_Bulbs_Natural_Light_2_pack",
+   "Phillips_Caplets_Size_24",
+   "Phillips_Stool_Softener_Liquid_Gels_30_liquid_gels",
+   "Pokmon_Conquest_Nintendo_DS_Game",
+   "Pokmon_X_Nintendo_3DS_Game",
+   "Pok\u00e9mon_Omega_Ruby_Alpha_Sapphire_Dual_Pack_Nintendo_3DS",
+   "ReadytoUse_Rolled_Fondant_Pure_White_24_oz_box",
+   "Seagate_Archive_HDD_8_TB_Internal_hard_drive_SATA_6Gbs_35_ST8000AS0002",
+   "Sony_Acid_Music_Studio",
+   "Sony_Downloadable_Loops",
+   "Super_Mario_3D_World_Wii_U_Game",
+   "Super_Mario_Kart_Super_Nintendo_Entertainment_System",
+   "Threshold_Hand_Towel_Blue_Medallion_16_x_27",
+   "Travel_Smart_Neck_Rest_Inflatable",
+   "VANS_FIRE_ROASTED_VEGGIE_CRACKERS_GLUTEN_FREE",
+   "Wilton_Easy_Layers_Cake_Pan_Set",
+   "Wilton_PreCut_Parchment_Sheets_10_x_15_24_sheets"
+  ],
+  "rounded": [
+   "3D_Dollhouse_Sink",
+   "3D_Dollhouse_Sofa",
+   "BIA_Porcelain_Ramekin_With_Glazed_Rim_35_45_oz_cup",
+   "Black_and_Decker_TR3500SD_2Slice_Toaster",
+   "Brother_LC_1053PKS_Ink_Cartridge_CyanMagentaYellow_1pack",
+   "CHILDRENS_ROOM_NEO",
+   "Canon_225226_Ink_Cartridges_BlackColor_Cyan_Magenta_Yellow_6_count",
+   "Canon_Pixma_Ink_Cartridge_8",
+   "Cole_Hardware_Antislip_Surfacing_White_2_x_60",
+   "Cole_Hardware_Dishtowel_Red",
+   "Cole_Hardware_Mug_Classic_Blue",
+   "Cole_Hardware_Saucer_Glazed_6",
+   "Crosley_Alarm_Clock_Vintage_Metal",
+   "Dell_Ink_Cartridge",
+   "Dixie_10_ounce_Bowls_35_ct",
+   "Down_To_Earth_Ceramic_Orchid_Pot_Asst_Blue",
+   "Eat_to_Live_The_Amazing_NutrientRich_Program_for_Fast_and_Sustained_Weight_Loss_Revised_Edition_Book",
+   "Embark_Lunch_Cooler_Blue",
+   "Epson_Ink_Cartridge_Black_200",
+   "Epson_UltraChrome_T0548_Ink_Cartridge_Matte_Black_1pack",
+   "Horse_Dreams_Pencil_Case",
+   "Markings_Letter_Holder",
+   "Nescafe_Tasters_Choice_Instant_Coffee_Decaf_House_Blend_Light_7_oz",
+   "Nintendo_2DS_Crimson_Red",
+   "Nordic_Ware_Original_Bundt_Pan",
+   "Now_Designs_Snack_Bags_Bicycle_2_count",
+   "OVAL_XYLOPHONE",
+   "Olive_Kids_Birdie_Munch_n_Lunch",
+   "Olive_Kids_Butterfly_Garden_Munch_n_Lunch_Bag",
+   "Olive_Kids_Dinosaur_Land_Munch_n_Lunch",
+   "Olive_Kids_Game_On_Lunch_Box",
+   "Olive_Kids_Paisley_Pencil_Case",
+   "PUNCH_DROP_TjicLPMqLvz",
+   "Paul_Frank_Dot_Lunch_Box",
+   "Pennington_Electric_Pot_Cabana_4",
+   "Pinwheel_Pencil_Case",
+   "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total",
+   "SHAPE_MATCHING",
+   "Shurtape_Tape_Purple_CP28",
+   "Tag_Dishtowel_Basket_Weave_Red_18_x_26",
+   "Tag_Dishtowel_Green",
+   "Threshold_Porcelain_Coffee_Mug_All_Over_Bead_White",
+   "Threshold_Ramekin_White_Porcelain",
+   "Threshold_Salad_Plate_Square_Rim_Porcelain",
+   "Top_Paw_Dog_Bowl_Blue_Paw_Bone_Ceramic_25_fl_oz_total",
+   "US_Army_Stash_Lunch_Bag",
+   "Victor_Reversible_Bookend",
+   "Whey_Protein_Vanilla",
+   "Womens_Authentic_Original_Boat_Shoe_in_Classic_Brown_Leather_48Nh7VuMwW6",
+   "Womens_Sparkle_Suede_Angelfish_in_Grey_Sparkle_Suede_Silver"
+  ],
+  "irregular": [
+   "ACE_Coffee_Mug_Kristen_16_oz_cup",
+   "Air_Hogs_Wind_Flyers_Set_Airplane_Red",
+   "Aroma_Stainless_Steel_Milk_Frother_2_Cup",
+   "BEDROOM_NEO",
+   "BUILD_A_ROBOT",
+   "BlackBlack_Nintendo_3DSXL",
+   "BlueBlack_Nintendo_3DSXL",
+   "Cascadia_8_Color_AquariusHibscsBearingSeaBlk_Size_50",
+   "Cole_Hardware_Flower_Pot_1025",
+   "Court_Attitude",
+   "Crazy_Shadow_2",
+   "D_ROSE_773_II_Kqclsph05pE",
+   "Ecoforms_Plant_Container_12_Pot_Nova",
+   "F10_TRX_FG_ssscuo9tGxb",
+   "F10_TRX_TF_rH7tmKCdUJq",
+   "KITCHEN_SET_CLASSIC_40HwCHfeG0H",
+   "LEUCIPPUS_ADIPURE",
+   "MEAT_SET",
+   "Mens_Bahama_in_Khaki_Oyster_xU2jeqYwhQJ",
+   "Mens_Billfish_Slip_On_in_Coffee_nK6AJJAHOae",
+   "Mens_Gold_Cup_ASV_2Eye_Boat_Shoe_in_Cognac_Leather",
+   "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_EjPnk3E8fCs",
+   "Mens_Gold_Cup_ASV_Capetown_Penny_Loafer_in_Black_GkQBKqABeQN",
+   "Mens_Gold_Cup_ASV_Dress_Casual_Venetian_in_Dark_Brown_Leather",
+   "Mens_Tremont_Kiltie_Tassel_Loafer_in_Black_Amaretto_FT0I9OjSA6O",
+   "Nickelodeon_The_Spongebob_Movie_PopAPart_Spongebob",
+   "OWL_SORTER",
+   "Predator_LZ_TRX_FG",
+   "RJ_Rabbit_Easter_Basket_Blue",
+   "Reebok_BREAKPOINT_MID",
+   "Reebok_FUELTRAIN",
+   "Reebok_R_CROSSFIT_OLY_UFORM",
+   "Reebok_TURBO_RC",
+   "Reef_Star_Cushion_Flipflops_Size_8_Black",
+   "Room_Essentials_Mug_White_Yellow",
+   "SAMOA",
+   "Sapota_Threshold_4_Ceramic_Round_Planter_Red",
+   "Simon_Swipe_Game",
+   "Sperry_TopSider_pSUFPWQXPp3",
+   "Sperry_TopSider_tNB9t6YBUf3",
+   "Squirt_Strain_Fruit_Basket",
+   "Threshold_Porcelain_Pitcher_White",
+   "Threshold_Porcelain_Teapot_White",
+   "Timberland_Mens_Earthkeepers_Newmarket_6Inch_Cupsole_Boot",
+   "UGG_Bailey_Button_Womens_Boots_Black_7",
+   "UGG_Cambridge_Womens_Black_7",
+   "Womens_Hikerfish_Boot_in_Black_Leopard_ridcCWsv8rW",
+   "Womens_Sparkle_Suede_Bahama_in_Silver_Sparkle_Suede_Grey_Patent_x9rclU7EJXx",
+   "Womens_Suede_Bahama_in_Graphite_Suede_cUAjIMhWSO9",
+   "Womens_Teva_Capistrano_Bootie_ldjRT9yZ5Ht"
+  ]
+ },
+ "handle_candidates": [
+  "ACE_Coffee_Mug_Kristen_16_oz_cup",
+  "Aroma_Stainless_Steel_Milk_Frother_2_Cup",
+  "BIA_Porcelain_Ramekin_With_Glazed_Rim_35_45_oz_cup",
+  "Cole_Hardware_Mug_Classic_Blue",
+  "RJ_Rabbit_Easter_Basket_Blue",
+  "Room_Essentials_Mug_White_Yellow",
+  "Squirt_Strain_Fruit_Basket",
+  "Threshold_Porcelain_Coffee_Mug_All_Over_Bead_White",
+  "Threshold_Porcelain_Pitcher_White",
+  "Threshold_Porcelain_Teapot_White"
+ ]
+}

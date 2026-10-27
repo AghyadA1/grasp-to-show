@@ -39,7 +39,8 @@ CRITERIA = {"antipodal_pairs_min": 10, "antipodal_tries": 400, "max_side_max_m":
             "qr_min_side_m": 0.03, "qr_flat_tol_face_m": 0.002, "qr_flat_tol_curved_m": 0.004,
             "classes": {"box": [0.85, 9], "rounded": [0.6, 0.85], "irregular": [0, 0.6]},
             "new_per_class": {"box": 25, "rounded": 50, "irregular": 50}, "test_fraction": 0.25, "seed": 0}
-HANDLE = re.compile(r"mug|cup(?!cake)|pitcher|kettle|frother|basket|_pan|teapot|bucket|jug", re.IGNORECASE)
+HANDLE = re.compile(r"mug|(?<!gold_)cup(?!cake|sole)|pitcher|kettle|frother|basket(?!_weave)|(?<!cake)(?<!bundt)_pan"
+                    r"|teapot|bucket|jug", re.IGNORECASE)
 
 
 def evaluate(d: Path):

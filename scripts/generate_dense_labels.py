@@ -148,7 +148,7 @@ def main() -> int:
             print(f"[{k}/{len(jobs)}] {rs[0]['object'][:45]:45s} {rs[0]['candidates']:5d} candidates, "
                   f"feasible for some target {np.mean([r['feasible_any_target'] for r in rs]):.0%} "
                   f"({rs[-1]['seconds']} s)", flush=True)
-    summary = {"config": vars(args), "wall_seconds": round(time.perf_counter() - t0, 1), "scenarios": rows}
+    summary = {"config": {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}, "wall_seconds": round(time.perf_counter() - t0, 1), "scenarios": rows}
     (OUT / "summary.json").write_text(json.dumps(summary, indent=1))
     if args.prune:
         sys.path.insert(0, str(ROOT / "scripts"))

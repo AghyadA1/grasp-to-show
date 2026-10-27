@@ -129,7 +129,7 @@ def scoreboard(S, runs, done: bool, size=(440, 300)) -> np.ndarray:
         img = J.text(img, k, (x, 37), 15, (255, 255, 255), bold=True)
     rows = [("planning time", {k: fmt_time(S["plan_s"][k]) for k in cols}),
             ("carry time", {k: f"{S['sol'][k][1]:.2f} s" for k in cols}),
-            ("peak grip use", {k: f"{runs[k]['u'].max():.2f}" for k in cols}),
+            ("peak grip use (sim)", {k: f"{runs[k]['u'].max():.2f}" for k in cols}),
             ("safety rule", {k: "kept" if S["sol"][k][2]["feasible"] else "broken" for k in cols})]
     if done:
         rows.append(("outcome", {k: ("QR read" if runs[k]["res"].success else "failed") +

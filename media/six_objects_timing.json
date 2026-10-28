@@ -1,0 +1,41 @@
+{
+ "Perricone_MD_The_Crease_Cure_Duo": {
+  "method": "pinch",
+  "scene": 0,
+  "network_s": 2.05,
+  "checks_s": 1.32,
+  "motion_s": 0.03,
+  "total_s": 3.4
+ },
+ "Philips_EcoVantage_43_W_Light_Bulbs_Natural_Light_2_pack": {
+  "method": "pinch",
+  "scene": 0,
+  "network_s": 0.45,
+  "checks_s": 0.48,
+  "motion_s": 0.03,
+  "total_s": 0.95
+ },
+ "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total": {
+  "method": "pinch",
+  "scene": 0,
+  "network_s": 0.34,
+  "checks_s": 0.72,
+  "motion_s": 0.03,
+  "total_s": 1.1
+ },
+ "Squirt_Strain_Fruit_Basket": {
+  "method": "pinch",
+  "scene": 0,
+  "network_s": 0.43,
+  "checks_s": 0.69,
+  "motion_s": 0.03,
+  "total_s": 1.14
+ },
+ "ACE_Coffee_Mug_Kristen_16_oz_cup": {
+  "method": "hook",
+  "scene": 0,
+  "hook_options_s": 11.12,
+  "motion_s": 1.92,
+  "total_s": 13.04
+ }
+}

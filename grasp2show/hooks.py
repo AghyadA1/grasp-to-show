@@ -321,8 +321,9 @@ def lift_test(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, close: bool,
               lift: float = 0.10, frames: list | None = None, renderer=None, camera=None) -> dict:
     """One lift for both kinds of grasp, so they compare fairly: a pinch (close=True: fingers open
     at width + 2 cm, then closed on the object) or a hook (close=False: fingers kept at `width`,
-    0 = closed, through the loop). Gravity on, lift the hand 10 cm, hold. frames: if given, a
-    rendered image is appended every 50 ms."""
+    0 = closed, through the loop). Gravity on, lift the hand 10 cm, hold. Success: a pinch rose
+    with the hand (70 % of the lift) and is held; a hook hangs on the gripper, not falling.
+    frames: if given, a rendered image is appended every 50 ms."""
     m, d, dt = sim.model, sim.data, sim.model.opt.timestep
     body = sim._obj_body
     mass0, inertia0 = m.body_mass[body], m.body_inertia[body].copy()
@@ -361,7 +362,16 @@ def lift_test(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, close: bool,
         touching, _ = sim._contacts()
         Tn = sim._obj_pose()
         rise = float(Tn[2, 3] - z0)
-        ok = bool(rise > 0.7 * lift and touching)
+        if close:
+            ok = bool(rise > 0.7 * lift and touching)
+        else:
+            # A hooked object turns until its centre of mass is under the finger, so its frame can
+            # end up lower than at the start (a tall jug tips by 75 deg) although it hangs fine;
+            # what matters is that it hangs on the gripper and is not falling (no table here: a
+            # dropped object is metres down by now).
+            com = np.asarray(sim.obj.com)
+            com_rise = float((Tn[:3, :3] @ com)[2] - (R0 @ com)[2]) + rise
+            ok = bool(touching and com_rise > -0.05)
         return {"success": ok, "reason": "" if ok else "fell", "rise": rise,
                 "swing_deg": float(np.degrees(rotation_angle(R0.T @ Tn[:3, :3])))}
     finally:

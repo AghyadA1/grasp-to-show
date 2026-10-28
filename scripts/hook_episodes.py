@@ -40,7 +40,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from grasp2show.config import ObjectConfig, SceneConfig, random_camera
 from grasp2show.experiment import Scenario, choose
 from grasp2show.gripper_sim import GripperSim
-from grasp2show.hanging import HOOK_SPEED, hook_options, plan_hook, usable_hooks
+from grasp2show.hanging import HOOK_SPEED, PITCHES, Hang, hang_table, hook_options, plan_hook, usable_hooks
 from grasp2show.objects import load_object_set, object_from_config
 from grasp2show.task import Grasp
 
@@ -50,16 +50,44 @@ GRASPS = ROOT / "data" / "grasps_v2"
 
 
 def hooks_for(name: str) -> list[dict]:
-    """Usable hooks of an object, computed once (about 2 min) and cached."""
+    """Usable hooks of an object and where the object hangs on each (hanging.hang_table), computed
+    once per object (a few minutes) and cached in data/hooks/<name>.npz."""
     f = HOOKS / f"{name}.npz"
+    obj = sim = None
     if f.exists():
         z = np.load(f)
-        return [{"T": T, "width": float(w), "kind": str(k)} for T, w, k in zip(z["T"], z["width"], z["kind"])]
-    obj = object_from_config(ObjectConfig(asset=name))
-    hooks = usable_hooks(obj, GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj))
+        hooks = [{"T": T, "width": float(w), "kind": str(k)} for T, w, k in zip(z["T"], z["width"], z["kind"])]
+        if "hang_T" in z.files:                          # cached hanging poses
+            for i, h in enumerate(hooks):
+                h["hangs"] = {}
+                for k in range(2):
+                    for j, p in enumerate(z["pitches"]):
+                        ok = not np.isnan(z["hang_T"][i, k, j, 0, 0])
+                        h["hangs"][(k, float(p))] = Hang(z["hang_T"][i, k, j] if ok else None, float(z["swing"][i, k, j]),
+                                                         float(z["tilt"][i, k, j]), z["carry"][i, k, j] if ok else None)
+            return hooks
+    else:
+        obj = object_from_config(ObjectConfig(asset=name))
+        sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
+        hooks = usable_hooks(obj, sim)
+    if sim is None:
+        obj = object_from_config(ObjectConfig(asset=name))
+        sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
+    hang_table(sim, hooks)
+    n, P = len(hooks), len(PITCHES)
+    hang_T, carry = np.full((n, 2, P, 4, 4), np.nan), np.full((n, 2, P, 4, 4), np.nan)
+    swing, tilt = np.full((n, 2, P), np.nan), np.full((n, 2, P), np.nan)
+    for i, h in enumerate(hooks):
+        for k in range(2):
+            for j, p in enumerate(PITCHES):
+                g = h["hangs"][(k, p)]
+                swing[i, k, j], tilt[i, k, j] = g.swing_deg, g.tilt_deg
+                if g.T_tcp_obj is not None:
+                    hang_T[i, k, j], carry[i, k, j] = g.T_tcp_obj, g.T_carry
     HOOKS.mkdir(parents=True, exist_ok=True)
     np.savez(f, T=np.array([h["T"] for h in hooks]).reshape(-1, 4, 4), width=np.array([h["width"] for h in hooks]),
-             kind=np.array([h["kind"] for h in hooks]))
+             kind=np.array([h["kind"] for h in hooks]), pitches=np.array(PITCHES), hang_T=hang_T, carry=carry,
+             swing=swing, tilt=tilt)
     return hooks
 
 

@@ -847,6 +847,23 @@ mug in any scene):
 
 ![hook vs pinch video](media/hook_vs_pinch_ACE_Coffee_Mug_Kristen_1.gif)
 
+**The handle objects that cannot be hooked** (`scripts/figure_unhookable.py`; the hand drawn
+where the hook pipeline came closest; grey plane: the table top):
+
+![unhookable](media/unhookable.png)
+
+Two are not handle objects at all (a ramekin and a berry basket matched the name filter). The
+blue mug's handle hole is too small once the 3-D finger is placed, not just its tip's cut. The
+porcelain mug hooks well in the air, but its handle is so low that the hand would reach 4.7 cm
+below the table. The milk frother is hookable (once the lift test stopped judging a hook by its
+frame's height: a tall jug tips 75° as it hangs, so its frame drops while it hangs fine) but
+with a single fitting hook no approach and carry were found in its 16 scenes.
+
+**Speed.** Planning a hook took ~13 s per scene, 94 % of it simulating where the object hangs
+for every hook, twin and carry pitch. Those poses do not depend on the scene, so they are now
+computed once per object with the hooks (`hanging.hang_table`, cached in `data/hooks/`): ~0.7 s
+for the hook options, plus 0–2 s for the carry search. (A way B pinch plans in ~1 s.)
+
 *The mug at 8 × its weight (2 kg), same scene. Left: way B's pinch. Right: the hook, carried
 with the fingers raised, shown hanging; insets: the scanner's view at the end.*
 

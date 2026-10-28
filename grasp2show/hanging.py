@@ -30,6 +30,7 @@ from .scene import start_pose
 from .transforms import inv_T, make_T, rot_z, rotation_angle
 
 PITCH_UP = 25.0   # deg: fingers raised this far above the horizontal while a hook carries (see carry_pose)
+PITCHES = (15.0, PITCH_UP, 40.0)   # carry pitches the planner chooses from
 
 
 @dataclass
@@ -94,7 +95,8 @@ def settle(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, mass_scale: flo
                 Rs.append((inv_T(sim._tcp_pose()) @ sim._obj_pose())[:3, :3])
         touching, _ = sim._contacts()
         T_obj = sim._obj_pose()
-        if not touching or T_obj[2, 3] < 0.5 * lift:
+        com_z = (T_obj[:3, :3] @ np.asarray(sim.obj.com))[2] + T_obj[2, 3] - np.asarray(sim.obj.com)[2]
+        if not touching or com_z < -0.05:          # fell (no table here), see hooks.lift_test
             return Hang(None, np.nan, np.nan)
         swing = max(np.degrees(rotation_angle(Rs[0].T @ R)) for R in Rs) * 2 if Rs else 0.0
         return Hang(inv_T(sim._tcp_pose()) @ T_obj, float(swing), float(np.degrees(rotation_angle(T_obj[:3, :3]))),
@@ -153,6 +155,19 @@ def usable_hooks(obj, sim: GripperSim, turns: int = 12, limit: int = 40, seed: i
     return out
 
 
+def hang_table(sim: GripperSim, hooks: list[dict], pitches=PITCHES) -> list[dict]:
+    """Where the object hangs for every hook, twin and carry pitch, once per object: adds
+    h["hangs"] = {(twin, pitch): Hang} to each hook. A hanging pose depends only on the object
+    and the hook (the object starts upright; its yaw on the table is a turn about the vertical,
+    which changes nothing), not on the scene. Simulated at the object's own mass: in the rigid
+    model the equilibrium does not depend on the mass, while the floating hand's weld gets
+    numerically stiff with a heavy object (heavy settles fell off where the real episodes held)."""
+    for h in hooks:
+        h["hangs"] = {(k, p): settle(sim, Tg, float(h["width"]), 1.0, pitch_deg=p)
+                      for k, Tg in enumerate((h["T"], twin_of(h["T"]))) for p in pitches}
+    return hooks
+
+
 def show_targets(cfg, obj, R_hand0: np.ndarray, T_tcp_obj: np.ndarray,
                  extra_turns_deg=(0.0, -25.0, 25.0)) -> list[tuple[float, np.ndarray, np.ndarray]]:
     """Show poses for a hooked object: (extra turn, T_world_tcp, T_world_obj). The hand keeps the
@@ -198,14 +213,17 @@ class HookOption:
 
 def hook_options(fc: FeasibilityChecker, sim: GripperSim, hooks: list[dict], mass_scale: float = 1.0,
                  pregrasp: float = 0.10, T_start: np.ndarray | None = None,
-                 pitches=(15.0, PITCH_UP, 40.0)) -> list[HookOption]:
+                 pitches=None) -> list[HookOption]:
     """Every hook (dicts T, width from hooks.fit_hook_poses), both twins: reach and collisions at
     the grasp; then for each carry pitch (how far the fingers are raised; it changes where the
     handle rests on the finger, so how the object hangs and which way its QR faces) where it
     hangs, the show pose and the reach / collision / visibility checks; the best pitch and turn
     are kept. T_start: where the object lies (a hook has 1-3 mm to spare, so pass the settled
-    pose, PickAndShow.resting_pose; default: the nominal start pose). Sorted: feasible first, then
-    by the QR's size in the scanner image."""
+    pose, PickAndShow.resting_pose; default: the nominal start pose). The hanging poses are taken
+    from h["hangs"] when the hook carries them (hang_table: they do not depend on the scene, and
+    simulating them was 95 % of the time), else simulated here. Sorted: feasible first, then by
+    the QR's size in the scanner image."""
+    pitches = PITCHES if pitches is None else pitches
     cfg, obj = fc.cfg, fc.obj
     T_start = start_pose(cfg, obj) if T_start is None else T_start
     out = []
@@ -223,7 +241,7 @@ def hook_options(fc: FeasibilityChecker, sim: GripperSim, hooks: list[dict], mas
                 continue
             best, hang = None, None
             for pitch in pitches:
-                hang = settle(sim, Tg, w, mass_scale, pitch_deg=pitch)
+                hang = h["hangs"][(k, pitch)] if "hangs" in h else settle(sim, Tg, w, mass_scale, pitch_deg=pitch)
                 if hang.T_tcp_obj is None:
                     continue
                 # show_targets works in the object's upright frame: the object's start yaw is a turn

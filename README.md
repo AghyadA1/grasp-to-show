@@ -785,7 +785,8 @@ decides how it sits on the finger, so the planner works the other way round.
    report) puts the fingertip within 0.1 mm.
 
 A hook is judged by the same scanner as a pinch: QR decoded, object still held, no unexpected
-contact. The swing is reported but not judged, since the object is meant to hang. An input
+contact. The swing is reported but not judged, since the object is meant to hang. Heavier
+objects are made by scaling mass and inertia (× 8 = 2 kg; the Franka's payload is 3 kg). An input
 shaper against the swing (crane control: the motion split into two halves, the second delayed by
 half the swing period) changed neither the results nor the mug's pose at the scanner on 16
 scenes: after a 2 s hold the swing has died down. It stays in the code, switched off.
@@ -798,14 +799,16 @@ mug in any scene):
 | Scanner | Policy | × 1 (0.25 kg) | × 2 | × 4 | × 8 (2 kg) |
 |---|---|---|---|---|---|
 | 640 × 480 | way B pinch | 25 % | 6 % | 0 % | 0 % |
-| 640 × 480 | hook | 25 % | 25 % | 19 % | 25 % |
-| 1280 × 960 | way B pinch | 44 % | 44 % | 12 % | 12 % |
-| 1280 × 960 | hook | **56 %** | **56 %** | **44 %** | **38 %** |
+| 640 × 480 | hook | 25 % | 25 % | 19 % | 12 % |
+| 1280 × 960 | way B pinch | 44 % | 44 % | 12 % | 6 % |
+| 1280 × 960 | hook | **56 %** | **56 %** | **44 %** | **31 %** |
 
 ![hook vs pinch](media/hook_episodes_cloud_s2.png)
 
-- **The hook does not care about the weight; the pinch does.** At 8 × the pinch slips in 6
-  scenes and drops the mug in 7.
+- **The hook copes with the weight much better than the pinch.** At 2 kg the pinch drops the
+  mug in 10 of 16 scenes and slips in 4 more. The hook loses some too: the heavier mug swings
+  and sags further on the finger, and in 5 scenes it touches the arm on the way (the collision
+  check allows ± 12° of swing).
 - **The 640 × 480 scanner limits both policies.** A 3 cm code hanging at a tilt is about 50–55 px
   across, and OpenCV decodes it on some frames and not others: re-running the same episode with
   a tiny change flipped the result both ways, and the unread images I checked all decoded once
@@ -813,8 +816,7 @@ mug in any scene):
   a 1280 × 960 scanner no failure is a QR failure.
 - **What the hook still misses**: in 3 of 16 scenes no hook passes the checks (the handle can
   only be threaded from two directions, and the hanging tilt can turn the code away from a high
-  or low scanner), and in 2–5 no carry keeps the fingers up and the swinging mug clear. Also, 1–2
-  collisions of the swinging mug with the arm.
+  or low scanner), and in 2–5 no carry keeps the fingers up and the swinging mug clear.
 - The other two mugs cannot be hooked from the table: the blue one's handle hole is too tight
   (no fit lifts it), and on the porcelain one every fitting finger pose puts the 20 cm-wide hand
   through the table (its handle sits low).

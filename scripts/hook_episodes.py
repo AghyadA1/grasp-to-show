@@ -83,7 +83,7 @@ def run_hook(sc: Scenario, hooks: list[dict], tries: int = 5) -> dict:
         return {**rec, "success": bool(r.success), "reason": reason, "kind": hooks[o.hook]["kind"],
                 "pred_angle_deg": round(o.vis.angle_deg, 1), "pred_pixels": round(o.vis.pixels, 1),
                 "hang_tilt_deg": round(o.hang.tilt_deg, 1), "qr_ok": bool(r.qr_ok), "held": bool(r.held),
-                "slip_mm": round(r.slip_mm, 1), "slip_deg": round(r.slip_deg, 1)}
+                "slip_mm": round(r.slip_mm, 1), "slip_deg": round(r.slip_deg, 1), "collisions": r.collisions}
     return {**rec, "success": False, "reason": f"plan: {why}"}
 
 

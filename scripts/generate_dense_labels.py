@@ -60,7 +60,7 @@ OUT = ROOT / "data" / ("dense" if os.environ.get("G2S_OBJECT_SET", "v1") == "v1"
 
 
 def process(job) -> list[dict]:
-    asset, scenes, n_pairs, n_rolls, seed, sim_lift, max_cand, grip_model, out = job
+    asset, scenes, n_pairs, n_rolls, seed, sim_lift, max_cand, grip_model, out, u_ok = job
     t0 = time.perf_counter()
     cfg0 = SceneConfig(obj=ObjectConfig(asset=asset))
     obj = object_from_config(cfg0.obj)
@@ -88,7 +88,7 @@ def process(job) -> list[dict]:
             lm = np.where(lift_sim, np.clip(lm, 0.1, 1.0), -1.0)
         reports = [fc.evaluate(T, w, rolls) for T, w in zip(cand.T_obj_tcp, cand.width)]
         if contacts is not None:
-            apply_to_reports(reports, contacts, obj, np.stack([show_pose(cfg, obj, r) for r in rolls]))
+            apply_to_reports(reports, contacts, obj, np.stack([show_pose(cfg, obj, r) for r in rolls]), u_ok=u_ok)
         S = aware_scores(reports, lm, n_rolls)
         np.savez_compressed(
             Path(out) / f"{asset}__{tag}.npz", T_obj_tcp=cand.T_obj_tcp.astype(np.float32),
@@ -116,6 +116,7 @@ def main() -> int:
     p.add_argument("--split", choices=["all", "train", "test"], default="all")
     p.add_argument("--sim-lift", action="store_true", help="check 1 from the simulated shake test (part 3)")
     p.add_argument("--max-candidates", type=int, default=0, help="cap per object (0: no cap)")
+    p.add_argument("--u-ok", type=float, default=0.8, help="every-contact model: holds if u below this")
     p.add_argument("--out", type=Path, default=None, help="output folder (default data/dense[_<set>])")
     p.add_argument("--grip-model", choices=["point", "all"], default="point",
                    help="stability at the targets: two-pad point model or every contact (part 3)")
@@ -138,7 +139,7 @@ def main() -> int:
         else:
             scenes = [(f"yaw{int(y)}", float(y), None, None) for y in args.yaws]
         jobs.append((n, scenes, args.pairs, args.rolls, 1000 + oset["objects"].index(n), args.sim_lift,
-                     args.max_candidates, args.grip_model, str(OUT)))
+                     args.max_candidates, args.grip_model, str(OUT), args.u_ok))
     n_sc = args.random_scenes or len(args.yaws)
     print(f"{len(jobs)} objects x {n_sc} scenes x {args.rolls} targets, {args.workers} workers -> {OUT}")
     t0, rows = time.perf_counter(), []

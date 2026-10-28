@@ -42,7 +42,7 @@ POLICIES = ["checks", "way_b_v1", "way_b_v2"]
 
 
 def run(job):
-    asset, k, yaw, xy, cam, models, clouds, top, grip_model = job
+    asset, k, yaw, xy, cam, models, clouds, top, grip_model, u_ok = job
     base = {"object": asset, "scene": k, "yaw_deg": round(yaw, 1), "cam_pos": list(cam.pos)}
     recs = []
     z = np.load(GRASPS / f"{asset}.npz")
@@ -57,7 +57,7 @@ def run(job):
         gs = GripperSim(sc.cfg, sc.obj)
         keys = list(sc.reports)
         apply_to_reports([sc.reports[i] for i in keys], [close_contacts(gs, sc.T[i], sc.W[i]) for i in keys], sc.obj,
-                         np.stack([show_pose(sc.cfg, sc.obj, r) for r in sc.rolls]))
+                         np.stack([show_pose(sc.cfg, sc.obj, r) for r in sc.rolls]), u_ok=u_ok)
     recs.append({**asdict(sc.run("checks", choose("aware", sc.reports, sc.lift_margin))), **base, "policy": "checks"})
     for pol, model in models.items():
         T, W, R, ms = way_b_grasps(asset, yaw, model, clouds, top, start_xy=xy, camera=cam)
@@ -79,6 +79,8 @@ def main() -> int:
     p.add_argument("--tag", default="way_b_v2", help="outputs: data/episodes_<tag>/, media/<tag>_policy.png")
     p.add_argument("--v3", type=Path, default=None, help="way B retrained on every-contact labels")
     p.add_argument("--grip-model", choices=["point", "all"], default="point")
+    p.add_argument("--u-ok", type=float, default=0.8, help="every-contact model: holds if u below this")
+    p.add_argument("--checks-only", action="store_true", help="only the checks policy (threshold sweeps)")
     p.add_argument("--clouds", type=Path, default=ROOT / "data" / "dataset_v2" / "clouds.npz")
     p.add_argument("--top", type=int, default=10)
     p.add_argument("--objects", type=int, default=None)
@@ -90,13 +92,16 @@ def main() -> int:
     if args.v3:
         models["way_b_v3"] = args.v3
         POLICIES.append("way_b_v3")
+    if args.checks_only:
+        models = {}
+        del POLICIES[1:]
     best = POLICIES[-1]
     jobs = []
     for n in test:
         r = np.random.default_rng(9000 + oset["objects"].index(n))     # disjoint from the training scenes
         for k in range(args.scenes):
             jobs.append((n, k, float(r.uniform(0, 360)), (float(r.uniform(0.40, 0.60)), float(r.uniform(-0.30, 0.0))),
-                         random_camera(r), models, args.clouds, args.top, args.grip_model))
+                         random_camera(r), models, args.clouds, args.top, args.grip_model, args.u_ok))
     out = OUT.with_name(f"episodes_{args.tag}")
     out.mkdir(parents=True, exist_ok=True)
     print(f"{len(jobs)} scenes ({len(test)} unseen objects x {args.scenes} random start + scanner poses), "
@@ -110,7 +115,8 @@ def main() -> int:
                 flush=True)
     (out / "records.jsonl").write_text("".join(json.dumps(r, default=float) + "\n" for r in recs))
     cls = {n: c for c, names in oset["classes"].items() for n in names}
-    summary = {"scenes": len(jobs), "objects": len(test), "grip_model": args.grip_model, "policies": {}}
+    summary = {"scenes": len(jobs), "objects": len(test), "grip_model": args.grip_model, "u_ok": args.u_ok,
+               "policies": {}}
     by = {}
     for r in recs:
         by.setdefault((r["object"], r["scene"]), {})[r["policy"]] = r["success"]
@@ -159,7 +165,7 @@ def plot(s, path):
     ax[0].set_ylim(0, 1.1)
     ax[0].set_ylabel("task success (95 % CI)")
     ax[0].set_title(f"{s['scenes']} scenes: {s['objects']} unseen objects, unseen scanner poses", fontsize=9)
-    classes = list(s["policies"]["way_b_v2"]["by_class"])
+    classes = list(s["policies"][pols[0]]["by_class"])
     w = 0.8 / len(pols)
     for i, pol in enumerate(pols):
         v = [s["policies"][pol]["by_class"].get(c, 0) for c in classes]

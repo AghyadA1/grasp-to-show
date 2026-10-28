@@ -13,8 +13,10 @@ factors (the object x1, x2, x4, x8; the checks and the simulator both know the m
   data/hooks/), where the object hangs, the hand turned so the QR faces the scanner, reach /
   collision / visibility checks, then a carry that keeps the fingers from pointing down.
 
-Both are executed in the simulator and judged the same way (QR decoded, held, slip < 20 mm /
-15 deg after the lift, no unexpected contact).
+Both are executed in the simulator and judged by the same ground truth: QR decoded by the scanner,
+object held, no unexpected contact; a pinch must also not slip (< 20 mm / 15 deg after the lift),
+while a hooked object hangs and may swing (its motion relative to the hand is reported, not
+judged). --scanner-scale 2: a 1280 x 960 scanner instead of 640 x 480 (for both policies).
 
 Usage:  $env:G2S_OBJECT_SET="v2"; python scripts/hook_episodes.py --workers 4 --way-b data/models/heatmap_net_v4.pt
 Outputs: data/hook_episodes/records.json, summary.json; media/hook_episodes.png
@@ -26,7 +28,7 @@ import json
 import os
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -38,7 +40,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from grasp2show.config import ObjectConfig, SceneConfig, random_camera
 from grasp2show.experiment import Scenario, choose
 from grasp2show.gripper_sim import GripperSim
-from grasp2show.hanging import hook_options, usable_hooks
+from grasp2show.hanging import HOOK_SPEED, hook_options, plan_hook, usable_hooks
 from grasp2show.objects import load_object_set, object_from_config
 from grasp2show.task import Grasp
 
@@ -65,7 +67,7 @@ def run_hook(sc: Scenario, hooks: list[dict], tries: int = 5) -> dict:
     if not hooks:
         return {"success": False, "reason": "no hook fits", "n_feasible": 0}
     sim = GripperSim(sc.cfg, sc.obj)                    # the object at this scene's mass
-    opts = hook_options(sc.fc, sim, hooks)
+    opts = hook_options(sc.fc, sim, hooks, T_start=sc.ep.resting_pose())
     ok = [o for o in opts if o.ok]
     rec = {"n_feasible": len(ok)}
     if not ok:
@@ -73,16 +75,11 @@ def run_hook(sc: Scenario, hooks: list[dict], tries: int = 5) -> dict:
         return {**rec, "success": False, "reason": "no hook: " + max(set(whys), key=whys.count)}
     why = ""
     for o in ok[:tries]:
-        floor = min((sc.fc.T_start @ o.T_obj_tcp)[2, 2], 0.0) - 0.25
-        paths, why = sc.ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, checker=sc.fc, width=o.width,
-                                         T_show=o.T_show, T_tcp_held=o.hang.T_tcp_obj, open_width=o.width,
-                                         finger_floor=floor)
+        paths, why = plan_hook(sc.ep, sc.fc, o)
         if paths is None:
             continue
-        r = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths)
-        reason = "" if r.success else ("collision" if r.collisions else "dropped" if not r.held else
-                                       "slip" if r.slip_mm >= sc.ep.slip_tol_mm or r.slip_deg >= sc.ep.slip_tol_deg
-                                       else "qr")
+        r = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED)
+        reason = "" if r.success else ("collision" if r.collisions else "dropped" if not r.held else "qr")
         return {**rec, "success": bool(r.success), "reason": reason, "kind": hooks[o.hook]["kind"],
                 "pred_angle_deg": round(o.vis.angle_deg, 1), "pred_pixels": round(o.vis.pixels, 1),
                 "hang_tilt_deg": round(o.hang.tilt_deg, 1), "qr_ok": bool(r.qr_ok), "held": bool(r.held),
@@ -91,7 +88,9 @@ def run_hook(sc: Scenario, hooks: list[dict], tries: int = 5) -> dict:
 
 
 def run(job) -> list[dict]:
-    name, k, yaw, xy, cam, mass, way_b, clouds = job
+    name, k, yaw, xy, cam, mass, way_b, clouds, scale = job
+    if scale != 1:
+        cam = replace(cam, width=int(cam.width * scale), height=int(cam.height * scale))
     t0 = time.time()
     hooks = hooks_for(name)
     z = np.load(GRASPS / f"{name}.npz")
@@ -148,6 +147,8 @@ def main() -> int:
     p.add_argument("--objects", nargs="*", default=None, help="default: handle candidates with grasp data")
     p.add_argument("--way-b", type=Path, default=None, help="also way B's pinch choice with this network")
     p.add_argument("--clouds", type=Path, default=ROOT / "data" / "dataset_v2" / "clouds.npz")
+    p.add_argument("--scanner-scale", type=float, default=1.0, help="scanner resolution x this (both policies)")
+    p.add_argument("--tag", default="", help="outputs: data/hook_episodes<tag>/, media/hook_episodes<tag>.png")
     p.add_argument("--workers", type=int, default=min(4, max(1, (os.cpu_count() or 2) - 1)))
     args = p.parse_args()
     oset = load_object_set()
@@ -162,16 +163,18 @@ def main() -> int:
         for k in range(args.scenes):
             yaw, xy, cam = float(r.uniform(0, 360)), (float(r.uniform(0.40, 0.60)), float(r.uniform(-0.30, 0.0))), \
                 random_camera(r)
-            jobs += [(n, k, yaw, xy, cam, m, args.way_b, args.clouds) for m in masses]
+            jobs += [(n, k, yaw, xy, cam, m, args.way_b, args.clouds, args.scanner_scale) for m in masses]
     print(f"{len(jobs)} scenes ({len(names)} objects x {args.scenes} scenes x {len(masses)} masses), "
           f"{args.workers} workers", flush=True)
     recs = []
     with Pool(args.workers) as pool:
         for rr in pool.imap_unordered(run, jobs):
             recs += rr
-    OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "records.json").write_text(json.dumps(recs, indent=1, default=float))
-    summary = {"objects": names, "scenes": args.scenes, "masses": masses, "policies": {}}
+    out = OUT.with_name(OUT.name + args.tag)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "records.json").write_text(json.dumps(recs, indent=1, default=float))
+    summary = {"objects": names, "scenes": args.scenes, "masses": masses, "scanner_scale": args.scanner_scale,
+               "policies": {}}
     pols = [p for p in ("pinch", "pinch_way_b", "hook") if any(r["policy"] == p for r in recs)]
     for pol in pols:
         summary["policies"][pol] = {
@@ -187,11 +190,11 @@ def main() -> int:
         str(m): float(np.mean([any(r["success"] for r in recs if r["object"] == o and r["scene"] == s
                                    and r["mass_scale"] == m) for o in names for s in range(args.scenes)]))
         for m in masses}
-    (OUT / "summary.json").write_text(json.dumps(summary, indent=1))
-    plot(recs, masses, ROOT / "media" / "hook_episodes.png")
+    (out / "summary.json").write_text(json.dumps(summary, indent=1))
+    plot(recs, masses, ROOT / "media" / f"hook_episodes{args.tag}.png")
     for pol in pols:
         print(pol, {m: round(v["success"], 2) for m, v in summary["policies"][pol].items() if m != "by_object"})
-    print(f"wrote {OUT / 'summary.json'} and media/hook_episodes.png")
+    print(f"wrote {out / 'summary.json'} and media/hook_episodes{args.tag}.png")
     return 0
 
 

@@ -174,7 +174,8 @@ class PickAndShow:
     def plan_analytic(self, T_obj_tcp: np.ndarray, T_target_obj: np.ndarray, q_start: np.ndarray,
                       q_target: np.ndarray, lift: float = 0.15, checker=None, width: float = 0.0,
                       T_show: np.ndarray | None = None, T_tcp_held: np.ndarray | None = None,
-                      open_width: float | None = None, finger_floor: float | None = None):
+                      open_width: float | None = None, finger_floor: float | None = None,
+                      T_lift: np.ndarray | None = None, T_start: np.ndarray | None = None):
         """Joint paths for one twin and one target, seeded with the configurations found by the
         feasibility checks (q_start at the grasp, q_target at the show pose).
         approach: joint-space home -> pre-grasp; descend, lift, present: tracked Cartesian lines;
@@ -187,12 +188,16 @@ class PickAndShow:
         finger_floor (hooks): the fingers must not point further down than this during the carry
         (lowest allowed vertical component of the TCP's z axis), or the handle slides off them. A
         joint-space transit that breaks it is replaced by a tracked Cartesian line that only turns
-        the hand about the vertical (a hook's show pose keeps the grasp's tilt)."""
-        T_start = start_pose(self.cfg, self.obj)
+        the hand about the vertical (a hook's show pose keeps the carry's tilt). T_lift: the hand's
+        pose at the end of the lift (default: 15 cm above the grasp, same orientation; a hook
+        raises its fingers on the way up, hanging.carry_pose). T_start: where the object really lies
+        (default: its nominal start pose; a hook needs the settled one, see resting_pose)."""
+        T_start = start_pose(self.cfg, self.obj) if T_start is None else T_start
         T_grasp = T_start @ T_obj_tcp
         T_pre = T_grasp @ make_T(np.eye(3), [0, 0, -0.10])
-        T_lift = T_grasp.copy()
-        T_lift[:3, 3] += [0, 0, lift]
+        if T_lift is None:
+            T_lift = T_grasp.copy()
+            T_lift[:3, 3] += [0, 0, lift]
         if T_show is None:
             T_show = T_target_obj @ T_obj_tcp
         away = T_show[:3, 3] - np.asarray(self.cfg.camera.pos)
@@ -231,7 +236,14 @@ class PickAndShow:
         descend = self.track(cartesian_line(T_pre, T_grasp, 15), q_pre)
         if descend is None:
             return None, "descent not trackable"
-        up = self.track(cartesian_line(T_grasp, T_lift, 20), descend[-1])
+        if np.allclose(T_lift[:3, :3], T_grasp[:3, :3]):
+            up = self.track(cartesian_line(T_grasp, T_lift, 20), descend[-1])
+        else:      # straight up until the object hangs, then turn into the lift pose's orientation
+            T_mid = T_grasp.copy()
+            T_mid[:3, 3] += [0, 0, 0.5 * (T_lift[2, 3] - T_grasp[2, 3])]
+            up = self.track(cartesian_line(T_grasp, T_mid, 10), descend[-1])
+            rest = None if up is None else self.track(cartesian_line(T_mid, T_lift, 12), up[-1])
+            up = None if rest is None else up + rest[1:]
         if up is None:                                       # joint-space lift if it stays clear
             q_lift = self.nearest_ik(T_lift, descend[-1])
             if q_lift is None or not free(descend[-1], q_lift, holding=True, T_held=inv_T(T_obj_tcp)):
@@ -309,7 +321,7 @@ class PickAndShow:
         mid = 0.5 * (fk(q0)[:3, 3] + T_preshow[:3, 3]) + [0, 0, 0.12]
         vias = []
         for yaw in np.radians(np.arange(0, 360, 30)):
-            for pitch in np.radians([0.0, 30.0]):
+            for pitch in np.arcsin(np.clip(finger_floor, -1, 1)) + np.radians([10.0, 30.0]):
                 z = np.array([np.cos(yaw) * np.cos(pitch), np.sin(yaw) * np.cos(pitch), np.sin(pitch)])
                 for roll in np.radians(np.arange(0, 180, 45)):
                     x0 = np.cross([0.0, 0.0, 1.0], z)
@@ -333,6 +345,17 @@ class PickAndShow:
         if present is None:
             return None, "presentation not trackable"
         return {"approach": approach, "descend": descend, "lift": up, "transit": transit, "present": present}, None
+
+    def resting_pose(self, t: float = 0.6) -> np.ndarray:
+        """The object's pose once it has settled on the table (the arm at home): the nominal start
+        pose is 1 mm high and assumes a flat base, so a scanned object ends up a millimetre lower
+        and a fraction of a degree tilted. What a perception system would report."""
+        m, d = self.model, self.data
+        reset_to_home(m, d)
+        for _ in range(max(round(t / m.opt.timestep), 1)):
+            d.ctrl[:7], d.ctrl[7] = HOME_Q, self.cfg.gripper.max_width
+            mujoco.mj_step(m, d)
+        return body_pose(m, d, self.obj.name)
 
     # -- execution ----------------------------------------------------------------------
     def _unexpected_contacts(self, holding: bool) -> set[str]:
@@ -440,7 +463,9 @@ class PickAndShow:
             seg[name] = max(seg[name], 1.7 * dq)
         hold(HOME_Q, g_open, 0.3)
         follow(path_trajectory(paths["approach"], seg["approach"], dt), g_open)
-        follow(path_trajectory(paths["descend"], seg["descend"], dt), g_open)
+        if hook:       # threading a fingertip through a handle with 1-3 mm to spare: settle, go slowly
+            hold(paths["descend"][0], g_open, 0.5)
+        follow(path_trajectory(paths["descend"], seg["descend"] * (2.5 if hook else 1.0), dt), g_open)
         hold(paths["descend"][-1], g_hold, 0.6)       # close: force-limited squeeze (a hook: stays)
         if log_every > 0:
             state["log"] = []
@@ -459,7 +484,7 @@ class PickAndShow:
             follow(path_trajectory(paths["transit"], seg["transit"] / speed, dt), g_hold)
             follow(path_trajectory(paths["present"], seg["present"] / speed, dt), g_hold)
         log, state["log"] = state["log"], None
-        hold(paths["present"][-1], g_hold, 1.0)
+        hold(paths["present"][-1], g_hold, 2.0 if hook else 1.0)   # a hanging object's swing dies down
 
         # -- ground truth: slip in the hand, still held, QR decoded by the scanner ---------
         T_tcp_obj = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
@@ -480,8 +505,10 @@ class PickAndShow:
             raise RuntimeError("scanner image is noise: the offscreen renderer is broken in this process")
         text, _ = decode_qr(rgb)
         qr_ok = text == self.cfg.obj.qr_payload
-        ok = (qr_ok and held and slip_mm < self.slip_tol_mm and slip_deg < self.slip_tol_deg
-              and not state["collisions"])
+        # A hooked object hangs and swings: its motion relative to the hand is not a grip failing,
+        # so a hook is judged by the scanner (and held, no collision); the slip is still reported.
+        slipped = not hook and (slip_mm >= self.slip_tol_mm or slip_deg >= self.slip_tol_deg)
+        ok = qr_ok and held and not slipped and not state["collisions"]
         transport = None
         if log:
             from .transport import TransportLog

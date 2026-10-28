@@ -27,7 +27,7 @@ from grasp2show.config import random_camera
 from grasp2show.experiment import Scenario
 from grasp2show.feasibility import twin_of
 from grasp2show.gripper_sim import GripperSim
-from grasp2show.hanging import hook_options
+from grasp2show.hanging import HOOK_SPEED, hook_options, plan_hook
 from grasp2show.objects import load_object_set
 from grasp2show.task import Grasp, show_pose
 
@@ -67,13 +67,10 @@ def run_hook(name, yaw, xy, cam, mass, frames):
     sc = Scenario(name, yaw, {kk: z[kk][:0] for kk in ("T_obj_tcp", "width", "success")}, start_xy=xy, camera=cam,
                   mass_scale=mass)
     hooks = hooks_for(name)
-    for o in [o for o in hook_options(sc.fc, GripperSim(sc.cfg, sc.obj), hooks) if o.ok][:5]:
-        floor = min((sc.fc.T_start @ o.T_obj_tcp)[2, 2], 0.0) - 0.25
-        paths, _ = sc.ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, checker=sc.fc, width=o.width,
-                                       T_show=o.T_show, T_tcp_held=o.hang.T_tcp_obj, open_width=o.width,
-                                       finger_floor=floor)
+    for o in [o for o in hook_options(sc.fc, GripperSim(sc.cfg, sc.obj), hooks, T_start=sc.ep.resting_pose()) if o.ok][:5]:
+        paths, _ = plan_hook(sc.ep, sc.fc, o)
         if paths is not None:
-            res = sc.ep.execute(Grasp("hook", o.T_obj_tcp, o.width, "hook"), paths,
+            res = sc.ep.execute(Grasp("hook", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED,
                                 on_frame=lambda d: frames.append(d.qpos.copy()))
             return sc, res
     return sc, None

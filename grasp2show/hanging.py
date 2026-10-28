@@ -25,9 +25,11 @@ import numpy as np
 from .feasibility import FeasibilityChecker, PoseCheck, Visibility, twin_of
 from .franka_ik import ik
 from .gripper_sim import GripperSim
-from .motion import min_jerk
+from .motion import cartesian_line, min_jerk
 from .scene import start_pose
 from .transforms import inv_T, make_T, rot_z, rotation_angle
+
+PITCH_UP = 25.0   # deg: fingers raised this far above the horizontal while a hook carries (see carry_pose)
 
 
 @dataclass
@@ -35,13 +37,37 @@ class Hang:
     T_tcp_obj: np.ndarray | None  # settled hanging pose relative to the hand (None: it fell)
     swing_deg: float               # remaining swing over the last 0.5 s (peak-to-peak, deg)
     tilt_deg: float                # how far the object turned from its upright start
+    T_carry: np.ndarray | None = None   # the hand while carrying (object's upright start frame)
+
+
+def carry_pose(T_obj_tcp: np.ndarray, lift: float, pitch_deg: float = PITCH_UP) -> np.ndarray:
+    """The hand lifted `lift` above the grasp with its fingers raised to `pitch_deg` above the
+    horizontal (turned about the horizontal axis across the fingers; if they already point
+    higher, unchanged). The Franka's fingertips taper, so a hook only passes them a few
+    millimetres through the handle: carried level, a swing slides the handle off the tip. Raised,
+    the handle slides the other way, down the finger to where it thickens, and wedges there."""
+    R = T_obj_tcp[:3, :3]
+    z = R[:, 2]
+    elev = np.arcsin(np.clip(z[2], -1, 1))
+    T = T_obj_tcp.copy()
+    T[:3, 3] += [0, 0, lift]
+    h = np.array([z[0], z[1], 0.0])
+    if np.linalg.norm(h) < 1e-6 or elev >= np.radians(pitch_deg):
+        return T
+    a = np.cross(h / np.linalg.norm(h), [0.0, 0.0, 1.0])
+    a /= np.linalg.norm(a)
+    th = np.radians(pitch_deg) - elev
+    K = np.array([[0, -a[2], a[1]], [a[2], 0, -a[0]], [-a[1], a[0], 0]])
+    T[:3, :3] = (np.eye(3) + np.sin(th) * K + (1 - np.cos(th)) * K @ K) @ R
+    return T
 
 
 def settle(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, mass_scale: float = 1.0,
-           lift: float = 0.10, hold: float = 2.5) -> Hang:
-    """The hook lift (hooks.lift_test) with a longer hold: fingers at `width` through the loop,
-    gravity on, lift 10 cm, hold until the swing has settled. The object starts upright (its
-    frame = the world frame), the hand at T_obj_tcp."""
+           lift: float = 0.15, hold: float = 2.5, pitch_deg: float = PITCH_UP) -> Hang:
+    """The hook lift (hooks.lift_test) as the robot will do it: fingers at `width` through the
+    loop, gravity on, the hand lifted 7.5 cm straight up (the object now hangs), then another 7.5 cm
+    while its fingers turn up to the carry pose (carry_pose), then held until the swing has settled. The object starts upright (its frame =
+    the world frame), the hand at T_obj_tcp."""
     m, d, dt = sim.model, sim.data, sim.model.opt.timestep
     body = sim._obj_body
     mass0, inertia0 = m.body_mass[body], m.body_inertia[body].copy()
@@ -52,11 +78,13 @@ def settle(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, mass_scale: flo
         for _ in range(max(round(sim.T_CLOSE / dt), 1)):
             mujoco.mj_step(m, d)
         m.opt.gravity[:] = [0, 0, -9.81]
-        n = max(round(0.6 / dt), 1)
+        T_carry = carry_pose(T_obj_tcp, lift, pitch_deg)
+        T_mid = T_obj_tcp.copy()
+        T_mid[:3, 3] += [0, 0, lift / 2]          # straight up until it hangs, then raise the fingers
+        path = cartesian_line(T_obj_tcp, T_mid, 25) + cartesian_line(T_mid, T_carry, 25)
+        n = max(round(1.2 / dt), 1)
         for k in range(1, n + 1):
-            T = T_obj_tcp.copy()
-            T[:3, 3] += [0, 0, lift * min_jerk(k / n)]
-            sim._set_hand(T)
+            sim._set_hand(path[min(int(min_jerk(k / n) * 50), 49)])
             mujoco.mj_step(m, d)
         n_hold, tail = max(round(hold / dt), 1), max(round(0.5 / dt), 1)
         Rs = []
@@ -66,10 +94,11 @@ def settle(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, mass_scale: flo
                 Rs.append((inv_T(sim._tcp_pose()) @ sim._obj_pose())[:3, :3])
         touching, _ = sim._contacts()
         T_obj = sim._obj_pose()
-        if not touching or T_obj[2, 3] < 0.7 * lift:
+        if not touching or T_obj[2, 3] < 0.5 * lift:
             return Hang(None, np.nan, np.nan)
         swing = max(np.degrees(rotation_angle(Rs[0].T @ R)) for R in Rs) * 2 if Rs else 0.0
-        return Hang(inv_T(sim._tcp_pose()) @ T_obj, float(swing), float(np.degrees(rotation_angle(T_obj[:3, :3]))))
+        return Hang(inv_T(sim._tcp_pose()) @ T_obj, float(swing), float(np.degrees(rotation_angle(T_obj[:3, :3]))),
+                    T_carry)
     finally:
         m.body_mass[body], m.body_inertia[body] = mass0, inertia0
         m.opt.gravity[:] = 0.0
@@ -124,14 +153,13 @@ def usable_hooks(obj, sim: GripperSim, turns: int = 12, limit: int = 40, seed: i
     return out
 
 
-def show_targets(cfg, obj, T_obj_tcp: np.ndarray, T_tcp_obj: np.ndarray,
+def show_targets(cfg, obj, R_hand0: np.ndarray, T_tcp_obj: np.ndarray,
                  extra_turns_deg=(0.0, -25.0, 25.0)) -> list[tuple[float, np.ndarray, np.ndarray]]:
     """Show poses for a hooked object: (extra turn, T_world_tcp, T_world_obj). The hand keeps the
-    tilt it had at the grasp (rotation part of T_obj_tcp, the object starting upright) and turns
-    about the vertical so the QR's horizontal direction points at the scanner (extra turns: the
-    same, a little off, when the exact one is out of reach)."""
+    tilt it carries with (R_hand0, in the object's upright start frame) and turns about the
+    vertical so the QR's horizontal direction points at the scanner (extra turns: the same, a
+    little off, when the exact one is out of reach)."""
     cam, at = np.asarray(cfg.camera.pos, float), np.asarray(cfg.camera.look_at, float)
-    R_hand0 = T_obj_tcp[:3, :3]
     R_obj0 = R_hand0 @ T_tcp_obj[:3, :3]
     n0 = R_obj0 @ obj.T_obj_qr[:3, 0]
     psi = np.arctan2(*(cam - at)[[1, 0]]) - np.arctan2(n0[1], n0[0])
@@ -160,6 +188,7 @@ class HookOption:
     show: PoseCheck | None = None
     vis: Visibility | None = None
     why: str = ""
+    T_start: np.ndarray | None = None   # where the object lies (world)
 
     @property
     def ok(self) -> bool:
@@ -167,12 +196,13 @@ class HookOption:
 
 
 def hook_options(fc: FeasibilityChecker, sim: GripperSim, hooks: list[dict], mass_scale: float = 1.0,
-                 pregrasp: float = 0.10) -> list[HookOption]:
+                 pregrasp: float = 0.10, T_start: np.ndarray | None = None) -> list[HookOption]:
     """Every hook (dicts T, width from hooks.fit_hook_poses), both twins: where it hangs, then the
-    show pose and the reach / collision / visibility checks. Sorted: feasible first, then by the
-    view angle of the QR."""
+    show pose and the reach / collision / visibility checks. T_start: where the object lies (a
+    hook has 1-3 mm to spare, so pass the settled pose, PickAndShow.resting_pose; default: the
+    nominal start pose). Sorted: feasible first, then by the view angle of the QR."""
     cfg, obj = fc.cfg, fc.obj
-    T_start = start_pose(cfg, obj)
+    T_start = start_pose(cfg, obj) if T_start is None else T_start
     out = []
     for i, h in enumerate(hooks):
         for k, Tg in enumerate((h["T"], twin_of(h["T"]))):
@@ -190,17 +220,30 @@ def hook_options(fc: FeasibilityChecker, sim: GripperSim, hooks: list[dict], mas
                 out.append(HookOption(i, k, Tg, w, hang, start=start, pre=pre,
                                       why="grasp unreachable" if not start.ok else "pre-grasp unreachable"))
                 continue
-            # the hand at the grasp, turned with the object's start yaw (show_targets works in the
-            # object's upright frame; a turn about the vertical changes nothing in the hanging)
+            # show_targets works in the object's upright frame: the object's start yaw is a turn
+            # about the vertical, which changes nothing in the hanging
             best = None
-            for extra, T_show, T_obj in show_targets(cfg, obj, Tg, hang.T_tcp_obj):
+            for extra, T_show, T_obj in show_targets(cfg, obj, hang.T_carry[:3, :3], hang.T_tcp_obj):
                 Ss = ik(T_show[None], fc.q7)[0]
                 reach = fc._reach(Ss, w, T_obj, holding=True, q_ref=start.q)
                 if not reach.ok:
                     continue
                 vis = fc.visibility(reach.q, w, T_obj)
-                opt = HookOption(i, k, Tg, w, hang, extra, T_show, T_obj, start, pre, reach, vis)
+                opt = HookOption(i, k, Tg, w, hang, extra, T_show, T_obj, start, pre, reach, vis, T_start=T_start)
                 if best is None or (vis.ok(), -vis.angle_deg) > (best.vis.ok(), -best.vis.angle_deg):
                     best = opt
             out.append(best or HookOption(i, k, Tg, w, hang, start=start, pre=pre, why="show pose unreachable"))
     return sorted(out, key=lambda o: (not o.ok, o.vis.angle_deg if o.vis else 1e3))
+
+
+HOOK_SPEED = 0.6   # hooks carry at 0.6 x the pinch speed: the object swings on a few mm of fingertip
+
+
+def plan_hook(ep, fc: FeasibilityChecker, o: HookOption):
+    """Joint paths for a hook option (episode.PickAndShow.plan_analytic): the lift ends in the carry
+    pose (fingers raised), the carry keeps the fingers at least 10 deg above the horizontal, the
+    held object hangs as found by settle(). Returns (paths, None) or (None, reason)."""
+    return ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, checker=fc, width=o.width, T_show=o.T_show,
+                            T_tcp_held=o.hang.T_tcp_obj, open_width=o.width,
+                            finger_floor=float(np.sin(np.radians(PITCH_UP - 15.0))),
+                            T_lift=o.T_start @ o.hang.T_carry, T_start=o.T_start)

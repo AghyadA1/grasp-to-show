@@ -22,11 +22,11 @@ def test_show_targets_face_the_scanner_and_keep_the_hanging():
     T_obj_tcp = make_T(_rot(rng.normal(size=3), 1.2), [0.08, 0.0, 0.06])      # hand at the grasp (object upright)
     T_tcp_obj = make_T(_rot(rng.normal(size=3), 0.9), [0.0, 0.05, -0.04])    # where the object hangs from the hand
     cam, at = np.asarray(cfg.camera.pos), np.asarray(cfg.camera.look_at)
-    (extra, T_tcp, T_obj), *others = show_targets(cfg, obj, T_obj_tcp, T_tcp_obj)
+    (extra, T_tcp, T_obj), *others = show_targets(cfg, obj, T_obj_tcp[:3, :3], T_tcp_obj)
     assert extra == 0.0 and len(others) == 2
     # the object hangs from the hand exactly as found
     np.testing.assert_allclose(inv_T(T_tcp) @ T_obj, T_tcp_obj, atol=1e-12)
-    # the hand only turned about the vertical: same tilt as at the grasp
+    # the hand only turned about the vertical: same tilt as it carries with
     dR = T_tcp[:3, :3] @ T_obj_tcp[:3, :3].T
     np.testing.assert_allclose(dR[2], [0, 0, 1], atol=1e-12)
     # QR centre at the look-at point, its normal's horizontal part pointing at the camera
@@ -37,3 +37,16 @@ def test_show_targets_face_the_scanner_and_keep_the_hanging():
     # the extra turns (used when the exact one is out of reach) turn the hand further about the vertical
     for extra_deg, T_tcp_k, _ in others:
         np.testing.assert_allclose(T_tcp_k[:3, :3], rot_z(np.radians(extra_deg)) @ T_tcp[:3, :3], atol=1e-12)
+
+
+def test_carry_pose_raises_the_fingers():
+    from grasp2show.hanging import carry_pose
+
+    T = make_T(_rot([1.0, 0.3, 0.0], 1.4), [0.08, 0.0, 0.06])      # fingers about level
+    C = carry_pose(T, 0.15, 25.0)
+    assert np.isclose(np.degrees(np.arcsin(C[2, 2])), 25.0)
+    np.testing.assert_allclose(C[:3, 3], T[:3, 3] + [0, 0, 0.15])
+    h0, h1 = T[:2, 2] / np.linalg.norm(T[:2, 2]), C[:2, 2] / np.linalg.norm(C[:2, 2])
+    np.testing.assert_allclose(h0, h1, atol=1e-12)                   # same heading, only raised
+    up = make_T(_rot([1.0, 0.0, 0.0], -0.9), [0, 0, 0])             # already pointing up: unchanged
+    np.testing.assert_allclose(carry_pose(up, 0.1)[:3, :3], up[:3, :3])

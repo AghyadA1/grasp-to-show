@@ -20,7 +20,7 @@ def test_generated_objects_are_convex_pieces_standing_on_the_table(tmp_path):
         if props is None:
             continue
         kept += 1
-        kinds.add(props["params"]["handle"]["kind"])
+        kinds.add(props["params"]["handle"]["base"])
         d = tmp_path / g.name
         files = sorted(d.glob("model_collision_*.obj"))
         assert len(files) == len(g.pieces) and (d / "model.obj").exists()

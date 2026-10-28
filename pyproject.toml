@@ -22,6 +22,7 @@ dependencies = [
   "trimesh",
   "rtree",          # trimesh ray casting
   "shapely",        # hooks: fingertip cross-sections in a handle hole
+  "embreex",        # fast ray casting for trimesh (hole finding ~100x faster)
   "matplotlib",
   "h5py",
 ]

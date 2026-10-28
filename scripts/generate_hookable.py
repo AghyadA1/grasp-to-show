@@ -89,8 +89,8 @@ def main() -> int:
     objects = [{**m, **res[m["name"]]} for m in made]
     rng = np.random.default_rng(0)
     test = set(rng.choice([o["name"] for o in objects], size=max(1, len(objects) // 5), replace=False).tolist())
-    kinds = Counter(o["handle"]["kind"] for o in objects)
-    hookable = Counter(o["handle"]["kind"] for o in objects if o["hookable"])
+    kinds = Counter(o["handle"]["where"] for o in objects)
+    hookable = Counter(o["handle"]["where"] for o in objects if o["hookable"])
     out = {"source": "grasp2show/shapegen.py via scripts/generate_hookable.py", "seeds": [args.start_seed, seed - 1],
            "objects": [o["name"] for o in objects], "train": [o["name"] for o in objects if o["name"] not in test],
            "test": sorted(test), "hookable": [o["name"] for o in objects if o["hookable"]],
@@ -153,7 +153,7 @@ def figure(objects: list[dict]) -> None:
                    f"{o['hooks']} hooks, all hit the table" if o["hooks"] else "no hook fits")
         col = (60, 170, 60) if o["hookable"] else (200, 60, 60)
         cv2.rectangle(img, (0, 0), (S, 40), (245, 245, 245), -1)
-        cv2.putText(img, f"{name}  {hp['kind']}{'-' + hp['shape'] if 'shape' in hp else ''}  {o['mass']:.2f} kg",
+        cv2.putText(img, f"{name}  {hp['where']} {hp['base']} {hp['wiggle']} {hp['section']}  {o['mass']:.2f} kg",
                     (6, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (30, 30, 30), 1, cv2.LINE_AA)
         cv2.putText(img, f"{verdict}  (gap {hp['gap'] * 100:.1f} x {hp['span'] * 100:.1f} cm)", (6, 33),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, col, 1, cv2.LINE_AA)

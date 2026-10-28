@@ -59,41 +59,63 @@ def collision_mesh(obj) -> trimesh.Trimesh:
     return trimesh.util.concatenate([trimesh.load(f, force="mesh") for f in obj.collision_files])
 
 
-def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 1500, n_dirs: int = 24,
+def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 4000, n_probe: int = 64,
                n_ring: int = 16, min_ring_hits: int = 15) -> list[tuple[np.ndarray, np.ndarray, int]]:
-    """Through-holes a closed-finger rod fits in: list of (point, axis d (unit), ring hits)."""
-    lo, hi = mesh.bounds[0] - 0.01, mesh.bounds[1] + 0.01
-    pts = rng.uniform(lo, hi, (n_points, 3))
+    """Through-holes a closed-finger rod fits in: list of (point, axis d (unit), ring hits).
+
+    Candidate rod centres are sampled just off the surface. From each, rays go out in n_probe
+    directions; around a hole they hit the object close by in (roughly) one plane, the hole's
+    cross-section, so the rod axis d is estimated as the normal of the plane that best fits the
+    nearby hit directions (smallest eigenvector of their scatter). A fixed set of trial axes would
+    have to be dense: a thin 6 mm handle is missed if the trial axis is off by more than ~6 deg.
+    Then the test: rays in the plane perpendicular to d hit within REACH in almost every
+    direction, none closer than the rod's radius, and the rod's own line is free both ways."""
+    surf, fid = trimesh.sample.sample_surface(mesh, n_points, seed=int(rng.integers(1 << 31)))
+    pts = surf + mesh.face_normals[fid] * rng.uniform(ROD_RADIUS, 0.04, (n_points, 1))
     _, dist, _ = trimesh.proximity.closest_point(mesh, pts)
     pts = pts[(dist > ROD_RADIUS) & (dist < 0.04)]                 # near the surface, with room for the rod
-    dirs = _fibonacci_dirs(2 * n_dirs)
-    dirs = dirs[dirs[:, 2] >= 0]                                   # d and -d are the same rod
+    if len(pts) == 0:
+        return []
+    D = _fibonacci_dirs(n_probe)
+    o = np.repeat(pts, n_probe, axis=0)
+    loc, idx, _ = mesh.ray.intersects_location(o, np.tile(D, (len(pts), 1)), multiple_hits=False)
+    dd = np.full(len(o), np.inf)
+    dd[idx] = np.linalg.norm(loc - o[idx], axis=1)
+    near = dd.reshape(len(pts), n_probe) < REACH
+    keep = near.sum(1) >= n_probe // 3
+    pts, near = pts[keep], near[keep]
+    if len(pts) == 0:
+        return []
+    axes = []
+    for nr in near:
+        H = D[nr]
+        _, V = np.linalg.eigh(H.T @ H)
+        d = V[:, 0]
+        axes.append(d if d[2] >= 0 else -d)
+    axes = np.array(axes)
+    # axial rays: the line of the rod must be free on both sides
+    o = np.repeat(pts, 2, axis=0)
+    ax = np.stack([axes, -axes], 1).reshape(-1, 3)
+    loc, idx, _ = mesh.ray.intersects_location(o, ax, multiple_hits=False)
+    blocked = np.zeros(len(o), bool)
+    blocked[idx[np.linalg.norm(loc - o[idx], axis=1) < FREE_ALONG]] = True
+    ok = ~blocked.reshape(-1, 2).any(1)
+    pts, axes = pts[ok], axes[ok]
+    if len(pts) == 0:
+        return []
     ang = 2 * np.pi * np.arange(n_ring) / n_ring
-    out = []
-    for d in dirs:
+    rings = []
+    for d in axes:
         u, v = _basis(d)
-        ring = np.cos(ang)[:, None] * u + np.sin(ang)[:, None] * v                # (R, 3)
-        # axial rays first (cheap rejection): the line of the rod must be free on both sides
-        o = np.repeat(pts, 2, axis=0)
-        ax = np.tile(np.stack([d, -d]), (len(pts), 1))
-        loc, idx, _ = mesh.ray.intersects_location(o, ax, multiple_hits=False)
-        blocked = np.zeros(len(o), bool)
-        blocked[idx[np.linalg.norm(loc - o[idx], axis=1) < FREE_ALONG]] = True
-        ok = ~blocked.reshape(-1, 2).any(1)
-        cand = pts[ok]
-        if len(cand) == 0:
-            continue
-        o = np.repeat(cand, n_ring, axis=0)
-        r = np.tile(ring, (len(cand), 1))
-        loc, idx, _ = mesh.ray.intersects_location(o, r, multiple_hits=False)
-        dd = np.full(len(o), np.inf)
-        dd[idx] = np.linalg.norm(loc - o[idx], axis=1)
-        dd = dd.reshape(len(cand), n_ring)
-        hits = (dd < REACH).sum(1)
-        fits = dd.min(1) >= ROD_RADIUS
-        for p, h in zip(cand[(hits >= min_ring_hits) & fits], hits[(hits >= min_ring_hits) & fits]):
-            out.append((p, d.copy(), int(h)))
-    return out
+        rings.append(np.cos(ang)[:, None] * u + np.sin(ang)[:, None] * v)
+    o = np.repeat(pts, n_ring, axis=0)
+    loc, idx, _ = mesh.ray.intersects_location(o, np.concatenate(rings), multiple_hits=False)
+    dd = np.full(len(o), np.inf)
+    dd[idx] = np.linalg.norm(loc - o[idx], axis=1)
+    dd = dd.reshape(len(pts), n_ring)
+    hits = (dd < REACH).sum(1)
+    good = (hits >= min_ring_hits) & (dd.min(1) >= ROD_RADIUS)
+    return [(p, d.copy(), int(h)) for p, d, h in zip(pts[good], axes[good], hits[good])]
 
 
 def hook_poses(loops, rng: np.random.Generator, n_roll: int = 8, max_loops: int = 20,

@@ -1,0 +1,673 @@
+{
+ "source": "grasp2show/shapegen.py via scripts/generate_hookable.py",
+ "seeds": [
+  0,
+  27
+ ],
+ "objects": [
+  "gen_00001",
+  "gen_00002",
+  "gen_00003",
+  "gen_00004",
+  "gen_00006",
+  "gen_00009",
+  "gen_00010",
+  "gen_00011",
+  "gen_00012",
+  "gen_00014",
+  "gen_00016",
+  "gen_00017",
+  "gen_00018",
+  "gen_00019",
+  "gen_00020",
+  "gen_00021",
+  "gen_00022",
+  "gen_00024",
+  "gen_00026",
+  "gen_00027"
+ ],
+ "train": [
+  "gen_00001",
+  "gen_00002",
+  "gen_00003",
+  "gen_00004",
+  "gen_00006",
+  "gen_00010",
+  "gen_00011",
+  "gen_00012",
+  "gen_00016",
+  "gen_00018",
+  "gen_00019",
+  "gen_00021",
+  "gen_00022",
+  "gen_00024",
+  "gen_00026",
+  "gen_00027"
+ ],
+ "test": [
+  "gen_00009",
+  "gen_00014",
+  "gen_00017",
+  "gen_00020"
+ ],
+ "hookable": [
+  "gen_00002",
+  "gen_00003",
+  "gen_00006",
+  "gen_00011",
+  "gen_00012",
+  "gen_00018",
+  "gen_00019",
+  "gen_00020",
+  "gen_00021",
+  "gen_00024",
+  "gen_00026",
+  "gen_00027"
+ ],
+ "by_handle": {
+  "side": {
+   "objects": 12,
+   "hookable": 7
+  },
+  "ring": {
+   "objects": 4,
+   "hookable": 3
+  },
+  "top": {
+   "objects": 4,
+   "hookable": 2
+  }
+ },
+ "details": [
+  {
+   "name": "gen_00001",
+   "seed": 1,
+   "mass": 0.707,
+   "handle": {
+    "where": "side",
+    "base": "superellipse",
+    "wiggle": "zigzag",
+    "section": "round",
+    "thickness": 0.0087,
+    "gap": 0.0321,
+    "span": 0.0803,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "cluster",
+    "pieces": [
+     "pebble",
+     "frustum",
+     "pebble",
+     "pebble"
+    ]
+   },
+   "hooks": 0,
+   "table_ok": 0,
+   "hookable": false,
+   "kinds": {},
+   "seconds": 0.6
+  },
+  {
+   "name": "gen_00002",
+   "seed": 2,
+   "mass": 1.008,
+   "handle": {
+    "where": "side",
+    "base": "polygon",
+    "wiggle": "twist",
+    "section": "triangle",
+    "thickness": 0.0128,
+    "gap": 0.0444,
+    "span": 0.0846,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "stack",
+    "pieces": [
+     "superellipsoid",
+     "frustum"
+    ]
+   },
+   "hooks": 12,
+   "table_ok": 18,
+   "hookable": true,
+   "kinds": {
+    "one": 10,
+    "two": 2
+   },
+   "seconds": 22.4
+  },
+  {
+   "name": "gen_00003",
+   "seed": 3,
+   "mass": 0.792,
+   "handle": {
+    "where": "side",
+    "base": "arc",
+    "wiggle": "squiggle",
+    "section": "round",
+    "thickness": 0.0112,
+    "gap": 0.0586,
+    "span": 0.0542,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "single",
+    "pieces": [
+     "superellipsoid"
+    ]
+   },
+   "hooks": 11,
+   "table_ok": 16,
+   "hookable": true,
+   "kinds": {
+    "one": 10,
+    "two": 1
+   },
+   "seconds": 18.4
+  },
+  {
+   "name": "gen_00004",
+   "seed": 4,
+   "mass": 1.24,
+   "handle": {
+    "where": "side",
+    "base": "rect",
+    "wiggle": "zigzag",
+    "section": "round",
+    "thickness": 0.0108,
+    "gap": 0.0187,
+    "span": 0.0444,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "single",
+    "pieces": [
+     "frustum"
+    ]
+   },
+   "hooks": 0,
+   "table_ok": 0,
+   "hookable": false,
+   "kinds": {},
+   "seconds": 0.6
+  },
+  {
+   "name": "gen_00006",
+   "seed": 6,
+   "mass": 0.583,
+   "handle": {
+    "where": "side",
+    "base": "superellipse",
+    "wiggle": "zigzag",
+    "section": "triangle",
+    "thickness": 0.015,
+    "gap": 0.058,
+    "span": 0.0616,
+    "tilt": 0.0,
+    "spikes": 6
+   },
+   "body": {
+    "style": "cluster",
+    "pieces": [
+     "frustum",
+     "frustum",
+     "pebble"
+    ]
+   },
+   "hooks": 13,
+   "table_ok": 20,
+   "hookable": true,
+   "kinds": {
+    "one": 9,
+    "two": 4
+   },
+   "seconds": 26.4
+  },
+  {
+   "name": "gen_00009",
+   "seed": 9,
+   "mass": 1.347,
+   "handle": {
+    "where": "side",
+    "base": "polygon",
+    "wiggle": "doodle",
+    "section": "round",
+    "thickness": 0.0061,
+    "gap": 0.0477,
+    "span": 0.0696,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "cluster",
+    "pieces": [
+     "superellipsoid",
+     "superellipsoid",
+     "superellipsoid",
+     "superellipsoid"
+    ],
+    "spikes": 3
+   },
+   "hooks": 0,
+   "table_ok": 0,
+   "hookable": false,
+   "kinds": {},
+   "seconds": 0.4
+  },
+  {
+   "name": "gen_00010",
+   "seed": 10,
+   "mass": 0.354,
+   "handle": {
+    "where": "side",
+    "base": "triangle",
+    "wiggle": "zigzag",
+    "section": "triangle",
+    "thickness": 0.0143,
+    "gap": 0.0269,
+    "span": 0.0437,
+    "tilt": 0.246
+   },
+   "body": {
+    "style": "single",
+    "pieces": [
+     "superellipsoid"
+    ]
+   },
+   "hooks": 0,
+   "table_ok": 0,
+   "hookable": false,
+   "kinds": {},
+   "seconds": 0.3
+  },
+  {
+   "name": "gen_00011",
+   "seed": 11,
+   "mass": 0.191,
+   "handle": {
+    "where": "ring",
+    "base": "arch",
+    "wiggle": "zigzag",
+    "section": "triangle",
+    "thickness": 0.0111,
+    "gap": 0.0532,
+    "span": 0.0735,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "single",
+    "pieces": [
+     "frustum"
+    ]
+   },
+   "hooks": 40,
+   "table_ok": 72,
+   "hookable": true,
+   "kinds": {
+    "two": 24,
+    "one": 16
+   },
+   "seconds": 38.4
+  },
+  {
+   "name": "gen_00012",
+   "seed": 12,
+   "mass": 0.202,
+   "handle": {
+    "where": "side",
+    "base": "arch",
+    "wiggle": "doodle",
+    "section": "round",
+    "thickness": 0.0114,
+    "gap": 0.0425,
+    "span": 0.0634,
+    "tilt": 0.0,
+    "spikes": 7
+   },
+   "body": {
+    "style": "twist",
+    "pieces": [
+     "slab",
+     "slab",
+     "slab",
+     "slab",
+     "slab"
+    ]
+   },
+   "hooks": 29,
+   "table_ok": 37,
+   "hookable": true,
+   "kinds": {
+    "one": 29
+   },
+   "seconds": 35.6
+  },
+  {
+   "name": "gen_00014",
+   "seed": 14,
+   "mass": 0.636,
+   "handle": {
+    "where": "top",
+    "base": "superellipse",
+    "wiggle": "zigzag",
+    "section": "triangle",
+    "thickness": 0.0066,
+    "gap": 0.0442,
+    "span": 0.0514,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "single",
+    "pieces": [
+     "frustum"
+    ]
+   },
+   "hooks": 0,
+   "table_ok": 0,
+   "hookable": false,
+   "kinds": {},
+   "seconds": 0.2
+  },
+  {
+   "name": "gen_00016",
+   "seed": 16,
+   "mass": 0.12,
+   "handle": {
+    "where": "ring",
+    "base": "arc",
+    "wiggle": "none",
+    "section": "triangle",
+    "thickness": 0.0078,
+    "gap": 0.0587,
+    "span": 0.0892,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "twist",
+    "pieces": [
+     "slab",
+     "slab",
+     "slab"
+    ]
+   },
+   "hooks": 0,
+   "table_ok": 0,
+   "hookable": false,
+   "kinds": {},
+   "seconds": 0.2
+  },
+  {
+   "name": "gen_00017",
+   "seed": 17,
+   "mass": 0.575,
+   "handle": {
+    "where": "side",
+    "base": "arc",
+    "wiggle": "zigzag",
+    "section": "round",
+    "thickness": 0.012,
+    "gap": 0.0127,
+    "span": 0.0364,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "single",
+    "pieces": [
+     "superellipsoid"
+    ]
+   },
+   "hooks": 0,
+   "table_ok": 0,
+   "hookable": false,
+   "kinds": {},
+   "seconds": 0.3
+  },
+  {
+   "name": "gen_00018",
+   "seed": 18,
+   "mass": 0.372,
+   "handle": {
+    "where": "ring",
+    "base": "triangle",
+    "wiggle": "none",
+    "section": "square",
+    "thickness": 0.0071,
+    "gap": 0.039,
+    "span": 0.0431,
+    "tilt": 0.0,
+    "spikes": 7
+   },
+   "body": {
+    "style": "stack",
+    "pieces": [
+     "pebble",
+     "frustum"
+    ],
+    "spikes": 5
+   },
+   "hooks": 25,
+   "table_ok": 50,
+   "hookable": true,
+   "kinds": {
+    "one": 25
+   },
+   "seconds": 36.3
+  },
+  {
+   "name": "gen_00019",
+   "seed": 19,
+   "mass": 0.624,
+   "handle": {
+    "where": "top",
+    "base": "triangle",
+    "wiggle": "twist",
+    "section": "round",
+    "thickness": 0.0104,
+    "gap": 0.0478,
+    "span": 0.0616,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "twist",
+    "pieces": [
+     "slab",
+     "slab",
+     "slab",
+     "slab"
+    ]
+   },
+   "hooks": 19,
+   "table_ok": 36,
+   "hookable": true,
+   "kinds": {
+    "one": 15,
+    "two": 4
+   },
+   "seconds": 23.5
+  },
+  {
+   "name": "gen_00020",
+   "seed": 20,
+   "mass": 0.235,
+   "handle": {
+    "where": "side",
+    "base": "arc",
+    "wiggle": "squiggle",
+    "section": "round",
+    "thickness": 0.0086,
+    "gap": 0.0528,
+    "span": 0.0488,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "stack",
+    "pieces": [
+     "frustum",
+     "superellipsoid"
+    ],
+    "spikes": 3
+   },
+   "hooks": 28,
+   "table_ok": 50,
+   "hookable": true,
+   "kinds": {
+    "one": 17,
+    "two": 11
+   },
+   "seconds": 30.0
+  },
+  {
+   "name": "gen_00021",
+   "seed": 21,
+   "mass": 0.489,
+   "handle": {
+    "where": "side",
+    "base": "polygon",
+    "wiggle": "doodle",
+    "section": "round",
+    "thickness": 0.0085,
+    "gap": 0.0528,
+    "span": 0.0525,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "stack",
+    "pieces": [
+     "frustum",
+     "pebble",
+     "pebble"
+    ],
+    "spikes": 4
+   },
+   "hooks": 16,
+   "table_ok": 32,
+   "hookable": true,
+   "kinds": {
+    "one": 8,
+    "two": 8
+   },
+   "seconds": 31.2
+  },
+  {
+   "name": "gen_00022",
+   "seed": 22,
+   "mass": 0.335,
+   "handle": {
+    "where": "top",
+    "base": "polygon",
+    "wiggle": "doodle",
+    "section": "round",
+    "thickness": 0.0154,
+    "gap": 0.0232,
+    "span": 0.0348,
+    "tilt": 0.185
+   },
+   "body": {
+    "style": "single",
+    "pieces": [
+     "superellipsoid"
+    ],
+    "spikes": 6
+   },
+   "hooks": 0,
+   "table_ok": 0,
+   "hookable": false,
+   "kinds": {},
+   "seconds": 0.4
+  },
+  {
+   "name": "gen_00024",
+   "seed": 24,
+   "mass": 1.039,
+   "handle": {
+    "where": "top",
+    "base": "superellipse",
+    "wiggle": "doodle",
+    "section": "triangle",
+    "thickness": 0.0133,
+    "gap": 0.0439,
+    "span": 0.0516,
+    "tilt": 0.0,
+    "spikes": 3
+   },
+   "body": {
+    "style": "cluster",
+    "pieces": [
+     "frustum",
+     "frustum",
+     "frustum",
+     "frustum"
+    ],
+    "spikes": 6
+   },
+   "hooks": 13,
+   "table_ok": 26,
+   "hookable": true,
+   "kinds": {
+    "two": 6,
+    "one": 7
+   },
+   "seconds": 19.4
+  },
+  {
+   "name": "gen_00026",
+   "seed": 26,
+   "mass": 1.326,
+   "handle": {
+    "where": "side",
+    "base": "arch",
+    "wiggle": "none",
+    "section": "strap",
+    "thickness": 0.0105,
+    "gap": 0.0591,
+    "span": 0.0546,
+    "tilt": 0.0
+   },
+   "body": {
+    "style": "stack",
+    "pieces": [
+     "superellipsoid",
+     "pebble"
+    ]
+   },
+   "hooks": 40,
+   "table_ok": 80,
+   "hookable": true,
+   "kinds": {
+    "two": 10,
+    "one": 30
+   },
+   "seconds": 40.1
+  },
+  {
+   "name": "gen_00027",
+   "seed": 27,
+   "mass": 0.38,
+   "handle": {
+    "where": "ring",
+    "base": "arch",
+    "wiggle": "none",
+    "section": "strap",
+    "thickness": 0.0078,
+    "gap": 0.0394,
+    "span": 0.0777,
+    "tilt": 0.289
+   },
+   "body": {
+    "style": "single",
+    "pieces": [
+     "superellipsoid"
+    ]
+   },
+   "hooks": 40,
+   "table_ok": 80,
+   "hookable": true,
+   "kinds": {
+    "two": 20,
+    "one": 20
+   },
+   "seconds": 41.6
+  }
+ ]
+}

@@ -33,12 +33,15 @@ from grasp2show.gripper_sim import GripperSim
 from grasp2show.hanging import HOOK_SPEED, hook_options, plan_hook
 from grasp2show.task import Grasp, show_pose
 
-OBJECTS = [("Perricone_MD_The_Crease_Cure_Duo", "pinch"),
-           ("Philips_EcoVantage_43_W_Light_Bulbs_Natural_Light_2_pack", "pinch"),
-           ("Pennington_Electric_Pot_Cabana_4", "pinch"),
-           ("Aroma_Stainless_Steel_Milk_Frother_2_Cup", "pinch"),
-           ("Squirt_Strain_Fruit_Basket", "pinch"),
-           ("ACE_Coffee_Mug_Kristen_16_oz_cup", "hook")]
+# one panel each: candidates in order (the first with a successful scene is shown), and the method
+PANELS = [(["Perricone_MD_The_Crease_Cure_Duo"], "pinch"),
+          (["Philips_EcoVantage_43_W_Light_Bulbs_Natural_Light_2_pack"], "pinch"),
+          (["Olive_Kids_Paisley_Pencil_Case", "Polar_Herring_Fillets_Smoked_Peppered_705_oz_total",
+            "Pennington_Electric_Pot_Cabana_4"], "pinch"),
+          (["F10_TRX_FG_ssscuo9tGxb", "UGG_Bailey_Button_Womens_Boots_Black_7", "MEAT_SET",
+            "Aroma_Stainless_Steel_Milk_Frother_2_Cup"], "pinch"),
+          (["Squirt_Strain_Fruit_Basket"], "pinch"),
+          (["ACE_Coffee_Mug_Kristen_16_oz_cup"], "hook")]
 PW, PH = 320, 240
 EMPTY = {"T_obj_tcp": np.zeros((0, 4, 4)), "width": np.zeros(0), "success": np.zeros(0, bool)}
 
@@ -140,8 +143,8 @@ def main() -> int:
     p.add_argument("--fps", type=int, default=20)
     args = p.parse_args()
     panels, timing = [], {}
-    for name, method in OBJECTS:
-        for k in range(args.max_scenes):
+    for names, method in PANELS:
+        for name, k in ((n_, k_) for n_ in names for k_ in range(args.max_scenes)):
             got = pinch(name, k, args.way_b, args.clouds) if method == "pinch" else hook(name, k)
             if got is None:
                 continue
@@ -154,7 +157,7 @@ def main() -> int:
                 timing[name] = {"method": method, "scene": k, **{kk: round(v, 2) for kk, v in t.items()}}
                 break
         else:
-            print(f"{name}: no successful scene in {args.max_scenes}")
+            print(f"{names}: no successful scene in {args.max_scenes}")
     n = max(len(f) for f in panels)
     panels = [f + [f[-1]] * (n - len(f)) for f in panels]
     while len(panels) < 6:
@@ -163,8 +166,8 @@ def main() -> int:
               for i in range(n)]
     stem = ROOT / "media" / "six_objects"
     imageio.mimwrite(f"{stem}.mp4", frames, fps=args.fps, quality=7, macro_block_size=8)
-    imageio.mimwrite(f"{stem}.gif", [cv2.resize(f, (f.shape[1] * 2 // 3, f.shape[0] * 2 // 3)) for f in frames[::3]],
-                     duration=1000 * 3 / args.fps, loop=0)
+    imageio.mimwrite(f"{stem}.gif", [cv2.resize(f, (f.shape[1] // 2, f.shape[0] // 2), interpolation=cv2.INTER_AREA)
+                                     for f in frames[::4]], duration=1000 * 4 / args.fps, loop=0)
     (ROOT / "media" / "six_objects_timing.json").write_text(json.dumps(timing, indent=1))
     print(json.dumps(timing, indent=1))
     print(f"wrote {stem}.mp4 and .gif ({n / args.fps:.0f} s)")

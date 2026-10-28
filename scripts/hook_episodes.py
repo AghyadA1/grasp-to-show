@@ -149,6 +149,7 @@ def main() -> int:
     p.add_argument("--clouds", type=Path, default=ROOT / "data" / "dataset_v2" / "clouds.npz")
     p.add_argument("--scanner-scale", type=float, default=1.0, help="scanner resolution x this (both policies)")
     p.add_argument("--tag", default="", help="outputs: data/hook_episodes<tag>/, media/hook_episodes<tag>.png")
+    p.add_argument("--update", action="store_true", help="replace only these masses in an existing run (--tag)")
     p.add_argument("--workers", type=int, default=min(4, max(1, (os.cpu_count() or 2) - 1)))
     args = p.parse_args()
     oset = load_object_set()
@@ -172,6 +173,10 @@ def main() -> int:
             recs += rr
     out = OUT.with_name(OUT.name + args.tag)
     out.mkdir(parents=True, exist_ok=True)
+    if args.update and (out / "records.json").exists():     # re-run some masses, keep the others
+        old = json.loads((out / "records.json").read_text())
+        recs = [r for r in old if r["mass_scale"] not in masses] + recs
+        masses = sorted({r["mass_scale"] for r in recs})
     (out / "records.json").write_text(json.dumps(recs, indent=1, default=float))
     summary = {"objects": names, "scenes": args.scenes, "masses": masses, "scanner_scale": args.scanner_scale,
                "policies": {}}

@@ -23,7 +23,7 @@ as a real system would fall back to its next grasp when motion planning fails):
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 import numpy as np
 
@@ -134,15 +134,15 @@ class Scenario:
     def __init__(self, asset: str, yaw_deg: float, grasps: dict, n_rolls: int = 12,
                  start_xy: tuple[float, float] | None = None, camera: CameraConfig | None = None,
                  mass_scale: float = 1.0):
-        """mass_scale: the object is that many times heavier (density scaled, so the checks and
-        the simulator agree)."""
+        """mass_scale: the object is that many times heavier (mass and inertia scaled after the
+        loader's 50 g - 1.5 kg clip, so the checks and the simulator agree)."""
         self.asset, self.yaw_deg = asset, yaw_deg
         extra = {} if start_xy is None else {"start_xy": tuple(start_xy)}
-        if mass_scale != 1.0:
-            extra["density"] = ObjectConfig().density * mass_scale
         cam = {} if camera is None else {"camera": camera}
         self.cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw_deg), **extra), **cam)
         self.obj = object_from_config(self.cfg.obj)
+        if mass_scale != 1.0:
+            self.obj = replace(self.obj, mass=self.obj.mass * mass_scale, inertia=self.obj.inertia * mass_scale)
         self.scene = build_scene(self.cfg, self.obj)
         self.fc = FeasibilityChecker(self.scene, self.cfg)
         self.ep = PickAndShow(self.scene, self.cfg)

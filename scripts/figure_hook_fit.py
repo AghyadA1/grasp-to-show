@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT))
 import grasp2show.hooks as H
 from grasp2show.config import ObjectConfig, SceneConfig
 from grasp2show.gripper_sim import GripperSim
+from grasp2show.hooks import best_fit
 from grasp2show.objects import object_from_config
 
 MUGS = ["Cole_Hardware_Mug_Classic_Blue", "ACE_Coffee_Mug_Kristen_16_oz_cup",
@@ -81,22 +82,13 @@ def handle_section(obj, centre, axis, half=0.045):
     return vis_lines, solid, hole
 
 
-def best_fit(poly, hole, solid):
-    """Place and turn poly to keep the most clearance from the solid; returns (placed, clearance m)."""
-    best, key = None, -np.inf
+def _placed(poly, fit):
+
+    if fit is None:
+        return None, -np.inf
+    a, dx, dy, cl = fit
     c0 = poly.centroid
-    xs = np.linspace(-0.012, 0.012, 13)
-    for a in range(0, 180, 6):
-        pr = affinity.rotate(poly, a, origin=c0)
-        for dx in xs:
-            for dy in xs:
-                pt = affinity.translate(pr, dx - c0.x, dy - c0.y)
-                if not pt.centroid.within(hole):
-                    continue
-                cl = pt.distance(solid) if not pt.intersects(solid) else -pt.intersection(solid).area ** 0.5
-                if cl > key:
-                    best, key = pt, cl
-    return best, key
+    return affinity.translate(affinity.rotate(poly, a, origin=c0), dx - c0.x, dy - c0.y), cl
 
 
 def main() -> int:
@@ -125,7 +117,7 @@ def main() -> int:
             ax.plot(*seg.T * 100, c="k", lw=1)
         lines = []
         for poly, col, lab in ((two, "#1d4e6e", "both fingers closed"), (one, "#3f8f6b", "one finger")):
-            placed, cl = best_fit(poly, hole, solid)
+            placed, cl = _placed(poly, best_fit(poly, hole, solid))
             if placed is not None:
                 ax.fill(*np.array(placed.exterior.coords).T * 100, color=col, alpha=0.75, lw=0)
             lines.append(f"{lab}: {'fits, ' if cl > 0 else 'overlaps, '}{cl * 1000:+.0f} mm")

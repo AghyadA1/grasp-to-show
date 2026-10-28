@@ -821,6 +821,30 @@ mug in any scene):
   (no fit lifts it), and on the porcelain one every fitting finger pose puts the 20 cm-wide hand
   through the table (its handle sits low).
 
+**All six handle objects, with the pinch at its best** (run on the laptop: grasps generated with
+`--min-width 0.002` so mug rims are included, way B v4, both scanners; success in %, at
+× 1 / × 2 / × 4 / × 8 the object's mass):
+
+| 1280 × 960 scanner | red mug (ACE) | fruit basket | all 6 objects |
+|---|---|---|---|
+| pinch, analytic checks | 75 / 19 / 0 / 0 | 100 / 94 / 69 / 25 | 33 / 23 / 11 / 4 |
+| pinch, way B v4 | 44 / 25 / 19 / 25 | 94 / 94 / 88 / 88 | 40 / 33 / 18 / 19 |
+| hook | 50 / 62 / 25 / 31 | — (no hook fits) | 8 / 10 / 4 / 5 |
+| best of the three per scene | 88 / 81 / 44 / 50 | | 52 / 48 / 23 / 23 |
+
+(640 × 480: red mug 25 / 25 / 12 / 25 for the hook, 19 / 12 / 6 / 0 for way B's pinch.)
+
+- Only the red mug can be hooked from the table; the other five either have no hole the
+  fingertips fit through with the palm clear, or (porcelain mug) the hand would go through the
+  table. So hooking is a niche grasp, not a replacement.
+- With rims allowed, the analytic checks find a good light-weight pinch on the red mug (75 %),
+  but it fails as soon as the mug is heavier. From × 2 on, the hook is the best single policy on
+  that mug.
+- The bottom row is what a perfect per-scene chooser between hook and pinch would reach: on the
+  red mug it nearly doubles the best single policy. That chooser is the next step.
+
+![hook vs pinch, all handle objects](media/hook_episodes_v4_s2.png)
+
 ![hook vs pinch video](media/hook_vs_pinch_ACE_Coffee_Mug_Kristen_1.gif)
 
 *The mug at 8 × its weight (2 kg), same scene. Left: way B's pinch. Right: the hook, carried

@@ -759,8 +759,70 @@ Then the mugs are made heavier (× 2 … × 16, up to 4 kg):
 Every hook that lifts the mug as it is still lifts it at 2 kg (8 × its weight); pinches lose
 their hold as the weight grows (on the porcelain mug 1 of 5 still holds at 2 kg). Not a clean
 sweep: on the red mug the only pinch found held up to 4 kg, longer than the hooks, which let go
-around the Franka's 3 kg payload. Next: hanging presentation (the object's orientation is set by
-where it hangs, not commanded: the QR must face the scanner in that pose) and swing-aware carries.
+around the Franka's 3 kg payload.
+
+**Showing a hooked object** (`grasp2show/hanging.py`). A pinched object moves with the hand, so
+the planner picks the object's show pose and the hand follows. A hooked object hangs: gravity
+decides how it sits on the finger, so the planner works the other way round.
+
+1. *Where it hangs*: the hook lift in the floating-gripper simulator, held until the swing has
+   died down, gives the hanging pose relative to the hand. It stays valid as long as the hand
+   keeps its tilt, since turning about the vertical leaves the hanging unchanged.
+2. *Show pose*: the hand turns about the vertical until the QR's horizontal direction points at
+   the scanner; the QR's tilt is whatever the hanging gives. The QR centre goes to the scanner's
+   look-at point, as for a pinch. Reach, collisions (with the object hanging, and swung ± 12°)
+   and QR visibility are then checked, for three carry pitches (below) and both twins.
+3. *Carry*: the Franka's fingertips taper, so a hook passes only a few millimetres of fingertip
+   through the handle; carried level, the handle slid off the tip in the first trials. So the
+   hand first lifts straight up until the mug hangs, then raises its fingers 15–40° (the planner
+   picks the pitch that shows the QR best). The handle slides down the finger to where it
+   thickens and wedges there. During the carry the fingers may not point lower than 15° below
+   that pitch; the planner searches joint moves, via points and Cartesian turns about the
+   vertical until one keeps them up.
+4. *Threading the handle*: a hook has 1–3 mm to spare. The scanned mug settles 1 mm lower and
+   0.6° tilted from its nominal start pose, which was enough for the fingertip to hit the handle
+   and push the mug away. Planning against the settled pose (what a perception system would
+   report) puts the fingertip within 0.1 mm.
+
+A hook is judged by the same scanner as a pinch: QR decoded, object still held, no unexpected
+contact. The swing is reported but not judged, since the object is meant to hang. An input
+shaper against the swing (crane control: the motion split into two halves, the second delayed by
+half the swing period) changed neither the results nor the mug's pose at the scanner on 16
+scenes: after a 2 s hold the swing has died down. It stays in the code, switched off.
+
+**Hook vs pinch, full episodes, heavier and heavier** (`scripts/hook_episodes.py`; the red mug,
+the only one of the three that can be hooked from the table; 16 random start + scanner poses per
+weight; way B v2's pinch choice; the analytic-check pinch policy found no workable grasp on this
+mug in any scene):
+
+| Scanner | Policy | × 1 (0.25 kg) | × 2 | × 4 | × 8 (2 kg) |
+|---|---|---|---|---|---|
+| 640 × 480 | way B pinch | 25 % | 6 % | 0 % | 0 % |
+| 640 × 480 | hook | 25 % | 25 % | 19 % | 25 % |
+| 1280 × 960 | way B pinch | 44 % | 44 % | 12 % | 12 % |
+| 1280 × 960 | hook | **56 %** | **56 %** | **44 %** | **38 %** |
+
+![hook vs pinch](media/hook_episodes_cloud_s2.png)
+
+- **The hook does not care about the weight; the pinch does.** At 8 × the pinch slips in 6
+  scenes and drops the mug in 7.
+- **The 640 × 480 scanner limits both policies.** A 3 cm code hanging at a tilt is about 50–55 px
+  across, and OpenCV decodes it on some frames and not others: re-running the same episode with
+  a tiny change flipped the result both ways, and the unread images I checked all decoded once
+  upscaled 2 ×. With
+  a 1280 × 960 scanner no failure is a QR failure.
+- **What the hook still misses**: in 3 of 16 scenes no hook passes the checks (the handle can
+  only be threaded from two directions, and the hanging tilt can turn the code away from a high
+  or low scanner), and in 2–5 no carry keeps the fingers up and the swinging mug clear. Also, 1–2
+  collisions of the swinging mug with the arm.
+- The other two mugs cannot be hooked from the table: the blue one's handle hole is too tight
+  (no fit lifts it), and on the porcelain one every fitting finger pose puts the 20 cm-wide hand
+  through the table (its handle sits low).
+
+![hook vs pinch video](media/hook_vs_pinch_ACE_Coffee_Mug_Kristen_1.gif)
+
+*The mug at 8 × its weight (2 kg), same scene. Left: way B's pinch. Right: the hook, carried
+with the fingers raised, shown hanging; insets: the scanner's view at the end.*
 
 ## C++ kernels
 
@@ -823,6 +885,9 @@ grasp2show/
   _accel.py        uses the C++ kernels when installed
   experiment.py    grasp-selection policies, scenario setup, episode execution and judging
   heatmap.py       goal-conditioned heatmaps (way A): per-target grasp scores painted on the surface
+  grip_model.py    part 3: holding capacity from every finger contact (LP over friction cones)
+  hooks.py         part 3: handle holes, fingertip placement in them, the common lift test
+  hanging.py       part 3: where a hooked object hangs, its show pose, the hook's carry
   learn/           learned scorer: dataset loading and features (data.py), PointNet model
                    (model.py), the scorer as a grasp-selection policy (policy.py), the heatmap
                    network of way B (dense.py)
@@ -863,7 +928,8 @@ why the choice of grasp at the start fixes the arm configuration at the target.
 - [x] Part 2: transport network: trained on the constraints, 99 % in full episodes (= optimiser), 3 % shorter, 1 ms vs 25 s
 - [x] Part 2: grasp chosen together with the motion (19 % shorter carries, 100 % success)
 - [x] Part 3: 112 objects of many shapes, random scanner poses; way B retrained: 61 % (87 % on boxes) vs 47 % for the checks
-- [ ] Part 3: grip model with every finger contact; hanging grasps; swing-aware carries; fine-tuning in simulation
+- [x] Part 3: grip model with every finger contact; hook grasps shown hanging (hook vs pinch with weight)
+- [ ] Part 3: turning an object so its handle can be reached; fine-tuning in simulation
 - [ ] v2: dexterous hand · v3: regrasp · v4: unknown shape · v5: explore, then show
 
 ## Related work

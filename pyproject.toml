@@ -21,6 +21,7 @@ dependencies = [
   "imageio-ffmpeg",
   "trimesh",
   "rtree",          # trimesh ray casting
+  "shapely",        # hooks: fingertip cross-sections in a handle hole
   "matplotlib",
   "h5py",
 ]

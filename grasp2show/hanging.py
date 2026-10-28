@@ -189,6 +189,7 @@ class HookOption:
     vis: Visibility | None = None
     why: str = ""
     T_start: np.ndarray | None = None   # where the object lies (world)
+    pitch_deg: float = PITCH_UP          # fingers above the horizontal while carrying
 
     @property
     def ok(self) -> bool:
@@ -196,54 +197,88 @@ class HookOption:
 
 
 def hook_options(fc: FeasibilityChecker, sim: GripperSim, hooks: list[dict], mass_scale: float = 1.0,
-                 pregrasp: float = 0.10, T_start: np.ndarray | None = None) -> list[HookOption]:
-    """Every hook (dicts T, width from hooks.fit_hook_poses), both twins: where it hangs, then the
-    show pose and the reach / collision / visibility checks. T_start: where the object lies (a
-    hook has 1-3 mm to spare, so pass the settled pose, PickAndShow.resting_pose; default: the
-    nominal start pose). Sorted: feasible first, then by the view angle of the QR."""
+                 pregrasp: float = 0.10, T_start: np.ndarray | None = None,
+                 pitches=(15.0, PITCH_UP, 40.0)) -> list[HookOption]:
+    """Every hook (dicts T, width from hooks.fit_hook_poses), both twins: reach and collisions at
+    the grasp; then for each carry pitch (how far the fingers are raised; it changes where the
+    handle rests on the finger, so how the object hangs and which way its QR faces) where it
+    hangs, the show pose and the reach / collision / visibility checks; the best pitch and turn
+    are kept. T_start: where the object lies (a hook has 1-3 mm to spare, so pass the settled
+    pose, PickAndShow.resting_pose; default: the nominal start pose). Sorted: feasible first, then
+    by the QR's size in the scanner image."""
     cfg, obj = fc.cfg, fc.obj
     T_start = start_pose(cfg, obj) if T_start is None else T_start
     out = []
     for i, h in enumerate(hooks):
         for k, Tg in enumerate((h["T"], twin_of(h["T"]))):
             w = float(h["width"])
-            hang = settle(sim, Tg, w, mass_scale)
-            if hang.T_tcp_obj is None:
-                out.append(HookOption(i, k, Tg, w, hang, why="falls off"))
-                continue
             T_grasp = T_start @ Tg
             T_pre = T_grasp @ make_T(np.eye(3), [0, 0, -pregrasp])
             S = ik(np.stack([T_grasp, T_pre]), fc.q7)
             start = fc._reach(S[0], w, T_start, holding=False)
             pre = fc._reach(S[1], w, T_start, holding=False, q_ref=start.q if start.ok else None)
             if not (start.ok and pre.ok):
-                out.append(HookOption(i, k, Tg, w, hang, start=start, pre=pre,
+                out.append(HookOption(i, k, Tg, w, Hang(None, np.nan, np.nan), start=start, pre=pre,
                                       why="grasp unreachable" if not start.ok else "pre-grasp unreachable"))
                 continue
-            # show_targets works in the object's upright frame: the object's start yaw is a turn
-            # about the vertical, which changes nothing in the hanging
-            best = None
-            for extra, T_show, T_obj in show_targets(cfg, obj, hang.T_carry[:3, :3], hang.T_tcp_obj):
-                Ss = ik(T_show[None], fc.q7)[0]
-                reach = fc._reach(Ss, w, T_obj, holding=True, q_ref=start.q)
-                if not reach.ok:
+            best, hang = None, None
+            for pitch in pitches:
+                hang = settle(sim, Tg, w, mass_scale, pitch_deg=pitch)
+                if hang.T_tcp_obj is None:
                     continue
-                vis = fc.visibility(reach.q, w, T_obj)
-                opt = HookOption(i, k, Tg, w, hang, extra, T_show, T_obj, start, pre, reach, vis, T_start=T_start)
-                if best is None or (vis.ok(), -vis.angle_deg) > (best.vis.ok(), -best.vis.angle_deg):
-                    best = opt
-            out.append(best or HookOption(i, k, Tg, w, hang, start=start, pre=pre, why="show pose unreachable"))
-    return sorted(out, key=lambda o: (not o.ok, o.vis.angle_deg if o.vis else 1e3))
+                # show_targets works in the object's upright frame: the object's start yaw is a turn
+                # about the vertical, which changes nothing in the hanging
+                for extra, T_show, T_obj in show_targets(cfg, obj, hang.T_carry[:3, :3], hang.T_tcp_obj):
+                    Ss = ik(T_show[None], fc.q7)[0]
+                    reach = fc._reach(Ss, w, T_obj, holding=True, q_ref=start.q)
+                    if not reach.ok:
+                        continue
+                    vis = fc.visibility(reach.q, w, T_obj)
+                    opt = HookOption(i, k, Tg, w, hang, extra, T_show, T_obj, start, pre, reach, vis,
+                                     T_start=T_start, pitch_deg=pitch)
+                    if best is None or (vis.ok(), vis.pixels) > (best.vis.ok(), best.vis.pixels):
+                        best = opt
+            if best is None:
+                why = "falls off" if hang is None or hang.T_tcp_obj is None else "show pose unreachable"
+                best = HookOption(i, k, Tg, w, hang, start=start, pre=pre, why=why)
+            out.append(best)
+    return sorted(out, key=lambda o: (not o.ok, -(o.vis.pixels if o.vis else 0.0)))
 
 
 HOOK_SPEED = 0.6   # hooks carry at 0.6 x the pinch speed: the object swings on a few mm of fingertip
+SWING = 12.0       # deg: collision margin for the swing, about the finger axis
 
 
-def plan_hook(ep, fc: FeasibilityChecker, o: HookOption):
+def _rot_axis(axis, a: float) -> np.ndarray:
+    k = np.asarray(axis, float) / np.linalg.norm(axis)
+    K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + np.sin(a) * K + (1 - np.cos(a)) * K @ K
+
+
+def swing_period(obj, T_tcp_obj: np.ndarray, g: float = 9.81) -> float:
+    """Period (s) of the hanging object swinging about the finger (the TCP's z axis): a physical
+    pendulum, T = 2 pi sqrt(I_axis / (m g r)), r = distance from the COM to the finger axis."""
+    com = T_tcp_obj[:3, :3] @ np.asarray(obj.com) + T_tcp_obj[:3, 3]
+    r = float(np.linalg.norm(com[:2]))
+    k = T_tcp_obj[:3, :3].T @ np.array([0.0, 0.0, 1.0])            # the finger axis, object frame
+    I_axis = float(k @ np.asarray(obj.inertia) @ k) + obj.mass * r ** 2
+    return float(2 * np.pi * np.sqrt(I_axis / (obj.mass * g * max(r, 1e-3))))
+
+
+def plan_hook(ep, fc: FeasibilityChecker, o: HookOption, shape: bool = False):
     """Joint paths for a hook option (episode.PickAndShow.plan_analytic): the lift ends in the carry
-    pose (fingers raised), the carry keeps the fingers at least 10 deg above the horizontal, the
-    held object hangs as found by settle(). Returns (paths, None) or (None, reason)."""
-    return ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, checker=fc, width=o.width, T_show=o.T_show,
-                            T_tcp_held=o.hang.T_tcp_obj, open_width=o.width,
-                            finger_floor=float(np.sin(np.radians(PITCH_UP - 15.0))),
-                            T_lift=o.T_start @ o.hang.T_carry, T_start=o.T_start)
+    pose (fingers raised), the carry keeps them at most 15 deg below that pitch (and not down), the
+    held object hangs as found by settle() (and is checked swung by +-SWING deg). shape: the carry
+    is input-shaped against the swing (episode: paths["shaper_delay"]); off by default: on 16
+    scenes it changed neither the successes nor the object's deviation at the scanner (the swing
+    has died down after the 2 s hold; what remains is a static offset of the hanging pose). Returns (paths, None) or
+    (None, reason)."""
+    # the object swings on the finger while carried: check it hanging as found and swung +-SWING deg
+    swung = [make_T(_rot_axis([0.0, 0.0, 1.0], np.radians(a)), [0, 0, 0]) @ o.hang.T_tcp_obj for a in (-SWING, SWING)]
+    paths, why = ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, checker=fc, width=o.width, T_show=o.T_show,
+                                  T_tcp_held=[o.hang.T_tcp_obj, *swung], open_width=o.width,
+                                  finger_floor=float(np.sin(np.radians(max(o.pitch_deg - 15.0, 0.0)))),
+                                  T_lift=o.T_start @ o.hang.T_carry, T_start=o.T_start)
+    if paths is not None and shape:
+        paths["shaper_delay"] = 0.5 * swing_period(fc.obj, o.hang.T_tcp_obj)
+    return paths, why

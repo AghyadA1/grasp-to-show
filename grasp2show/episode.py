@@ -203,7 +203,7 @@ class PickAndShow:
         away = T_show[:3, 3] - np.asarray(self.cfg.camera.pos)
         T_preshow = T_show.copy()
         T_preshow[:3, 3] += 0.08 * away / np.linalg.norm(away)
-        T_tcp_obj = inv_T(T_obj_tcp) if T_tcp_held is None else T_tcp_held
+        T_tcp_obj = inv_T(T_obj_tcp) if T_tcp_held is None else T_tcp_held   # may be a list (all checked)
         if open_width is None:
             open_width = min(width + 0.02, self.cfg.gripper.max_width)
 
@@ -212,12 +212,13 @@ class PickAndShow:
                 return True
             gap = width if holding else open_width
             T_held = T_tcp_obj if T_held is None else T_held
+            helds = T_held if isinstance(T_held, list) else [T_held]
             for s in np.linspace(0, 1, n):
                 q = (1 - s) * qa + s * qb
-                T_obj = fk(q) @ T_held if holding else T_start
-                checker._set(q, gap, T_obj)
-                if checker._bad_contacts(holding):
-                    return False
+                for Th in helds if holding else [None]:
+                    checker._set(q, gap, fk(q) @ Th if holding else T_start)
+                    if checker._bad_contacts(holding):
+                        return False
             return True
 
         q_pre = self.nearest_ik(T_pre, q_start)
@@ -451,6 +452,17 @@ class PickAndShow:
                                          make_T(d.site_xmat[tcp_id].reshape(3, 3), d.site_xpos[tcp_id]),
                                          make_T(d.xmat[obj_id].reshape(3, 3), d.xpos[obj_id])))
 
+        def shaped(q_traj):
+            """paths["shaper_delay"] (s): a zero-vibration input shaper for a hanging object: the
+            motion is split into two half-size copies, the second delayed by half the swing period,
+            so the swing the first one starts the second one cancels (crane control)."""
+            n = round(paths.get("shaper_delay", 0.0) / dt)
+            if n <= 0:
+                return q_traj
+            padded = np.vstack([q_traj, np.repeat(q_traj[-1:], n, axis=0)])
+            delayed = np.vstack([np.repeat(q_traj[:1], n, axis=0), q_traj])
+            return 0.5 * padded + 0.5 * delayed
+
         def hold(q, width, T):
             follow(np.repeat(np.asarray(q)[None], max(int(T / dt), 1), axis=0), width)
 
@@ -481,8 +493,8 @@ class PickAndShow:
                 traj = np.column_stack([np.interp(t_new, t_src, traj[:, j]) for j in range(traj.shape[1])])
             follow(traj, g_hold)
         else:
-            follow(path_trajectory(paths["transit"], seg["transit"] / speed, dt), g_hold)
-            follow(path_trajectory(paths["present"], seg["present"] / speed, dt), g_hold)
+            follow(shaped(path_trajectory(paths["transit"], seg["transit"] / speed, dt)), g_hold)
+            follow(shaped(path_trajectory(paths["present"], seg["present"] / speed, dt)), g_hold)
         log, state["log"] = state["log"], None
         hold(paths["present"][-1], g_hold, 2.0 if hook else 1.0)   # a hanging object's swing dies down
 

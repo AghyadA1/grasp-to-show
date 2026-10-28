@@ -27,7 +27,8 @@ from .transforms import frame_from_axes, make_T
 class Grasp:
     name: str
     T_obj_tcp: np.ndarray
-    width: float  # object thickness between the fingers (m)
+    width: float  # object thickness between the fingers (m); a hook: the finger gap it is held at
+    kind: str = "pinch"  # "pinch" (closed on the object) or "hook" (fingers through a loop, gap kept)
 
 
 def flipped(grasp: Grasp) -> Grasp:
@@ -41,7 +42,7 @@ def flipped(grasp: Grasp) -> Grasp:
     Rz = np.diag([-1.0, -1.0, 1.0])
     T = grasp.T_obj_tcp.copy()
     T[:3, :3] = T[:3, :3] @ Rz
-    return Grasp(grasp.name + "_flipped", T, grasp.width)
+    return Grasp(grasp.name + "_flipped", T, grasp.width, grasp.kind)
 
 
 def scripted_grasps(cfg: SceneConfig) -> dict[str, Grasp]:

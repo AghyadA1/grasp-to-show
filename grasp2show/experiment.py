@@ -132,9 +132,14 @@ class Scenario:
     """One object at one start pose: feasibility reports and episode execution."""
 
     def __init__(self, asset: str, yaw_deg: float, grasps: dict, n_rolls: int = 12,
-                 start_xy: tuple[float, float] | None = None, camera: CameraConfig | None = None):
+                 start_xy: tuple[float, float] | None = None, camera: CameraConfig | None = None,
+                 mass_scale: float = 1.0):
+        """mass_scale: the object is that many times heavier (density scaled, so the checks and
+        the simulator agree)."""
         self.asset, self.yaw_deg = asset, yaw_deg
         extra = {} if start_xy is None else {"start_xy": tuple(start_xy)}
+        if mass_scale != 1.0:
+            extra["density"] = ObjectConfig().density * mass_scale
         cam = {} if camera is None else {"camera": camera}
         self.cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw_deg), **extra), **cam)
         self.obj = object_from_config(self.cfg.obj)

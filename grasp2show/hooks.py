@@ -283,11 +283,14 @@ def _placed_pose(poly, fit, centre, axis, z_sec: float, tcp_in_poly=(0.0, 0.0)):
     return make_T(np.column_stack([x, y, np.cross(x, y)]), origin)
 
 
-def fit_hook_poses(obj, loops, z_secs=(0.005, -0.004), open_width: float = 0.08, max_holes: int = 2):
+def fit_hook_poses(obj, loops, z_secs=(0.005, -0.004), open_width: float = 0.08, max_holes: int = 2,
+                   turns: int = 4):
     """Hook poses that fit, per distinct hole: both fingers closed through it, and one finger
     through it with the gripper open (the other outside), from both sides, at a few depths and
-    several turns (the palm, wide and behind the fingertips, must also clear the object: the
-    simulated test decides). Each: dict(T, width, kind, depth, clearance)."""
+    several turns (up to `turns` per hole, side, depth and kind; the palm, wide and behind the
+    fingertips, must also clear the object: the simulated test decides; and, on the table, the
+    table: more turns give the arm more ways to reach a handle that sits low). Each: dict(T, width,
+    kind, depth, clearance)."""
     if not loops:
         return []
     P = np.array([lp[0] for lp in loops])
@@ -308,7 +311,7 @@ def fit_hook_poses(obj, loops, z_secs=(0.005, -0.004), open_width: float = 0.08,
             for z, (two, one) in secs.items():
                 for kind, poly, w, tcp_pt in (("two", two, 0.0, (0.0, 0.0)),
                                               ("one", one, open_width, (0.0, -open_width / 2))):
-                    for fit in best_fits(poly, hole, solid):
+                    for fit in best_fits(poly, hole, solid, k=turns):
                         out.append({"T": _placed_pose(poly, fit, centre, axis, z, tcp_pt), "width": w, "kind": kind,
                                     "depth": z, "clearance": fit[3]})
     return out

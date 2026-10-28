@@ -77,7 +77,8 @@ def main() -> int:
     p.add_argument("--v1", type=Path, default=ROOT / "data" / "models" / "heatmap_net.pt")
     p.add_argument("--v2", type=Path, default=ROOT / "data" / "models" / "heatmap_net_v2.pt")
     p.add_argument("--tag", default="way_b_v2", help="outputs: data/episodes_<tag>/, media/<tag>_policy.png")
-    p.add_argument("--v3", type=Path, default=None, help="way B retrained on every-contact labels")
+    p.add_argument("--v3", type=Path, default=None, help="a further way B network to compare")
+    p.add_argument("--v3-name", default="way_b_v3", help="its name in the outputs (e.g. way_b_v4)")
     p.add_argument("--grip-model", choices=["point", "all"], default="point")
     p.add_argument("--u-ok", type=float, default=0.8, help="every-contact model: holds if u below this")
     p.add_argument("--checks-only", action="store_true", help="only the checks policy (threshold sweeps)")
@@ -90,8 +91,8 @@ def main() -> int:
     test = [n for n in oset["test"] if (GRASPS / f"{n}.npz").exists()][: args.objects]
     models = {"way_b_v1": args.v1, "way_b_v2": args.v2}
     if args.v3:
-        models["way_b_v3"] = args.v3
-        POLICIES.append("way_b_v3")
+        models[args.v3_name] = args.v3
+        POLICIES.append(args.v3_name)
     if args.checks_only:
         models = {}
         del POLICIES[1:]
@@ -151,17 +152,19 @@ def plot(s, path):
 
     labels = {"checks": "analytic checks", "way_b_v1": "way B, trained on\nboxes, fixed scanner",
               "way_b_v2": "way B, retrained on\nmany shapes, random scanner",
-              "way_b_v3": "way B, retrained on\nevery-contact labels"}
-    cols = {"checks": "#9aa5b1", "way_b_v1": "#e07a2f", "way_b_v2": "#1d4e6e", "way_b_v3": "#3f8f6b"}
+              "way_b_v3": "way B, retrained on\nevery-contact labels",
+              "way_b_v4": "way B, retrained with\nthin walls (rims)"}
+    cols = {"checks": "#9aa5b1", "way_b_v1": "#e07a2f", "way_b_v2": "#1d4e6e", "way_b_v3": "#3f8f6b",
+            "way_b_v4": "#7a5ba6"}
     pols = [p for p in POLICIES if p in s["policies"]]
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.8), gridspec_kw={"width_ratios": [1, 1.2]})
     for i, pol in enumerate(pols):
         d = s["policies"][pol]
-        ax[0].bar(i, d["success"], 0.6, color=cols[pol])
+        ax[0].bar(i, d["success"], 0.6, color=cols.get(pol, "#555555"))
         ax[0].errorbar(i, d["success"], yerr=[[d["success"] - d["ci95"][0]], [d["ci95"][1] - d["success"]]], c="k",
                        capsize=3, lw=1)
         ax[0].text(i, d["ci95"][1] + 0.02, f"{d['success']:.0%}", ha="center", fontsize=9)
-    ax[0].set_xticks(range(len(pols)), [labels[p] for p in pols], fontsize=8)
+    ax[0].set_xticks(range(len(pols)), [labels.get(p, p) for p in pols], fontsize=8)
     ax[0].set_ylim(0, 1.1)
     ax[0].set_ylabel("task success (95 % CI)")
     ax[0].set_title(f"{s['scenes']} scenes: {s['objects']} unseen objects, unseen scanner poses", fontsize=9)
@@ -169,7 +172,7 @@ def plot(s, path):
     w = 0.8 / len(pols)
     for i, pol in enumerate(pols):
         v = [s["policies"][pol]["by_class"].get(c, 0) for c in classes]
-        ax[1].bar(np.arange(len(classes)) + (i - (len(pols) - 1) / 2) * w, v, w, color=cols[pol], label=labels[pol].replace("\n", " "))
+        ax[1].bar(np.arange(len(classes)) + (i - (len(pols) - 1) / 2) * w, v, w, color=cols.get(pol, "#555555"), label=labels.get(pol, pol).replace("\n", " "))
         for x, y in zip(np.arange(len(classes)) + (i - (len(pols) - 1) / 2) * w, v):
             ax[1].text(x, y + 0.02, f"{y:.0%}", ha="center", fontsize=7)
     ax[1].set_xticks(range(len(classes)), classes, fontsize=9)

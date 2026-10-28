@@ -61,7 +61,7 @@ def plot_labels(obj, cand, success, path: Path, title: str, max_lines: int = 150
 
 
 def process(job: tuple[str, int, int, int, int, bool]) -> dict:
-    name, n_pairs, n_approach, max_tests, seed, resume = job
+    name, n_pairs, n_approach, max_tests, seed, resume, min_width = job
     t0 = time.perf_counter()
     if resume and (OUT / f"{name}.npz").exists():           # done in an earlier, interrupted run
         z = np.load(OUT / f"{name}.npz")
@@ -73,7 +73,7 @@ def process(job: tuple[str, int, int, int, int, bool]) -> dict:
     obj = object_from_config(cfg.obj)
     sim = GripperSim(cfg, obj)
     rng = np.random.default_rng(seed)
-    p1, p2 = sample_antipodal(obj.mesh, n_pairs, rng)
+    p1, p2 = sample_antipodal(obj.mesh, n_pairs, rng, min_width=min_width)
     cand = candidates_from_pairs(p1, p2, n_approach, rng)
     n_sampled = len(cand)
     free = np.array([not sim.in_collision(T, w) for T, w in zip(cand.T_obj_tcp, cand.width)], bool)
@@ -121,6 +121,8 @@ def main() -> int:
     p.add_argument("--max-tests", type=int, default=300, help="shake tests per object")
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--min-width", type=float, default=0.008,
+                   help="smallest distance between the two contacts (0.002 lets thin walls in: a mug's rim)")
     p.add_argument("--resume", action="store_true", help="reuse objects already labelled (after an interruption)")
     p.add_argument("--prune", action="store_true",
                    help="remove objects with no grasp that lifts from the active object set (pickability)")
@@ -130,7 +132,8 @@ def main() -> int:
     names = oset["objects"] if args.split == "all" else oset[args.split]
     names = names[: args.objects]
     (OUT / "plots").mkdir(parents=True, exist_ok=True)
-    jobs = [(n, args.pairs, args.approaches, args.max_tests, args.seed + i, args.resume) for i, n in enumerate(names)]
+    jobs = [(n, args.pairs, args.approaches, args.max_tests, args.seed + i, args.resume, args.min_width)
+            for i, n in enumerate(names)]
     print(f"{len(jobs)} objects on {args.workers} workers")
     t0 = time.perf_counter()
     rows = []

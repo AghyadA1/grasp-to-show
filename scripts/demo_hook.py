@@ -4,13 +4,14 @@ Both runs are the same scene (start pose, scanner pose) as scripts/hook_episodes
 object made `--mass` times heavier. Left: way B's pinch; right: the hook planner
 (grasp2show/hanging.py). The scanner's last image is inset in each view.
 
-Usage:  $env:G2S_OBJECT_SET="v2"; python scripts/demo_hook.py --scene 3 --mass 8
+Usage:  $env:G2S_OBJECT_SET="v2"; python scripts/demo_hook.py --scene 13 --mass 8 --scanner-scale 2
 Outputs: media/hook_vs_pinch_<object>.mp4 and .gif
 """
 from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import cv2
@@ -92,12 +93,12 @@ def render(sc, qs, res, title):
     out = []
     inset = None
     if res is not None and res.scanner_rgb is not None:
-        inset = cv2.resize(res.scanner_rgb, (W // 3, H // 3))
+        inset = cv2.resize(res.scanner_rgb, (W // 3, H // 3), interpolation=cv2.INTER_AREA)
     for i, q in enumerate(qs):
         d.qpos[:] = q
         mujoco.mj_forward(m, d)
         r.update_scene(d, camera=cam)
-        img = r.render().copy()
+        img = cv2.resize(r.render(), (W, H), interpolation=cv2.INTER_AREA)
         cv2.putText(img, title, (12, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
         if i >= len(qs) - 45 and inset is not None:          # the last 1.5 s: what the scanner saw
             img[H - inset.shape[0] - 8:H - 8, W - inset.shape[1] - 8:W - 8] = inset
@@ -118,9 +119,12 @@ def main() -> int:
     p.add_argument("--mass", type=float, default=8)
     p.add_argument("--way-b", type=Path, default=ROOT / "data" / "models" / "heatmap_net_v2.pt")
     p.add_argument("--clouds", type=Path, default=ROOT / "data" / "dataset_v2" / "clouds.npz")
+    p.add_argument("--scanner-scale", type=float, default=1.0, help="scanner resolution x this")
     p.add_argument("--fps", type=int, default=30)
     args = p.parse_args()
     yaw, xy, cam = scene(args.object, args.scene)
+    if args.scanner_scale != 1:
+        cam = replace(cam, width=int(cam.width * args.scanner_scale), height=int(cam.height * args.scanner_scale))
     fp, fh = [], []
     sp, rp = run_pinch(args.object, yaw, xy, cam, args.mass, args.way_b, args.clouds, fp)
     kg = f"{sp.obj.mass:.1f} kg"

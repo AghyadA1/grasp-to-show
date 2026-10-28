@@ -726,8 +726,22 @@ evenly from the three shape classes, a random orientation per test, friction 0.1
 Calibration: of the grasps with u < 0.5, 99 % hold; 0.5–0.75: 77 %; 0.75–1: 47 %; above 1.5,
 almost none. The model is somewhat optimistic near u = 1 (the simulator's soft contacts creep),
 so the planning limit u ≤ 0.7 keeps its role. Only 1 % of the sampled grasps touched the palm:
-the antipodal sampler proposes pinches. Hooking needs its own grasps (closed fingers through a
-handle), next.
+the antipodal sampler proposes pinches.
+
+**But it does not improve full episodes.** Labels from it (hold at the presentation pose if
+u < 0.8) doubled the share of "workable" grasps and way B retrained on them got worse (51 % vs
+62 %, twice the slips): near u = 1 the model is optimistic, and the episode adds the carry's
+accelerations. With stricter thresholds the analytic checks policy is unchanged within noise
+(u < 0.4: 45 %, < 0.55: 46 %, the point model: 47 %): in full episodes the hold check is not the
+bottleneck; "no workable grasp at all" and collisions during the motion are. Way B keeps its
+point-model labels (v2); the new model stays for what needs it (carrying curved objects).
+
+**Hooking** (`grasp2show/hooks.py`): a loop finder (points the object surrounds in a ring that a
+rod of closed fingers can pass through) and a simulated hook test. On the scanned mugs it finds
+the handle holes, but the Franka Hand cannot use them: its closed fingers form a 2.1 × 5.3 cm
+block (each finger link is 2.6 cm deep), one finger alone 2.1 × 2.6 cm, while a mug's handle hole
+is about 2 × 5 cm (1.8 cm across in the simulator's convex collision parts). Hooking needs a
+thinner fingertip.
 
 ## C++ kernels
 

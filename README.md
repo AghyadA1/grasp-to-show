@@ -736,12 +736,31 @@ accelerations. With stricter thresholds the analytic checks policy is unchanged 
 bottleneck; "no workable grasp at all" and collisions during the motion are. Way B keeps its
 point-model labels (v2); the new model stays for what needs it (carrying curved objects).
 
-**Hooking** (`grasp2show/hooks.py`): a loop finder (points the object surrounds in a ring that a
-rod of closed fingers can pass through) and a simulated hook test. On the scanned mugs it finds
-the handle holes, but the Franka Hand cannot use them: its closed fingers form a 2.1 × 5.3 cm
-block (each finger link is 2.6 cm deep), one finger alone 2.1 × 2.6 cm, while a mug's handle hole
-is about 2 × 5 cm (1.8 cm across in the simulator's convex collision parts). Hooking needs a
-thinner fingertip.
+**Hooking** (`grasp2show/hooks.py`): find the holes a fingertip can pass through (points the
+object surrounds in a ring, with the line through them free on both sides, so not the inside of a
+cup), cut each hole with a plane and place the fingertips' cross-section in it, from the
+simulator's own finger geometry, turned for the most clearance. The fingers taper: 5 mm in front
+of the TCP both closed fingertips are 1.8 × 3.1 cm (2.1 × 5.3 cm at the base); one finger alone
+fits even a tight handle (the other stays outside, gripper open).
+
+![fit](media/hook_fit.png)
+
+In simulation (`scripts/hook_strength.py`; same lift for every grasp: gravity on, lift 10 cm,
+hold), hooks lift two of the three mugs (6 and 2 working hooks, mostly one finger through the
+handle; the third mug's hole is too tight once the palm must also clear the body). The mug swings
+until it hangs below the finger:
+
+![hook](media/hook_ACE_Coffee_Mug_Kristen_1.png)
+
+Then the mugs are made heavier (× 2 … × 16, up to 4 kg):
+
+![strength](media/hook_strength.png)
+
+Every hook that lifts the mug as it is still lifts it at 2 kg (8 × its weight); pinches lose
+their hold as the weight grows (on the porcelain mug 1 of 5 still holds at 2 kg). Not a clean
+sweep: on the red mug the only pinch found held up to 4 kg, longer than the hooks, which let go
+around the Franka's 3 kg payload. Next: hanging presentation (the object's orientation is set by
+where it hangs, not commanded: the QR must face the scanner in that pose) and swing-aware carries.
 
 ## C++ kernels
 

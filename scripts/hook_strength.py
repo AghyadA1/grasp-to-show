@@ -63,22 +63,34 @@ def run(name: str) -> dict:
 
 
 def render(sim, obj, hook, path):
+    """GIF of one hook lift, seen from the side of the fingers (along the hand's x axis, so the
+    palm does not hide the handle), plus a still of the start and the end next to each other."""
     import imageio.v2 as imageio
 
-    r = mujoco.Renderer(sim.model, 360, 480)
+    m = sim.model
+    m.vis.headlight.ambient[:] = 0.45
+    m.vis.headlight.diffuse[:] = 0.75
+    r = mujoco.Renderer(m, 400, 400)
+    T = hook["T"]
+    view = T[:3, 0] if T[2, 0] < 0.5 else -T[:3, 0]       # the side of the fingers, not from below
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    cam.lookat[:] = obj.mesh.bounds.mean(0) + [0, 0, 0.05]
-    cam.distance, cam.azimuth, cam.elevation = 0.45, 135.0, -15.0
+    cam.lookat[:] = T[:3, 3] - 0.02 * T[:3, 2] + [0, 0, 0.05]
+    cam.distance = 0.42
+    cam.azimuth = float(np.degrees(np.arctan2(view[1], view[0])))
+    cam.elevation = -12.0
     frames = []
-    lift_test(sim, hook["T"], hook["width"], close=False, frames=frames, renderer=r, camera=cam)
+    lift_test(sim, T, hook["width"], close=False, frames=frames, renderer=r, camera=cam)
+    bg = np.array([238, 240, 243], np.uint8)
+    frames = [np.where(f.sum(-1, keepdims=True) == 0, bg, f) for f in frames]
     imageio.mimsave(path, frames[::2], duration=0.1, loop=0)
+    imageio.imwrite(path.with_suffix(".png"), np.hstack([frames[1], frames[-1]]))
     r.close()
 
 
 def main() -> int:
     oset = load_object_set()
-    names = oset.get("handle_candidates", [])
+    names = sys.argv[1:] or oset.get("handle_candidates", [])
     OUT.mkdir(parents=True, exist_ok=True)
     with Pool(max(1, min(len(names), (os.cpu_count() or 2) - 1))) as pool:
         rows = pool.map(run, names)
@@ -106,6 +118,8 @@ def plot(rows, path):
         ax.plot(kg, np.array(r["held"]["pinch"]) / r["pinches"], "o-", c="#e07a2f", label=f"pinch ({r['pinches']})")
         ax.axvline(3.0, ls=":", c="0.5")
         ax.set_xscale("log")
+        ax.set_xticks([0.25, 0.5, 1, 2, 4], ["0.25", "0.5", "1", "2", "4"])
+        ax.minorticks_off()
         ax.set_ylim(-0.05, 1.05)
         ax.set_xlabel("object mass (kg); dotted: Franka payload")
         ax.set_title(r["object"].replace("_", " ")[:30], fontsize=8)

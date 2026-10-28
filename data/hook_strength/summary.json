@@ -1,0 +1,172 @@
+{
+ "scales": [
+  1,
+  2,
+  4,
+  8,
+  12,
+  16
+ ],
+ "objects": [
+  {
+   "object": "ACE_Coffee_Mug_Kristen_16_oz_cup",
+   "mass_kg": 0.249,
+   "hooks": 6,
+   "pinches": 1,
+   "hook_kinds": [
+    "one",
+    "one",
+    "two",
+    "two",
+    "one",
+    "one"
+   ],
+   "held": {
+    "hook": [
+     6,
+     6,
+     6,
+     6,
+     2,
+     0
+    ],
+    "pinch": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ]
+   }
+  },
+  {
+   "object": "Aroma_Stainless_Steel_Milk_Frother_2_Cup",
+   "mass_kg": 0.544,
+   "hooks": 0,
+   "pinches": 8,
+   "hook_kinds": [],
+   "held": {
+    "hook": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "pinch": [
+     8,
+     4,
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "object": "BIA_Porcelain_Ramekin_With_Glazed_Rim_35_45_oz_cup",
+   "mass_kg": 0.07,
+   "hooks": 0,
+   "pinches": 8,
+   "hook_kinds": [],
+   "held": {
+    "hook": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "pinch": [
+     8,
+     8,
+     8,
+     6,
+     4,
+     4
+    ]
+   }
+  },
+  {
+   "object": "Cole_Hardware_Mug_Classic_Blue",
+   "mass_kg": 0.348,
+   "hooks": 0,
+   "pinches": 8,
+   "hook_kinds": [],
+   "held": {
+    "hook": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "pinch": [
+     8,
+     5,
+     3,
+     2,
+     2,
+     0
+    ]
+   }
+  },
+  {
+   "object": "Squirt_Strain_Fruit_Basket",
+   "mass_kg": 0.169,
+   "hooks": 0,
+   "pinches": 8,
+   "hook_kinds": [],
+   "held": {
+    "hook": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "pinch": [
+     8,
+     8,
+     7,
+     6,
+     3,
+     2
+    ]
+   }
+  },
+  {
+   "object": "Threshold_Porcelain_Coffee_Mug_All_Over_Bead_White",
+   "mass_kg": 0.246,
+   "hooks": 2,
+   "pinches": 5,
+   "hook_kinds": [
+    "one",
+    "one"
+   ],
+   "held": {
+    "hook": [
+     2,
+     2,
+     2,
+     2,
+     0,
+     0
+    ],
+    "pinch": [
+     5,
+     4,
+     2,
+     1,
+     1,
+     0
+    ]
+   }
+  }
+ ]
+}

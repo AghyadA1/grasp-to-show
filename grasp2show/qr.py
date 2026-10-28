@@ -54,7 +54,10 @@ def decode_qr(rgb: np.ndarray) -> tuple[str | None, np.ndarray | None]:
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     points = None
     for det in _DETECTORS:
-        text, pts, _ = det.detectAndDecode(bgr)
+        try:
+            text, pts, _ = det.detectAndDecode(bgr)
+        except cv2.error:          # rare internal failure on some images (seen on Windows): no read
+            continue
         if text:
             return text, pts
         points = pts if pts is not None else points

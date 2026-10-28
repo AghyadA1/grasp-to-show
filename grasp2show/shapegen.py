@@ -401,7 +401,34 @@ def generate(seed: int) -> Generated | None:
     lo = g.mesh.bounds[0]
     if lo[2] < -1e-6:                                         # nothing below the base
         return None
+    if not connected(g.pieces):                               # every piece must hang together
+        return None
     return g
+
+
+def _touch(a: trimesh.Trimesh, b: trimesh.Trimesh, tol: float = 0.001) -> bool:
+    """Do two convex pieces overlap or touch (within tol)? Exact enough for convex hulls: a
+    vertex of one inside the other, or the closest surface points closer than tol."""
+    if not (np.all(a.bounds[0] - tol <= b.bounds[1]) and np.all(b.bounds[0] - tol <= a.bounds[1])):
+        return False
+    if a.contains(b.vertices).any() or b.contains(a.vertices).any():
+        return True
+    pts = np.vstack([b.vertices, trimesh.sample.sample_surface(b, 200, seed=0)[0]])
+    _, d, _ = trimesh.proximity.closest_point(a, pts)
+    return bool(d.min() < tol)
+
+
+def connected(pieces: list[trimesh.Trimesh]) -> bool:
+    """Is the object one piece? (Each convex part touches the rest, starting from the first body
+    part: a handle floating above its body, or a part of a cluster off on its own, fails.)"""
+    seen, todo = {0}, [0]
+    while todo:
+        i = todo.pop()
+        for j in range(len(pieces)):
+            if j not in seen and _touch(pieces[i], pieces[j]):
+                seen.add(j)
+                todo.append(j)
+    return len(seen) == len(pieces)
 
 
 def _hsv(h, s, v):

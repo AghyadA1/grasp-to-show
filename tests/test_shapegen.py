@@ -3,7 +3,7 @@ import json
 
 import numpy as np
 
-from grasp2show.shapegen import generate, mass_properties, write
+from grasp2show.shapegen import connected, generate, mass_properties, write
 
 
 def test_generated_objects_are_convex_pieces_standing_on_the_table(tmp_path):
@@ -16,6 +16,7 @@ def test_generated_objects_are_convex_pieces_standing_on_the_table(tmp_path):
         for p in g.pieces:                                                 # exact collision geometry
             assert p.is_watertight and np.isclose(p.volume, p.convex_hull.volume, rtol=1e-6)
         assert g.mesh.bounds[0, 2] >= -1e-6                                 # nothing below the base
+        assert connected(g.pieces)                                          # no floating handle
         props = write(g, tmp_path, density=600.0)
         if props is None:
             continue
@@ -41,3 +42,14 @@ def test_mass_properties_of_one_box_match_the_formula():
     assert np.isclose(m, 6.0)
     assert np.allclose(com, 0.0)
     assert np.allclose(np.diag(I), m / 12 * np.array([0.2**2 + 0.3**2, 0.1**2 + 0.3**2, 0.1**2 + 0.2**2]))
+
+
+def test_a_floating_handle_is_rejected():
+    import trimesh
+
+    body = trimesh.creation.box(extents=[0.1, 0.1, 0.1])
+    on_top = trimesh.creation.box(extents=[0.02, 0.02, 0.02])
+    on_top.apply_translation([0, 0, 0.0595])                               # overlaps the top by 0.5 mm
+    floating = on_top.copy()
+    floating.apply_translation([0, 0, 0.01])                               # 1 cm above it
+    assert connected([body, on_top]) and not connected([body, floating])

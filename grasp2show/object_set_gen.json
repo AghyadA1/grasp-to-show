@@ -106,7 +106,7 @@
    "table_ok": 0,
    "hookable": false,
    "kinds": {},
-   "seconds": 0.6
+   "seconds": 1.1
   },
   {
    "name": "gen_00002",
@@ -136,7 +136,7 @@
     "one": 10,
     "two": 2
    },
-   "seconds": 22.4
+   "seconds": 23.1
   },
   {
    "name": "gen_00003",
@@ -165,7 +165,7 @@
     "one": 10,
     "two": 1
    },
-   "seconds": 18.4
+   "seconds": 19.0
   },
   {
    "name": "gen_00004",
@@ -191,7 +191,7 @@
    "table_ok": 0,
    "hookable": false,
    "kinds": {},
-   "seconds": 0.6
+   "seconds": 0.7
   },
   {
    "name": "gen_00006",
@@ -223,7 +223,7 @@
     "one": 9,
     "two": 4
    },
-   "seconds": 26.4
+   "seconds": 26.7
   },
   {
    "name": "gen_00009",
@@ -253,7 +253,7 @@
    "table_ok": 0,
    "hookable": false,
    "kinds": {},
-   "seconds": 0.4
+   "seconds": 0.5
   },
   {
    "name": "gen_00010",
@@ -308,7 +308,7 @@
     "two": 24,
     "one": 16
    },
-   "seconds": 38.4
+   "seconds": 38.7
   },
   {
    "name": "gen_00012",
@@ -341,7 +341,7 @@
    "kinds": {
     "one": 29
    },
-   "seconds": 35.6
+   "seconds": 35.1
   },
   {
    "name": "gen_00014",
@@ -452,7 +452,7 @@
    "kinds": {
     "one": 25
    },
-   "seconds": 36.3
+   "seconds": 37.4
   },
   {
    "name": "gen_00019",
@@ -484,7 +484,7 @@
     "one": 15,
     "two": 4
    },
-   "seconds": 23.5
+   "seconds": 23.6
   },
   {
    "name": "gen_00020",
@@ -515,7 +515,7 @@
     "one": 17,
     "two": 11
    },
-   "seconds": 30.0
+   "seconds": 29.6
   },
   {
    "name": "gen_00021",
@@ -547,7 +547,7 @@
     "one": 8,
     "two": 8
    },
-   "seconds": 31.2
+   "seconds": 33.6
   },
   {
    "name": "gen_00022",
@@ -608,7 +608,7 @@
     "two": 6,
     "one": 7
    },
-   "seconds": 19.4
+   "seconds": 18.4
   },
   {
    "name": "gen_00026",
@@ -638,7 +638,7 @@
     "two": 10,
     "one": 30
    },
-   "seconds": 40.1
+   "seconds": 41.6
   },
   {
    "name": "gen_00027",
@@ -667,7 +667,7 @@
     "two": 20,
     "one": 20
    },
-   "seconds": 41.6
+   "seconds": 43.9
   }
  ]
 }

@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from grasp2show.config import ObjectConfig, SceneConfig
 from grasp2show.gripper_sim import GripperSim
-from grasp2show.hanging import max_penetration, nudge
+from grasp2show.hanging import hand_min_z, max_penetration, nudge
 from grasp2show.hooks import (
     _placed_pose,
     best_fit,
@@ -63,7 +63,7 @@ def diagnose(name: str):
     if lifting:
         h, T = lifting[0]
         sim._reset(np.eye(3), T, h["width"])
-        zmin = _lowest_hand_point(sim)
+        zmin = hand_min_z(sim)
         if zmin < 0:
             return obj, sim, (f"{len(lifting)} hooks fit and lift it, but with the object on the table\n"
                               f"the hand reaches {zmin * 100:.1f} cm below the table top"), T, h["width"], axis
@@ -89,18 +89,6 @@ def diagnose(name: str):
            f"{max_penetration(sim, T, w) * 1000:.1f} mm into the handle" if not clear else
            f"{len(clear)} fits clear the handle, but none lifts the object")
     return obj, sim, why, T, w, axis
-
-
-def _lowest_hand_point(sim) -> float:
-    m, d = sim.model, sim.data
-    zs = []
-    for g in range(m.ngeom):
-        if m.geom_bodyid[g] not in sim._gripper_bodies or m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH:
-            continue
-        mid = m.geom_dataid[g]
-        v = m.mesh_vert[m.mesh_vertadr[mid]:m.mesh_vertadr[mid] + m.mesh_vertnum[mid]]
-        zs.append(((d.geom_xmat[g].reshape(3, 3) @ v.T).T + d.geom_xpos[g])[:, 2].min())
-    return float(min(zs))
 
 
 def render(sim, T, w, axis, obj) -> list[np.ndarray]:

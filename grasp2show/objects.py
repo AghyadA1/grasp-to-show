@@ -39,6 +39,14 @@ def scanned_objects_dir() -> Path:
     return root / "models"
 
 
+GENERATED_DIR = REPO_ROOT / "data" / "generated_objects" / "models"   # grasp2show/shapegen.py
+
+
+def asset_dir(asset: str) -> Path:
+    """Where an object's files are: a generated object (name starting with "gen_") or a scan."""
+    return (GENERATED_DIR if asset.startswith("gen_") else scanned_objects_dir()) / asset
+
+
 def object_set_file() -> Path:
     """The active object set: v1 (40 box-like packages, the default) or, with G2S_OBJECT_SET=v2,
     the set of many shapes (scripts/select_objects_v2.py)."""
@@ -97,6 +105,8 @@ class ObjectModel:
                               contype=0, conaffinity=0, group=2)
             if mat:
                 g.material = mat
+            else:                                   # generated objects: plain colour
+                g.rgba = list(self.rgba)
             for i, f in enumerate(self.collision_files):
                 spec.add_mesh(name=f"{n}_col{i}", file=str(f))
                 body.add_geom(name=f"{n}_col{i}", type=mujoco.mjtGeom.mjGEOM_MESH, meshname=f"{n}_col{i}",
@@ -132,10 +142,23 @@ def make_box(name: str, half_size, mass: float, friction, condim: int, qr_side: 
 
 def make_scanned(asset: str, friction, condim: int, density: float = DEFAULT_DENSITY,
                  name: str = "obj", qr: QRPlacement | None = None) -> ObjectModel:
-    d = scanned_objects_dir() / asset
+    d = asset_dir(asset)
     if not (d / "model.obj").exists():
-        raise FileNotFoundError(f"{d} missing. Run: python scripts/get_objects.py")
+        raise FileNotFoundError(f"{d} missing. Run: python scripts/get_objects.py "
+                                "(generated objects: python scripts/generate_hookable.py)")
     mesh = trimesh.load(d / "model.obj", force="mesh", process=True)
+    props = json.loads((d / "props.json").read_text()) if (d / "props.json").exists() else None
+    if props is not None:                           # a generated object: exact solid, own colour and QR
+        if qr is None and props.get("qr"):
+            qr = QRPlacement.from_dict(props["qr"])
+        xml = (d / "model.xml").read_text()
+        cols = [d / f for f in sorted(set(re.findall(r'file="(model_collision_\d+\.obj)"', xml)),
+                                      key=lambda s: int(re.findall(r"\d+", s)[0]))]
+        if qr is None:
+            raise ValueError(f"{asset}: no QR placement")
+        return ObjectModel(name, mesh, float(props["mass"]), np.asarray(props["com"]), np.asarray(props["inertia"]),
+                           qr, rest_z=float(-mesh.bounds[0, 2]), friction=tuple(friction), condim=condim,
+                           rgba=tuple(props.get("rgba", (0.7, 0.7, 0.7, 1.0))), asset_dir=d, collision_files=cols)
     hull = mesh.convex_hull
     hull.density = density
     mass = float(np.clip(hull.mass, 0.05, 1.5))

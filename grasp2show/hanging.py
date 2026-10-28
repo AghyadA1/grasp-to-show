@@ -18,6 +18,7 @@ fingers. The planner therefore works the other way round:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import mujoco
 import numpy as np
@@ -104,6 +105,21 @@ def settle(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, mass_scale: flo
     finally:
         m.body_mass[body], m.body_inertia[body] = mass0, inertia0
         m.opt.gravity[:] = 0.0
+
+
+def hand_min_z(sim: GripperSim) -> float:
+    """Lowest point of the hand and fingers (world z) in the floating-gripper sim's current state.
+    With the object upright at the origin (base on z = 0) this says whether the hand would go
+    through the table at that grasp."""
+    m, d = sim.model, sim.data
+    zs = []
+    for g in range(m.ngeom):
+        if m.geom_bodyid[g] not in sim._gripper_bodies or m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH:
+            continue
+        mid = m.geom_dataid[g]
+        v = m.mesh_vert[m.mesh_vertadr[mid]:m.mesh_vertadr[mid] + m.mesh_vertnum[mid]]
+        zs.append(((d.geom_xmat[g].reshape(3, 3) @ v.T).T + d.geom_xpos[g])[:, 2].min())
+    return float(min(zs))
 
 
 def max_penetration(sim: GripperSim, T_obj_tcp: np.ndarray, width: float) -> float:
@@ -300,3 +316,52 @@ def plan_hook(ep, fc: FeasibilityChecker, o: HookOption, shape: bool = False):
     if paths is not None and shape:
         paths["shaper_delay"] = 0.5 * swing_period(fc.obj, o.hang.T_tcp_obj)
     return paths, why
+
+
+HOOK_CACHE = Path(__file__).resolve().parents[1] / "data" / "hooks"
+
+
+def hook_library(name: str) -> list[dict]:
+    """Usable hooks of an object and where the object hangs on each (hanging.hang_table), computed
+    once per object (a few minutes) and cached in data/hooks/<name>.npz. Each hook: dict T,
+    width, kind, hangs {(twin, pitch): Hang}."""
+    from .config import ObjectConfig, SceneConfig
+    from .objects import object_from_config
+
+    f = HOOK_CACHE / f"{name}.npz"
+    obj = sim = None
+    if f.exists():
+        z = np.load(f)
+        hooks = [{"T": T, "width": float(w), "kind": str(k)} for T, w, k in zip(z["T"], z["width"], z["kind"])]
+        if "hang_T" in z.files:                          # cached hanging poses
+            for i, h in enumerate(hooks):
+                h["hangs"] = {}
+                for k in range(2):
+                    for j, p in enumerate(z["pitches"]):
+                        ok = not np.isnan(z["hang_T"][i, k, j, 0, 0])
+                        h["hangs"][(k, float(p))] = Hang(z["hang_T"][i, k, j] if ok else None, float(z["swing"][i, k, j]),
+                                                         float(z["tilt"][i, k, j]), z["carry"][i, k, j] if ok else None)
+            return hooks
+    else:
+        obj = object_from_config(ObjectConfig(asset=name))
+        sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
+        hooks = usable_hooks(obj, sim)
+    if sim is None:
+        obj = object_from_config(ObjectConfig(asset=name))
+        sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
+    hang_table(sim, hooks)
+    n, P = len(hooks), len(PITCHES)
+    hang_T, carry = np.full((n, 2, P, 4, 4), np.nan), np.full((n, 2, P, 4, 4), np.nan)
+    swing, tilt = np.full((n, 2, P), np.nan), np.full((n, 2, P), np.nan)
+    for i, h in enumerate(hooks):
+        for k in range(2):
+            for j, p in enumerate(PITCHES):
+                g = h["hangs"][(k, p)]
+                swing[i, k, j], tilt[i, k, j] = g.swing_deg, g.tilt_deg
+                if g.T_tcp_obj is not None:
+                    hang_T[i, k, j], carry[i, k, j] = g.T_tcp_obj, g.T_carry
+    HOOK_CACHE.mkdir(parents=True, exist_ok=True)
+    np.savez(f, T=np.array([h["T"] for h in hooks]).reshape(-1, 4, 4), width=np.array([h["width"] for h in hooks]),
+             kind=np.array([h["kind"] for h in hooks]), pitches=np.array(PITCHES), hang_T=hang_T, carry=carry,
+             swing=swing, tilt=tilt)
+    return hooks

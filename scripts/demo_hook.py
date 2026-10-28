@@ -139,8 +139,9 @@ def main() -> int:
     frames = [np.concatenate([a, b], 1) for a, b in zip(pad(left), pad(right))]
     stem = ROOT / "media" / f"hook_vs_pinch_{args.object[:24]}"
     imageio.mimwrite(f"{stem}.mp4", frames, fps=args.fps, quality=8, macro_block_size=8)
-    small = [cv2.resize(f, (f.shape[1] // 2, f.shape[0] // 2)) for f in frames[::3]]
-    imageio.mimwrite(f"{stem}.gif", small, duration=1000 * 3 / args.fps, loop=0)
+    small = [cv2.resize(f, (f.shape[1] * 2 // 5, f.shape[0] * 2 // 5), interpolation=cv2.INTER_AREA)
+             for f in frames[::5]]                     # README-sized (~3 MB)
+    imageio.mimwrite(f"{stem}.gif", small, duration=1000 * 5 / args.fps, loop=0)
     print(f"wrote {stem}.mp4 and .gif ({n / args.fps:.0f} s)")
     return 0
 

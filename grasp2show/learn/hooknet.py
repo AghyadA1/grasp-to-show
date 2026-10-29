@@ -111,6 +111,57 @@ def labels(cloud: np.ndarray, T: np.ndarray, one: np.ndarray, mask: np.ndarray, 
     return pos, tgt
 
 
+def labels3(cloud: np.ndarray, T: np.ndarray, one: np.ndarray, mask: np.ndarray, fell: np.ndarray,
+            radius: float = LABEL_RADIUS, w_untested: float = 0.15):
+    """Labels from everything the simulator tested (hookteach.Tested), not from rules: positive
+    near the anchor of a hook that lifted (targets: that hook, as `labels`); a real negative near
+    the anchors of hooks that were tried there and fell, unless one lifted close by; and points
+    nothing was tried at are negatives that count little (most of an object's surface cannot be
+    hooked, but no test says so). Colliding placements say nothing about the spot: left out.
+    fell (F, 3): anchors of failed tries. Returns pos (P,), tgt (P, 10), weight (P,)."""
+    pos, tgt = labels(cloud, T, one, mask, radius)
+    weight = np.full(len(cloud), w_untested, np.float32)
+    weight[pos] = 1.0
+    if len(fell):
+        tree = cKDTree(fell)
+        n_fell = np.array([len(x) for x in tree.query_ball_point(cloud[:, :3], radius)])
+        lifted_near = np.zeros(len(cloud), bool)
+        if mask.any():
+            d, _ = cKDTree(anchor(T[mask], one[mask])).query(cloud[:, :3])
+            lifted_near = d < 2 * radius
+        neg = (n_fell > 0) & ~lifted_near
+        weight[neg] = np.where(n_fell[neg] >= 2, 1.0, 0.5)
+    return pos, tgt, weight
+
+
+def visible(points: np.ndarray, cam: np.ndarray, gamma: float = 2.5) -> np.ndarray:
+    """Indices of the points a camera at `cam` sees (Katz, Tal and Basri 2007, hidden point
+    removal: spherical flip about the camera, then a convex hull)."""
+    from scipy.spatial import ConvexHull
+
+    p = points - cam
+    r = np.linalg.norm(p, axis=1, keepdims=True)
+    R = r.max() * 10 ** gamma
+    flipped = p + 2 * (R - r) * p / r
+    hull = ConvexHull(np.vstack([flipped, np.zeros(3)]))
+    return np.setdiff1d(hull.vertices, [len(p)])
+
+
+def view_sample(cloud: np.ndarray, rng: np.random.Generator, n: int = N_POINTS, partial: float = 0.0) -> np.ndarray:
+    """n points of a stored cloud (more points than n): a random subset, or with probability
+    `partial` what one camera sees (0.4-0.9 m away, 15-65 deg up, any side; one view of an
+    object shows about half of it), resampled to n (repeats if too few)."""
+    if rng.random() < partial:
+        az, el = rng.uniform(0, 2 * np.pi), np.radians(rng.uniform(15, 65))
+        dist = rng.uniform(0.4, 0.9)
+        c = cloud[:, :3].mean(0)
+        cam = c + dist * np.array([np.cos(el) * np.cos(az), np.cos(el) * np.sin(az), np.sin(el)])
+        idx = visible(cloud[:, :3], cam)
+        if len(idx) >= n // 4:
+            return cloud[rng.choice(idx, n, replace=len(idx) < n)]
+    return cloud[rng.choice(len(cloud), n, replace=len(cloud) < n)]
+
+
 def augment(cloud: np.ndarray, T: np.ndarray, rng: np.random.Generator):
     """A random turn about the vertical (the object stands on the table at any yaw) and a little
     noise on the points (a camera's cloud is not exact)."""
@@ -125,25 +176,43 @@ def augment(cloud: np.ndarray, T: np.ndarray, rng: np.random.Generator):
 
 
 class HookNet(nn.Module):
-    """Per-point hook probability and hook parameters from the object's point cloud alone."""
+    """Per-point hook probability and hook parameters from the object's point cloud alone.
+    hops=3 adds a third edge convolution whose neighbours are found in feature space (DGCNN's
+    dynamic graph): points far apart that look alike (the two sides of a basket's bail, a rim
+    all around) exchange information, which fixed 3-D neighbourhoods of k points cannot."""
 
-    def __init__(self, k: int = 16):
+    def __init__(self, k: int = 16, hops: int = 2):
         super().__init__()
+        self.hops = hops
         self.edge1 = EdgeConv(6, 64, k)
         self.edge2 = EdgeConv(64, 64, k)
-        self.point_mlp = nn.Sequential(nn.Conv1d(128, 128, 1), nn.BatchNorm1d(128), nn.ReLU(),
+        if hops == 3:
+            self.edge3 = EdgeConv(64, 64, k)
+        c = 64 * hops
+        self.point_mlp = nn.Sequential(nn.Conv1d(c, 128, 1), nn.BatchNorm1d(128), nn.ReLU(),
                                        nn.Conv1d(128, 256, 1), nn.BatchNorm1d(256), nn.ReLU())
-        self.head = nn.Sequential(nn.Conv1d(128 + 256 + 256, 256, 1), nn.BatchNorm1d(256), nn.ReLU(),
+        self.head = nn.Sequential(nn.Conv1d(c + 256 + 256, 256, 1), nn.BatchNorm1d(256), nn.ReLU(),
                                   nn.Dropout(0.2), nn.Conv1d(256, 128, 1), nn.ReLU(), nn.Conv1d(128, N_OUT, 1))
 
     def forward(self, cloud: torch.Tensor) -> torch.Tensor:          # cloud (B, P, 6) -> (B, 11, P)
         xyz = cloud[..., :3]
         x = torch.cat([xyz * 10.0, cloud[..., 3:]], -1).transpose(1, 2)
-        e1 = self.edge1(x, xyz)
-        e2 = self.edge2(e1, xyz)                                       # two hops: a handle's hole is wider than k points
-        f = self.point_mlp(torch.cat([e1, e2], 1))
+        e = [self.edge1(x, xyz)]
+        e.append(self.edge2(e[0], xyz))                                # two hops: a handle's hole is wider than k points
+        if self.hops == 3:
+            e.append(self.edge3(e[1], e[1].transpose(1, 2)))           # neighbours in feature space
+        f = self.point_mlp(torch.cat(e, 1))
         g = f.max(dim=2, keepdim=True).values.expand(-1, -1, f.shape[2])
-        return self.head(torch.cat([e1, e2, f, g], 1))
+        return self.head(torch.cat([*e, f, g], 1))
+
+
+def load_hook_net(path, device="cpu") -> HookNet:
+    """A trained hook network: hook_net.pt (scripts/train_hook_net.py, two hops) or
+    hook_net_self.pt (scripts/self_train_hooks.py, three)."""
+    ck = torch.load(path, map_location=device)
+    net = HookNet(hops=ck.get("hops", 2)).to(device)
+    net.load_state_dict(ck["state"])
+    return net.eval()
 
 
 def split(out: torch.Tensor) -> dict:
@@ -153,8 +222,16 @@ def split(out: torch.Tensor) -> dict:
             "offset": o[..., 7:10] / 10.0, "one_logit": o[..., 10]}
 
 
-def loss_fn(o: dict, pos: torch.Tensor, tgt: torch.Tensor, pos_weight: torch.Tensor) -> tuple[torch.Tensor, dict]:
-    bce = nn.functional.binary_cross_entropy_with_logits(o["logit"], pos.float(), pos_weight=pos_weight)
+def loss_fn(o: dict, pos: torch.Tensor, tgt: torch.Tensor, pos_weight: torch.Tensor,
+            weight: torch.Tensor | None = None) -> tuple[torch.Tensor, dict]:
+    """weight: per-point weight of the hook/no-hook term (labels3: tested points count fully,
+    untested ones a little); None = all 1."""
+    if weight is None:
+        bce = nn.functional.binary_cross_entropy_with_logits(o["logit"], pos.float(), pos_weight=pos_weight)
+    else:
+        el = nn.functional.binary_cross_entropy_with_logits(o["logit"], pos.float(), pos_weight=pos_weight,
+                                                            reduction="none")
+        bce = (el * weight).sum() / weight.sum().clamp(min=1.0)
     parts = {"bce": bce.item()}
     if not pos.any():
         return bce, parts

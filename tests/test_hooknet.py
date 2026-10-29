@@ -44,3 +44,33 @@ def test_predictions_are_valid_hook_poses():
         R = h["T"][:3, :3]
         assert np.allclose(R.T @ R, np.eye(3), atol=1e-5) and np.isclose(np.linalg.det(R), 1.0)
         assert h["width"] in (0.0, OPEN_WIDTH)
+
+
+def test_three_way_labels():
+    from grasp2show.learn.hooknet import labels3
+
+    x = np.linspace(-0.1, 0.1, 201)
+    cloud = np.zeros((201, 6), np.float32)
+    cloud[:, 0], cloud[:, 5] = x, 1.0
+    T = np.tile(np.eye(4), (2, 1, 1))
+    T[0, :3, 3] = [-0.08, 0, 0]                                  # a hook that lifted at x = -0.08
+    one, mask = np.zeros(2, bool), np.array([True, False])
+    fell = np.array([[0.05, 0, 0], [0.051, 0, 0], [0.0, 0, 0]])  # two failed tries at 0.05, one at 0
+    pos, _, w = labels3(cloud, T, one, mask, fell, radius=0.01)
+    at = lambda v: int(np.argmin(np.abs(x - v)))
+    assert pos[at(-0.08)] and w[at(-0.08)] == 1.0
+    assert not pos[at(0.05)] and w[at(0.05)] == 1.0             # a real negative: tried twice, fell
+    assert w[at(0.0)] == 0.5                                      # tried once
+    assert w[at(-0.03)] < 0.5 and not pos[at(-0.03)]              # untested: counts little
+
+
+def test_partial_view_sees_the_near_side():
+    from grasp2show.learn.hooknet import view_sample, visible
+
+    rng = np.random.default_rng(0)
+    p = rng.normal(size=(3000, 3))
+    p = 0.05 * p / np.linalg.norm(p, axis=1, keepdims=True)
+    idx = visible(p, np.array([0.5, 0, 0]))
+    assert 0.3 < len(idx) / len(p) < 0.6 and (p[idx, 0] > -0.01).all()
+    c = np.hstack([p, p / 0.05]).astype(np.float32)
+    assert view_sample(c, rng, n=1024, partial=1.0).shape == (1024, 6)

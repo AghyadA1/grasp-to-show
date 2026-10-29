@@ -25,7 +25,7 @@ import mujoco
 import numpy as np
 import trimesh
 
-from .qr_placement import QRPlacement, find_qr_face
+from .qr_placement import QRPlacement, find_qr_face, find_qr_patch
 from .transforms import make_T, mat_to_quat
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -167,9 +167,11 @@ def make_scanned(asset: str, friction, condim: int, density: float = DEFAULT_DEN
     cols = [d / f for f in sorted(set(re.findall(r'file="(model_collision_\d+\.obj)"', xml)),
                                   key=lambda s: int(re.findall(r"\d+", s)[0]))]
     if qr is None:
-        qr = find_qr_face(mesh)
-        if qr is None:
-            raise ValueError(f"{asset}: no flat face large enough for a QR patch")
+        qr = find_qr_face(mesh) or find_qr_patch(mesh, n_candidates=60)
+        if qr is None:                  # no sticker spot (scissors, rings): fine for hook labels, the
+            top = mesh.bounds[1, 2]     # QR is only used when showing; a nominal one on top, facing up
+            c = mesh.bounds.mean(0)
+            qr = QRPlacement(make_T(np.array([[0, 0, -1.0], [0, 1, 0], [1, 0, 0]]), [c[0], c[1], top]), 0.03, np.inf)
     return ObjectModel(name, mesh, mass, hull.center_mass, hull.moment_inertia, qr,
                        rest_z=float(-mesh.bounds[0, 2]), friction=tuple(friction), condim=condim,
                        asset_dir=d, collision_files=cols)

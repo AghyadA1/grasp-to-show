@@ -918,6 +918,33 @@ hole finder's rules, so pockets and J-shaped hooks can be found too.
 *The mug at 8 × its weight (2 kg), same scene. Left: way B's pinch. Right: the hook, carried
 with the fingers raised, shown hanging; insets: the scanner's view at the end.*
 
+### Self-training: the simulator teaches the hook network (running)
+
+The first hook network learned the hole finder's hooks, so it learned the hole finder's blind
+spots too: a closed pocket with a lip, a J-hook, a knob's cap, a basket's bail wider than its
+6 cm reach were "not hookable" without ever being tried. Now the rules only propose and rank;
+every label is a lift test (`grasp2show/hookteach.py`, `scripts/self_train_hooks.py`):
+
+- **Teacher (once per object, ~100 tests):** the hole finder in ranking mode (no hard
+  "opens on both sides" rule; a second pass with a 13 cm reach for carrying handles; the
+  fingertip also under the top bar of each hole), fingertips under any downward-facing surface
+  (lips, rims, knob caps, J-hooks) with up to 12 hand orientations each until one is clear,
+  and random placements. Each outcome is kept: lifted, tried and fell, or could not be placed.
+- **Labels (`hooknet.labels3`):** positive near a hook that lifted; a full-weight negative where
+  tries fell and nothing lifted close by; untested points count 0.15 (most of a surface cannot
+  be hooked, but no test said so); collisions say nothing.
+- **Rounds:** train (random yaw, 1 mm noise, 30 % single-camera partial views by hidden point
+  removal; a third edge convolution with neighbours in feature space), then the network proposes
+  on the training objects (its best points, points drawn by its probability with jittered
+  poses, random exploration), the simulator tests them, and they join the labels: its false
+  positives become hard negatives, hooks it finds that the teacher missed become positives.
+- **Objects:** 800 generated + new families (mugs, J-hooks, knobs, lips, crates with slot
+  handholds), 34 real scans with something to hook (26 train / 8 held out:
+  `object_set_hookreal.json`), and the v2 scans (mostly no handle).
+- **Reported each round** on held-out generated objects and held-out real scans: point AUC,
+  hit rate, coverage of the teacher's distinct hooks, precision, and hooks found that the
+  teacher missed (`media/self_train_hooks.png`).
+
 ## C++ kernels
 
 `cpp/` is an optional C++17 package (nanobind bindings, no other dependencies) with the two hot

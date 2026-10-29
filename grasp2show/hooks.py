@@ -62,7 +62,7 @@ def collision_mesh(obj) -> trimesh.Trimesh:
 
 
 def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 4000, n_probe: int = 128,
-               n_ring: int = 16, min_ring_hits: int = 15) -> list[tuple[np.ndarray, np.ndarray, int]]:
+               n_ring: int = 16, min_ring_hits: int = 15, strict: bool = True, reach: float = REACH) -> list[tuple]:
     """Through-holes a closed-finger rod fits in: list of (point, axis d (unit), ring hits).
 
     Candidate rod centres are sampled just off the surface. From each, rays go out in n_probe
@@ -73,7 +73,15 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
     Then the test: rays in the plane perpendicular to d hit within REACH in almost every
     direction, none closer than the rod's radius, the rod's own line is free (FREE_IN on one
     side, FREE_OUT on the other), and SLAB further along the axis on both sides the ring is open
-    again: a hole through a thin handle, not the inside of a cup or tube."""
+    again: a hole through a thin handle, not the inside of a cup or tube.
+
+    strict=False (the self-training teacher, grasp2show/hookteach.py): the free-line and
+    cavity rules do not reject, they rank: returns (point, axis, ring hits, score) for every point
+    the ring surrounds (12 of 16 rays), score = ring closure + 0.5 x line free + 0.5 x opens
+    again. Rules decide what is tried first; the simulated lift decides what is a hook."""
+    if not strict:
+        min_ring_hits = min(min_ring_hits, 12)
+    REACH_ = reach                                  # (big carrying handles: a basket's bail spans 20 cm)
     surf, fid = trimesh.sample.sample_surface(mesh, n_points, seed=int(rng.integers(1 << 31)))
     pts = surf + mesh.face_normals[fid] * rng.uniform(ROD_RADIUS, 0.04, (n_points, 1))
     _, dist, _ = trimesh.proximity.closest_point(mesh, pts)
@@ -85,7 +93,7 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
     loc, idx, _ = mesh.ray.intersects_location(o, np.tile(D, (len(pts), 1)), multiple_hits=False)
     dd = np.full(len(o), np.inf)
     dd[idx] = np.linalg.norm(loc - o[idx], axis=1)
-    near = dd.reshape(len(pts), n_probe) < REACH
+    near = dd.reshape(len(pts), n_probe) < REACH_
     keep = near.sum(1) >= 8                                         # a thin ring is hit by few probe rays
     pts, near = pts[keep], near[keep]
     if len(pts) == 0:
@@ -107,7 +115,10 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
     free[idx] = np.linalg.norm(loc - o[idx], axis=1)
     fp, fm = free[0::2], free[1::2]
     ok = ((fp >= FREE_IN) & (fm >= FREE_OUT)) | ((fm >= FREE_IN) & (fp >= FREE_OUT))
-    pts, axes = pts[ok], axes[ok]
+    free_ok = ok
+    if not strict:
+        ok = np.ones(len(pts), bool)
+    pts, axes, free_ok = pts[ok], axes[ok], free_ok[ok]
     if len(pts) == 0:
         return []
     ang = 2 * np.pi * np.arange(n_ring) / n_ring
@@ -120,9 +131,10 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
     dd = np.full(len(o), np.inf)
     dd[idx] = np.linalg.norm(loc - o[idx], axis=1)
     dd = dd.reshape(len(pts), n_ring)
-    hits = (dd < REACH).sum(1)
+    hits = (dd < REACH_).sum(1)
     good = (hits >= min_ring_hits) & (dd.min(1) >= ROD_RADIUS)
     pts, axes, hits, R = pts[good], axes[good], hits[good], np.concatenate(rings).reshape(-1, n_ring, 3)[good]
+    free_ok = free_ok[good]
     if len(pts) == 0:
         return []
     # a hole, not a cavity: SLAB along the axis on both sides the ring is open again (a handle is
@@ -134,7 +146,10 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
         loc, idx, _ = mesh.ray.intersects_location(o, R.reshape(-1, 3), multiple_hits=False)
         dq = np.full(len(o), np.inf)
         dq[idx] = np.linalg.norm(loc - o[idx], axis=1)
-        open_both &= (dq.reshape(len(q), n_ring) < REACH).sum(1) <= n_ring - n_ring // 4   # a quarter escapes
+        open_both &= (dq.reshape(len(q), n_ring) < REACH_).sum(1) <= n_ring - n_ring // 4   # a quarter escapes
+    if not strict:
+        score = hits / n_ring + 0.5 * free_ok + 0.5 * open_both
+        return [(p, d.copy(), int(h), float(sc)) for p, d, h, sc in zip(pts, axes, hits, score)]
     return [(p, d.copy(), int(h)) for p, d, h in zip(pts[open_both], axes[open_both], hits[open_both])]
 
 

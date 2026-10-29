@@ -133,14 +133,14 @@ def _basis(d: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 CONTAINERS_FROM_SEED = 700   # seeds below (the first 500 objects) were generated before containers existed: unchanged
 
 
-def make_container(rng) -> tuple[list[trimesh.Trimesh], dict]:
+def make_container(rng, profile: str | None = None) -> tuple[list[trimesh.Trimesh], dict]:
     """An open container (cup, mug, bowl, bucket, vase): a thin wall around a vertical axis, open
     at the top, on a solid bottom. Real mugs are hollow, and a cloud of a cup's inside is unlike
     any solid body, so the network must see some. The wall is cut into convex pieces (angular
     sectors x height bands), each the hull of its inner and outer corners."""
     h = rng.uniform(0.06, 0.18)
     r_bot = rng.uniform(0.03, 0.07)
-    profile = str(rng.choice(["straight", "taper", "flare", "bowl", "belly"]))
+    profile = profile or str(rng.choice(["straight", "taper", "flare", "bowl", "belly"]))
     r_top = {"straight": r_bot, "taper": r_bot * rng.uniform(0.7, 0.95), "flare": r_bot * rng.uniform(1.1, 1.5),
              "bowl": r_bot * rng.uniform(1.3, 1.8), "belly": r_bot * rng.uniform(0.8, 1.0)}[profile]
     wall = rng.uniform(0.003, 0.008)
@@ -337,16 +337,17 @@ def _top_at(body: trimesh.Trimesh, xy: np.ndarray) -> float | None:
     return float(loc[0, 2]) if len(loc) else None
 
 
-def make_handle(rng, body: trimesh.Trimesh, phi: float | None = None,
-                rim: float | None = None) -> tuple[list[trimesh.Trimesh], dict]:
+def make_handle(rng, body: trimesh.Trimesh, phi: float | None = None, rim: float | None = None,
+                where: str | None = None, base: str | None = None, wig: str | None = None,
+                thick: tuple[float, float] | None = None) -> tuple[list[trimesh.Trimesh], dict]:
     """One handle: where (side, top, ring on a stem; on an open container: side, or a bail from
     rim to rim, rim = the rim's radius), base shape, wiggle, section, spikes."""
-    where = str(rng.choice(["side", "side", "side", "top", "top", "ring"])) if rim is None else \
-        str(rng.choice(["side", "side", "side", "bail"]))
-    base = str(rng.choice(BASES))
-    wig = str(rng.choice(WIGGLES))
+    where = where or (str(rng.choice(["side", "side", "side", "top", "top", "ring"])) if rim is None else
+                      str(rng.choice(["side", "side", "side", "bail"])))
+    base = base or str(rng.choice(BASES))
+    wig = wig or str(rng.choice(WIGGLES))
     sec_kind = str(rng.choice(SECTIONS))
-    half_t = rng.uniform(MIN_THICK, MAX_THICK)
+    half_t = rng.uniform(*thick) if thick else rng.uniform(MIN_THICK, MAX_THICK)
     half_w = rng.uniform(1.5, 3.0) * half_t
     phi = rng.uniform(0, 2 * np.pi) if phi is None else phi
     ex = np.array([np.cos(phi), np.sin(phi), 0.0])
@@ -432,10 +433,164 @@ def make_handle(rng, body: trimesh.Trimesh, phi: float | None = None,
     return pieces, p
 
 
+# -- shapes added for self-training (seeds >= NEW_SHAPES_FROM_SEED) ----------------------------
+NEW_SHAPES_FROM_SEED = 1200   # earlier seeds (the first 800 objects) are unchanged
+FAMILIES = ["mug", "mug", "jhook", "knob", "lip", "crate", "crate", "classic", "classic"]
+
+
+def _box(lo, hi) -> trimesh.Trimesh:
+    lo, hi = np.asarray(lo, float), np.asarray(hi, float)
+    return _hull(np.array([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]))
+
+
+def make_jhook(rng, body: trimesh.Trimesh) -> tuple[list[trimesh.Trimesh], dict]:
+    """A J-shaped hook on the side (a coat hook): out from the body, then curling up, open at its
+    tip: nothing closes it, so no hole finder sees it; the finger goes into the bend of the J."""
+    phi = rng.uniform(0, 2 * np.pi)
+    ex, ez = np.array([np.cos(phi), np.sin(phi), 0.0]), np.array([0.0, 0.0, 1.0])
+    top = body.bounds[1, 2]
+    z = rng.uniform(0.3, 0.75) * top
+    r = _surface_radius(body, z, ex)
+    if r is None:
+        return [], {"where": "jhook", "failed": "no surface"}
+    half_t = rng.uniform(0.003, 0.008)
+    arm = rng.uniform(0.01, 0.04)
+    R = rng.uniform(0.012, 0.03) + half_t
+    end = np.radians(rng.uniform(110, 200))
+    x0 = r + arm
+    seg = [np.array([r - 0.004, z]), np.array([x0, z])]
+    phis = np.linspace(0, end, 18)[1:]
+    curl = [np.array([x0 + R * np.sin(f), z + R - R * np.cos(f)]) for f in phis]
+    P2 = np.array(seg + curl)
+    path = P2[:, :1] * ex + P2[:, 1:] * ez
+    n_plane = np.cross(ex, ez)
+    sec_kind = str(rng.choice(SECTIONS))
+    pieces = sweep(path, n_plane, section_points(sec_kind, half_t, rng.uniform(1.5, 3.0) * half_t), np.ones(len(path)))
+    return pieces, {"where": "jhook", "base": "J", "wiggle": "none", "section": sec_kind,
+                    "thickness": round(2 * half_t, 4), "gap": round(2 * R - 2 * half_t, 4), "span": round(R, 4),
+                    "curl_deg": round(float(np.degrees(end)), 1)}
+
+
+def make_knob(rng, body: trimesh.Trimesh) -> tuple[list[trimesh.Trimesh], dict]:
+    """A mushroom knob on top (a lid's knob): a stem and a wider cap; a finger hooks under the cap
+    beside the stem."""
+    c0 = np.array([rng.uniform(-0.2, 0.2) * body.extents[0], rng.uniform(-0.2, 0.2) * body.extents[1], 0.0])
+    z0 = _top_at(body, c0)
+    if z0 is None:
+        return [], {"where": "knob", "failed": "top too small"}
+    rs, hs = rng.uniform(0.005, 0.012), rng.uniform(0.015, 0.04)
+    rc, tc = rs + rng.uniform(0.012, 0.03), rng.uniform(0.008, 0.02)
+    ang = np.linspace(0, 2 * np.pi, 16, endpoint=False)
+    ring = np.stack([np.cos(ang), np.sin(ang), np.zeros_like(ang)], 1)
+    stem = _hull(np.vstack([c0 + rs * ring + [0, 0, z0 - 0.004], c0 + rs * ring + [0, 0, z0 + hs + 0.002]]))
+    cap_shape = str(rng.choice(["disc", "dome", "ball"]))
+    if cap_shape == "disc":
+        cap = _hull(np.vstack([c0 + rc * ring + [0, 0, z0 + hs], c0 + rc * ring + [0, 0, z0 + hs + tc]]))
+    else:
+        u, v = np.meshgrid(np.linspace(-np.pi / 2, np.pi / 2, 10), ang)
+        sph = np.stack([np.cos(u) * np.cos(v), np.cos(u) * np.sin(v), np.sin(u)], -1).reshape(-1, 3)
+        if cap_shape == "dome":
+            sph[:, 2] = np.maximum(sph[:, 2], 0.0)
+        cap = _hull(c0 + sph * [rc, rc, tc] + [0, 0, z0 + hs + (0 if cap_shape == "dome" else tc)])
+    return [stem, cap], {"where": "knob", "base": cap_shape, "wiggle": "none", "section": "round",
+                         "thickness": round(2 * rs, 4), "gap": round(hs, 4), "span": round(rc - rs, 4)}
+
+
+def make_lip(rng, body_info: dict) -> tuple[list[trimesh.Trimesh], dict]:
+    """An outward lip around a container's rim (a flowerpot's, a bowl's): a finger hooks under it."""
+    r = body_info["rim_radius"]
+    top = body_info["height"]
+    w, t = rng.uniform(0.008, 0.02), rng.uniform(0.003, 0.007)
+    droop = rng.uniform(0.0, 0.01)
+    n = 20
+    ang = np.linspace(0, 2 * np.pi, n + 1)
+    pieces = []
+    for a0, a1 in itertools.pairwise(ang):
+        pts = []
+        for a in (a0, a1):
+            d = np.array([np.cos(a), np.sin(a), 0.0])
+            pts += [d * (r - 0.004) + [0, 0, top - t], d * (r - 0.004) + [0, 0, top],
+                    d * (r + w) + [0, 0, top - t - droop], d * (r + w) + [0, 0, top - droop]]
+        pieces.append(_hull(np.array(pts)))
+    return pieces, {"where": "lip", "base": "rim", "wiggle": "none", "section": "strap",
+                    "thickness": round(t, 4), "gap": round(w, 4), "span": round(droop, 4)}
+
+
+def make_crate(rng) -> tuple[list[trimesh.Trimesh], list[trimesh.Trimesh], dict]:
+    """An open box (a crate, a tote) with slot handholds cut through one or two walls near the
+    top: body pieces (walls around the slots, bottom), handle pieces (none: the slot is the
+    handle), parameters."""
+    L, W, H = rng.uniform(0.12, 0.3), rng.uniform(0.1, 0.22), rng.uniform(0.08, 0.2)
+    t = rng.uniform(0.004, 0.01)
+    sw, sh = rng.uniform(0.05, 0.1), rng.uniform(0.02, 0.04)        # slot width, height
+    below = rng.uniform(0.012, 0.035)                                  # slot top below the rim
+    n_slots = int(rng.choice([1, 2]))
+    pieces = [_box([-L / 2, -W / 2, 0], [L / 2, W / 2, t])]            # bottom
+    pieces += [_box([-L / 2, -W / 2, 0], [L / 2, -W / 2 + t, H]),     # long walls (no slot)
+               _box([-L / 2, W / 2 - t, 0], [L / 2, W / 2, H])]
+    for k, side in enumerate((1, -1)):                                 # short walls, slots in 1 or 2
+        x0, x1 = (L / 2 - t, L / 2) if side > 0 else (-L / 2, -L / 2 + t)
+        if k < n_slots and sw < W - 2 * t - 0.02:
+            zt = H - below
+            zb = zt - sh
+            if zb < t + 0.01:
+                return [], [], {"failed": "box too low"}
+            pieces += [_box([x0, -W / 2, 0], [x1, W / 2, zb]),                       # below the slot
+                       _box([x0, -W / 2, zt], [x1, W / 2, H]),                        # above it
+                       _box([x0, -W / 2, zb - 0.001], [x1, -sw / 2, zt + 0.001]),     # its sides
+                       _box([x0, sw / 2, zb - 0.001], [x1, W / 2, zt + 0.001])]
+        else:
+            pieces.append(_box([x0, -W / 2, 0], [x1, W / 2, H]))
+    return pieces, [], {"style": "crate", "where": "slot", "base": "slot", "wiggle": "none", "section": "strap",
+                        "thickness": round(t, 4), "gap": round(sh, 4), "span": round(sw, 4), "slots": n_slots,
+                        "height": round(H, 3)}
+
+
+def generate_new(seed: int):
+    """Objects of the families added for self-training: realistic mugs, J-hooks, knobs, lips,
+    crates with slot handholds, and the classic generator. Returns (body, handle, body params,
+    handle params, rng) or None."""
+    rng = np.random.default_rng(seed + 888_000)
+    fam = str(rng.choice(FAMILIES))
+    if fam == "classic":
+        return None
+    if fam == "crate":
+        body, handle, hp = make_crate(rng)
+        return (body, handle, {"style": "crate", "family": fam}, hp, rng) if body else ("fail", fam)
+    if fam in ("mug", "lip"):
+        body, bp = make_container(rng, profile=str(rng.choice(["straight", "taper", "belly", "flare"])))
+        bp["family"] = fam
+        if fam == "mug":
+            handle, hp = make_handle(rng, body=trimesh.util.concatenate(body), rim=bp["rim_radius"], where="side",
+                                     base=str(rng.choice(["arc", "rect", "superellipse", "arch"])),
+                                     wig=str(rng.choice(["none", "none", "none", "doodle"])), thick=(0.004, 0.007))
+        else:
+            handle, hp = make_lip(rng, bp)
+        return (body, handle, bp, hp, rng) if handle else ("fail", fam)
+    body, bp = make_body(rng)
+    bp["family"] = fam
+    b = trimesh.util.concatenate(body)
+    handle, hp = make_jhook(rng, b) if fam == "jhook" else make_knob(rng, b)
+    return (body, handle, bp, hp, rng) if handle else ("fail", fam)
+
+
 # -- the whole object ---------------------------------------------------------------------------
 def generate(seed: int) -> Generated | None:
     """One object from a seed; None if it came out unusable (no handle could be attached, it
     would tip over, or no spot for the QR sticker)."""
+    if seed >= NEW_SHAPES_FROM_SEED:
+        new = generate_new(seed)
+        if isinstance(new, tuple) and new[0] == "fail":
+            return None
+        if new is not None:
+            body_pieces, handle, bp, hp, rng = new
+            hue = rng.uniform(0, 1)
+            rgba = tuple(float(x) for x in (*_hsv(hue, rng.uniform(0.35, 0.8), rng.uniform(0.55, 0.95)), 1.0))
+            g = Generated(f"gen_{seed:05d}", body_pieces, handle,
+                          {"seed": seed, "body": bp, "handle": hp, "handles": [hp]}, rgba)
+            if g.mesh.bounds[0, 2] < -1e-6 or not connected(g.pieces):
+                return None
+            return g
     rng = np.random.default_rng(seed)
     rim = None
     rng_c = np.random.default_rng(seed + 777_000)

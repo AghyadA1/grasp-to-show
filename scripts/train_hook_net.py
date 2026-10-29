@@ -40,6 +40,7 @@ os.environ.setdefault("G2S_OBJECT_SET", "v2")          # the scans' QR placement
 from train_scorer import auc
 
 from grasp2show.learn.hooknet import (
+    CLOUD_VERSION,
     HookNet,
     HookSet,
     augment,
@@ -66,8 +67,11 @@ def build(names: list[str]) -> HookSet:
     one = np.zeros((O, H_MAX), bool)
     mask = np.zeros((O, H_MAX), bool)
     for i, n in enumerate(names):
-        mesh = trimesh.load(asset_dir(n) / "model.obj", force="mesh", process=True)
-        clouds[i] = sample_cloud(mesh, seed=i)
+        d = asset_dir(n)
+        mesh = trimesh.load(d / "model.obj", force="mesh", process=True)
+        pieces = [trimesh.load(f, force="mesh") for f in sorted(d.glob("model_collision_*.obj"))] \
+            if n.startswith("gen_") else None                       # generated: outer surface only
+        clouds[i] = sample_cloud(mesh, seed=i, pieces=pieces)
         hooks = hook_library(n, hangs=False)[:H_MAX]
         for j, h in enumerate(hooks):
             T[i, j], one[i, j], mask[i, j] = h["T"], h["kind"] == "one", True
@@ -82,11 +86,12 @@ def load_data(rebuild: bool) -> tuple[HookSet, dict]:
     names = gen["objects"] + scans
     if DATA.exists() and not rebuild:
         z = np.load(DATA, allow_pickle=False)
-        if list(z["names"]) == names:
+        if list(z["names"]) == names and int(z.get("version", 1)) == CLOUD_VERSION:
             return HookSet(names, z["clouds"], z["T"], z["one"], z["mask"]), {"gen": gen, "scans": scans}
     print(f"building the dataset: {len(names)} objects", flush=True)
     s = build(names)
-    np.savez_compressed(DATA, names=np.array(names), clouds=s.clouds, T=s.T, one=s.one, mask=s.mask)
+    np.savez_compressed(DATA, names=np.array(names), clouds=s.clouds, T=s.T, one=s.one, mask=s.mask,
+                        version=CLOUD_VERSION)
     return s, {"gen": gen, "scans": scans}
 
 

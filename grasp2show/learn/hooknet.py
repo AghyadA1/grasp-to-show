@@ -39,10 +39,33 @@ N_OUT = 11              # logit, approach (3), closing (3), offset (3), one-fing
 OPEN_WIDTH = 0.08       # finger gap of a one-finger hook (the other finger stays outside)
 
 
-def sample_cloud(mesh: trimesh.Trimesh, n: int = N_POINTS, seed: int = 0) -> np.ndarray:
-    """(n, 6) surface points and their normals, object frame."""
-    pts, fid = trimesh.sample.sample_surface(mesh, n, seed=seed)
-    return np.hstack([pts, mesh.face_normals[fid]]).astype(np.float32)
+CLOUD_VERSION = 2       # 2: generated objects sampled on their outer surface only
+
+
+def sample_cloud(mesh: trimesh.Trimesh, n: int = N_POINTS, seed: int = 0,
+                 pieces: list[trimesh.Trimesh] | None = None) -> np.ndarray:
+    """(n, 6) surface points and their normals, object frame. pieces: a generated object's convex
+    parts. Its mesh is their concatenation, so 10-30 % of its area is hidden inside the solid
+    (where parts overlap or meet: every handle segment's end caps, every wall sector's sides); a
+    camera never sees those faces, and a network that does learns the wrong signature. Points
+    whose outside (1 mm along the normal) is inside some part are dropped."""
+    if pieces is None:
+        pts, fid = trimesh.sample.sample_surface(mesh, n, seed=seed)
+        return np.hstack([pts, mesh.face_normals[fid]]).astype(np.float32)
+    whole = trimesh.util.concatenate(pieces)
+    out = np.zeros((0, 6))
+    k = 0
+    while len(out) < n:
+        pts, fid = trimesh.sample.sample_surface(whole, 3 * n, seed=seed + 1000 * k)
+        nrm = whole.face_normals[fid]
+        q = pts + 0.001 * nrm
+        hidden = np.zeros(len(q), bool)
+        for pc in pieces:
+            hidden |= pc.contains(q)
+        out = np.vstack([out, np.hstack([pts, nrm])[~hidden]])
+        k += 1
+    idx = np.random.default_rng(seed).choice(len(out), n, replace=False)
+    return out[idx].astype(np.float32)
 
 
 @dataclass

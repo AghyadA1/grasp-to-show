@@ -182,11 +182,14 @@ def hook_pose(point: np.ndarray, approach: np.ndarray, closing: np.ndarray, offs
 
 
 @torch.no_grad()
-def predict_hooks(net: HookNet, cloud: np.ndarray, k: int = 10, min_prob: float = 0.5, sep: float = 0.01,
+def predict_hooks(net: HookNet, cloud: np.ndarray, k: int = 10, min_prob: float = 0.02, sep: float = 0.01,
                   device="cpu") -> list[dict]:
     """Hook candidates for one cloud (object frame): the k most probable points, at least `sep`
     apart, each decoded with both approach signs (2k poses). Each: dict T, width, kind, prob,
-    anchor (the predicted fingertip in the hole), axis (the predicted hole axis)."""
+    anchor (the predicted fingertip in the hole), axis (the predicted hole axis). The threshold is
+    low on purpose: on real scans the probabilities come out lower than on generated objects
+    (the red mug's best point scores 0.3) while the ranking still holds, and the lift test
+    rejects the wrong candidates anyway."""
     net.eval()
     o = split(net(torch.as_tensor(cloud[None], device=device)))
     p = torch.sigmoid(o["logit"][0]).cpu().numpy()

@@ -864,6 +864,57 @@ for every hook, twin and carry pitch. Those poses do not depend on the scene, so
 computed once per object with the hooks (`hanging.hang_table`, cached in `data/hooks/`): ~0.7 s
 for the hook options, plus 0–2 s for the carry search. (A way B pinch plans in ~1 s.)
 
+### Generated handled objects and a hook network
+
+Only one of the 112 scanned objects can be hooked from the table, too few to learn from, and a
+scan's convex decomposition can partly fill a handle's hole. So handled objects are generated
+(`grasp2show/shapegen.py`), from convex pieces only, so the simulator's collision geometry is
+exactly the object:
+
+- bodies: superellipsoids, prisms and pyramids, faceted pebbles, stacks and clusters of them,
+  twisted stacks of slabs, sometimes spiky; and (from seed 700) open containers: cups, mugs,
+  bowls, flared pots, buckets with thin walls;
+- handles: arcs, rectangles, triangles, random polygons, superellipses, pointed arches, each
+  plain or with squiggles, zigzags, random doodles or a 3-D twist; round, strap, square or
+  triangular cross-section, sometimes swelling; sometimes spiky; on the side, over the top, as a
+  ring on a stem, or rim to rim on a bucket; sometimes two;
+- the opening is drawn around what the Franka's fingertips need (75 % big enough, 25 % a little
+  too tight, so the network also sees near misses); every part must touch the rest.
+
+`scripts/generate_hookable.py` runs each object through the same hook pipeline as the scans
+(hole finding, fingertip fit, simulated lift) and keeps the hooks that lift it as labels; an
+object counts as hookable if a hook also keeps the hand above the table. Making this work on
+generated shapes fixed three blind spots of the hole finder (it now estimates each hole's axis
+from the hits around it, so 6 mm handles are found; tilted handles need the line through the
+hole free only on the side the fingers come from; and a cup's inside is not a hole), and Embree
+ray casting made it ~100 × faster. 800 objects, 549 hookable from the table:
+
+![generated objects](media/generated_objects.png)
+
+The hook network (`grasp2show/learn/hooknet.py`, `scripts/train_hook_net.py`) works on the point
+cloud alone, in the style of Contact-GraspNet: per point, the probability that a hook is
+anchored there (the fingertip that is in the hole) and that hook's pose (the axis through the
+hole, without a sign: holes are threaded from either side; the closing axis; the offset; one
+finger or both). Only the simulated lift test of its top candidates remains.
+
+| 160 unseen generated objects | point AUC | objects with a hook where a prediction lifts | predictions that lift | time per object |
+|---|---|---|---|---|
+| analytic pipeline | | (the labels) | | ~18 s |
+| network | 0.96 | 82 % | 36 % | 0.3 s + 0.9 s lift checks |
+| network + analytic fit around its holes | | 88 % | 36 % | 28 s + 1.6 s |
+
+On the six real scanned handle objects, never seen in training, it is weaker: the red mug gets
+6 lifting hooks out of 10 candidates, the frother 1 of 10, the porcelain mug none (its best hook
+point ranks 17th), and the three objects with no hook get only candidates that the lift test
+rejects. Two fixes got it this far: the generated objects' point clouds were sampled from every
+convex piece, so 10–33 % of the points lay on faces hidden inside the solid (a signature no
+camera sees); and on scans the probabilities come out lower, so candidates are ranked rather
+than thresholded. Next: self-training (the network proposes hooks on new shapes, the simulator
+checks them, confirmed ones become labels), candidates ranked rather than filtered by the
+hole finder's rules, so pockets and J-shaped hooks can be found too.
+
+![hook network](media/hook_net_eval.png)
+
 *The mug at 8 × its weight (2 kg), same scene. Left: way B's pinch. Right: the hook, carried
 with the fingers raised, shown hanging; insets: the scanner's view at the end.*
 
@@ -931,6 +982,8 @@ grasp2show/
   grip_model.py    part 3: holding capacity from every finger contact (LP over friction cones)
   hooks.py         part 3: handle holes, fingertip placement in them, the common lift test
   hanging.py       part 3: where a hooked object hangs, its show pose, the hook's carry
+  shapegen.py      part 3: generated objects with handles (convex pieces, exact collision)
+  learn/hooknet.py part 3: the hook network
   learn/           learned scorer: dataset loading and features (data.py), PointNet model
                    (model.py), the scorer as a grasp-selection policy (policy.py), the heatmap
                    network of way B (dense.py)

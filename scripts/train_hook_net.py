@@ -68,7 +68,7 @@ def build(names: list[str]) -> HookSet:
     for i, n in enumerate(names):
         mesh = trimesh.load(asset_dir(n) / "model.obj", force="mesh", process=True)
         clouds[i] = sample_cloud(mesh, seed=i)
-        hooks = hook_library(n)[:H_MAX]
+        hooks = hook_library(n, hangs=False)[:H_MAX]
         for j, h in enumerate(hooks):
             T[i, j], one[i, j], mask[i, j] = h["T"], h["kind"] == "one", True
         if (i + 1) % 50 == 0:

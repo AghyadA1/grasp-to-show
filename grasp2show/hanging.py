@@ -139,19 +139,21 @@ def nudge(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, tol: float = 0.0
     """The 2-D fit (hooks.best_fits) places the fingertip section in one cut through the hole; the
     real finger is 3-D and the simulator's handle is a set of convex pieces, a little fatter than
     the scan, so a fit can still dig 1-2 mm into the handle. Search small shifts (+-2 mm across the
-    hole, a few mm along it) for the pose with the least penetration; None if none is within tol."""
-    best, key = None, np.inf
+    hole, a few mm along it), smallest first, for a pose clear of the handle; if none is clear,
+    the one with the least penetration, or None if that is more than tol."""
     R = T_obj_tcp[:3, :3]
-    for dz in depths:
-        for dx in range(-reach, reach + 1):
-            for dy in range(-reach, reach + 1):
-                T = T_obj_tcp.copy()
-                T[:3, 3] += R @ np.array([dx * step, dy * step, dz])
-                pen = max_penetration(sim, T, width)
-                if pen == 0.0 and dx == dy == 0 and dz == 0.0:
-                    return T                                  # the fit itself is clear
-                if pen < key - 1e-5:
-                    best, key = T, pen
+    shifts = [(dx * step, dy * step, dz) for dz in depths for dx in range(-reach, reach + 1)
+              for dy in range(-reach, reach + 1)]
+    shifts.sort(key=lambda s: abs(s[0]) + abs(s[1]) + abs(s[2]))
+    best, key = None, np.inf
+    for sh in shifts:
+        T = T_obj_tcp.copy()
+        T[:3, 3] += R @ np.asarray(sh)
+        pen = max_penetration(sim, T, width)
+        if pen == 0.0:
+            return T                                         # the smallest shift that is clear
+        if pen < key - 1e-5:
+            best, key = T, pen
     return best if key <= tol else None
 
 
@@ -321,10 +323,11 @@ def plan_hook(ep, fc: FeasibilityChecker, o: HookOption, shape: bool = False):
 HOOK_CACHE = Path(__file__).resolve().parents[1] / "data" / "hooks"
 
 
-def hook_library(name: str) -> list[dict]:
+def hook_library(name: str, hangs: bool = True) -> list[dict]:
     """Usable hooks of an object and where the object hangs on each (hanging.hang_table), computed
-    once per object (a few minutes) and cached in data/hooks/<name>.npz. Each hook: dict T,
-    width, kind, hangs {(twin, pitch): Hang}."""
+    once per object and cached in data/hooks/<name>.npz. Each hook: dict T, width, kind, and (if
+    hangs) hangs {(twin, pitch): Hang}. hangs=False skips the hanging poses (the hook network's
+    labels need only the hooks; a later call with hangs=True adds them to the cache)."""
     from .config import ObjectConfig, SceneConfig
     from .objects import object_from_config
 
@@ -342,10 +345,17 @@ def hook_library(name: str) -> list[dict]:
                         h["hangs"][(k, float(p))] = Hang(z["hang_T"][i, k, j] if ok else None, float(z["swing"][i, k, j]),
                                                          float(z["tilt"][i, k, j]), z["carry"][i, k, j] if ok else None)
             return hooks
+        if not hangs:
+            return hooks
     else:
         obj = object_from_config(ObjectConfig(asset=name))
         sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
         hooks = usable_hooks(obj, sim)
+        if not hangs:
+            HOOK_CACHE.mkdir(parents=True, exist_ok=True)
+            np.savez(f, T=np.array([h["T"] for h in hooks]).reshape(-1, 4, 4),
+                     width=np.array([h["width"] for h in hooks]), kind=np.array([h["kind"] for h in hooks]))
+            return hooks
     if sim is None:
         obj = object_from_config(ObjectConfig(asset=name))
         sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)

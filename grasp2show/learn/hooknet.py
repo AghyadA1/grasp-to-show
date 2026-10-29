@@ -189,7 +189,7 @@ def predict_hooks(net: HookNet, cloud: np.ndarray, k: int = 10, min_prob: float 
     return out
 
 
-def refine_hooks(obj, preds: list[dict], merge: float = 0.015, turns: int = 6) -> list[dict]:
+def refine_hooks(obj, preds: list[dict], merge: float = 0.015, turns: int = 4, max_holes: int = 2) -> list[dict]:
     """The analytic fingertip fit (hooks.fit_hook_poses) around the holes the network found: its
     anchors, merged within `merge`, are the holes' centres and its axes their axes. The global
     search for holes (ray casting the whole object) is what the network replaces; the fit itself
@@ -197,8 +197,10 @@ def refine_hooks(obj, preds: list[dict], merge: float = 0.015, turns: int = 6) -
     from ..hooks import fit_hook_poses
 
     holes = []
-    for h in preds:
+    for h in sorted(preds, key=lambda h: -h["prob"]):                 # the most probable holes first
         if all(np.linalg.norm(h["anchor"] - c) > merge for c, _ in holes):
             holes.append((h["anchor"], h["axis"]))
+        if len(holes) == max_holes:
+            break
     loops = [(c, d, 16) for c, d in holes]
     return fit_hook_poses(obj, loops, turns=turns, max_holes=len(loops)) if loops else []

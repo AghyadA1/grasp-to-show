@@ -24,6 +24,7 @@ fit, lift test, hanging, and the hand clearing the table.
 """
 from __future__ import annotations
 
+import itertools
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -127,6 +128,52 @@ def _basis(d: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     u = np.cross(d, a)
     u /= np.linalg.norm(u)
     return u, np.cross(d, u)
+
+
+CONTAINERS_FROM_SEED = 700   # seeds below (the first 500 objects) were generated before containers existed: unchanged
+
+
+def make_container(rng) -> tuple[list[trimesh.Trimesh], dict]:
+    """An open container (cup, mug, bowl, bucket, vase): a thin wall around a vertical axis, open
+    at the top, on a solid bottom. Real mugs are hollow, and a cloud of a cup's inside is unlike
+    any solid body, so the network must see some. The wall is cut into convex pieces (angular
+    sectors x height bands), each the hull of its inner and outer corners."""
+    h = rng.uniform(0.06, 0.18)
+    r_bot = rng.uniform(0.03, 0.07)
+    profile = str(rng.choice(["straight", "taper", "flare", "bowl", "belly"]))
+    r_top = {"straight": r_bot, "taper": r_bot * rng.uniform(0.7, 0.95), "flare": r_bot * rng.uniform(1.1, 1.5),
+             "bowl": r_bot * rng.uniform(1.3, 1.8), "belly": r_bot * rng.uniform(0.8, 1.0)}[profile]
+    wall = rng.uniform(0.003, 0.008)
+    bottom = rng.uniform(0.004, 0.012)
+    n_ang = int(rng.choice([12, 16, 20, 24]))
+    n_z = 1 if profile in ("straight", "taper", "flare") else 4
+    ell = rng.uniform(0.8, 1.0)                                   # slightly oval, sometimes
+
+    def r_at(z):
+        t = z / h
+        r = r_bot + (r_top - r_bot) * t
+        if profile == "bowl":
+            r = r_bot + (r_top - r_bot) * np.sqrt(t)
+        if profile == "belly":
+            r = r + 0.25 * r_bot * np.sin(np.pi * t)
+        return r
+
+    pieces = []
+    zs = np.linspace(bottom * 0.5, h, n_z + 1)
+    ang = np.linspace(0, 2 * np.pi, n_ang + 1)
+    for z0, z1 in itertools.pairwise(zs):
+        for a0, a1 in itertools.pairwise(ang):
+            pts = []
+            for z in (z0, z1):
+                for a in (a0, a1):
+                    for r in (r_at(z), r_at(z) - wall):
+                        pts.append([r * np.cos(a), ell * r * np.sin(a), z])
+            pieces.append(_hull(np.array(pts)))
+    disc = np.linspace(0, 2 * np.pi, n_ang, endpoint=False)
+    rb = r_at(0.0)
+    pieces.append(_hull(np.array([[rb * np.cos(a), ell * rb * np.sin(a), z] for a in disc for z in (0.0, bottom)])))
+    return pieces, {"style": "container", "profile": profile, "height": round(h, 3), "wall": round(wall, 4),
+                    "rim_radius": round(float(r_top), 3)}
 
 
 def make_body(rng) -> tuple[list[trimesh.Trimesh], dict]:
@@ -290,9 +337,12 @@ def _top_at(body: trimesh.Trimesh, xy: np.ndarray) -> float | None:
     return float(loc[0, 2]) if len(loc) else None
 
 
-def make_handle(rng, body: trimesh.Trimesh, phi: float | None = None) -> tuple[list[trimesh.Trimesh], dict]:
-    """One handle: where (side, top, ring on a stem), base shape, wiggle, section, spikes."""
-    where = str(rng.choice(["side", "side", "side", "top", "top", "ring"]))
+def make_handle(rng, body: trimesh.Trimesh, phi: float | None = None,
+                rim: float | None = None) -> tuple[list[trimesh.Trimesh], dict]:
+    """One handle: where (side, top, ring on a stem; on an open container: side, or a bail from
+    rim to rim, rim = the rim's radius), base shape, wiggle, section, spikes."""
+    where = str(rng.choice(["side", "side", "side", "top", "top", "ring"])) if rim is None else \
+        str(rng.choice(["side", "side", "side", "bail"]))
     base = str(rng.choice(BASES))
     wig = str(rng.choice(WIGGLES))
     sec_kind = str(rng.choice(SECTIONS))
@@ -317,6 +367,10 @@ def make_handle(rng, body: trimesh.Trimesh, phi: float | None = None) -> tuple[l
             return [], {**p, "failed": "no surface"}
         A, B = (r1 - 0.004) * ex + z1 * ez, (r2 - 0.004) * ex + z2 * ez
         out_dir = ex
+    elif where == "bail":                                            # bucket handle, rim to rim
+        zr = top - 0.004
+        A, B = -(rim - 0.002) * ex + zr * ez, (rim - 0.002) * ex + zr * ez
+        out_dir = ez
     elif where == "top":
         L0 = span + 2 * half_t
         a, b = -L0 / 2 * ex, L0 / 2 * ex
@@ -383,14 +437,21 @@ def generate(seed: int) -> Generated | None:
     """One object from a seed; None if it came out unusable (no handle could be attached, it
     would tip over, or no spot for the QR sticker)."""
     rng = np.random.default_rng(seed)
-    body_pieces, bp = make_body(rng)
+    rim = None
+    rng_c = np.random.default_rng(seed + 777_000)
+    if seed >= CONTAINERS_FROM_SEED and rng_c.random() < 0.4:
+        body_pieces, bp = make_container(rng_c)
+        rim = bp["rim_radius"]
+        rng = rng_c
+    else:
+        body_pieces, bp = make_body(rng)
     body = trimesh.util.concatenate(body_pieces)
-    handle, hp = make_handle(rng, body)
+    handle, hp = make_handle(rng, body, rim=rim)
     if not handle:
         return None
     hps = [hp]
     if rng.random() < 0.2:                          # a second handle, e.g. a pot's two ears
-        h2, hp2 = make_handle(rng, body, phi=None)
+        h2, hp2 = make_handle(rng, body, phi=None, rim=rim)
         if h2:
             handle += h2
             hps.append(hp2)

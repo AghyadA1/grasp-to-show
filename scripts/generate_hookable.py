@@ -11,6 +11,7 @@
 
 Usage:  python scripts/generate_hookable.py --count 500 --workers 4
         python scripts/generate_hookable.py --count 20 --figure     (and a picture of them)
+        python scripts/generate_hookable.py --count 300 --append    (more, after the last seed)
 Outputs: grasp2show/object_set_gen.json (names, hookable, per-object hook counts, train/test
          split), media/generated_objects.png with --figure. Use the set with G2S_OBJECT_SET=gen.
 """
@@ -53,7 +54,7 @@ def make(seed: int) -> dict | None:
 
 def check(name: str) -> dict:
     t0 = time.time()
-    hooks = hook_library(name)
+    hooks = hook_library(name, hangs=False)
     obj = object_from_config(ObjectConfig(asset=name))
     sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
     table_ok = 0
@@ -71,7 +72,14 @@ def main() -> int:
     p.add_argument("--start-seed", type=int, default=0)
     p.add_argument("--workers", type=int, default=min(4, max(1, (os.cpu_count() or 2) - 1)))
     p.add_argument("--figure", action="store_true", help="also draw media/generated_objects.png (first 20)")
+    p.add_argument("--append", action="store_true",
+                   help="add to the existing set (start after its last seed; earlier objects and split kept)")
+    p.add_argument("--recheck", action="store_true",
+                   help="with --append: also redo the hook check of the earlier objects (after a change to it)")
     args = p.parse_args()
+    old = json.loads(SET_FILE.read_text()) if args.append and SET_FILE.exists() else None
+    if old is not None:
+        args.start_seed = max(args.start_seed, old["seeds"][1] + 1)
     made, seed = [], args.start_seed
     while len(made) < args.count:
         m = make(seed)
@@ -81,17 +89,30 @@ def main() -> int:
     print(f"{len(made)} objects from seeds {args.start_seed}-{seed - 1}; checking hooks with {args.workers} workers",
           flush=True)
     res = {}
+    todo = [m["name"] for m in made]
+    if old is not None and args.recheck:
+        from grasp2show.hanging import HOOK_CACHE
+
+        for n in old["objects"]:
+            (HOOK_CACHE / f"{n}.npz").unlink(missing_ok=True)
+        todo = old["objects"] + todo
     with Pool(args.workers) as pool:
-        for i, r in enumerate(pool.imap_unordered(check, [m["name"] for m in made]), 1):
+        for i, r in enumerate(pool.imap_unordered(check, todo), 1):
             res[r["name"]] = r
-            print(f"[{i}/{len(made)}] {r['name']}: {r['hooks']} hooks, {r['table_ok']} clear of the table "
+            print(f"[{i}/{len(todo)}] {r['name']}: {r['hooks']} hooks, {r['table_ok']} clear of the table "
                   f"({r['seconds']} s)", flush=True)
-    objects = [{**m, **res[m["name"]]} for m in made]
-    rng = np.random.default_rng(0)
-    test = set(rng.choice([o["name"] for o in objects], size=max(1, len(objects) // 5), replace=False).tolist())
-    kinds = Counter(o["handle"]["where"] for o in objects)
-    hookable = Counter(o["handle"]["where"] for o in objects if o["hookable"])
-    out = {"source": "grasp2show/shapegen.py via scripts/generate_hookable.py", "seeds": [args.start_seed, seed - 1],
+    new = [{**m, **res[m["name"]]} for m in made]
+    rng = np.random.default_rng(args.start_seed)
+    test = set(rng.choice([o["name"] for o in new], size=max(1, len(new) // 5), replace=False).tolist())
+    objects = new
+    if old is not None:                                            # earlier objects keep their split
+        objects = [{**d, **res.get(d["name"], {})} for d in old["details"]] + new
+        test |= set(old["test"])
+    kind = lambda o: "container-" + o["handle"]["where"] if o["body"].get("style") == "container" else o["handle"]["where"]
+    kinds = Counter(kind(o) for o in objects)
+    hookable = Counter(kind(o) for o in objects if o["hookable"])
+    out = {"source": "grasp2show/shapegen.py via scripts/generate_hookable.py",
+           "seeds": [old["seeds"][0] if old else args.start_seed, seed - 1],
            "objects": [o["name"] for o in objects], "train": [o["name"] for o in objects if o["name"] not in test],
            "test": sorted(test), "hookable": [o["name"] for o in objects if o["hookable"]],
            "by_handle": {k: {"objects": kinds[k], "hookable": hookable[k]} for k in kinds},
@@ -102,7 +123,7 @@ def main() -> int:
           + ", ".join(f"{k} {v['hookable']}/{v['objects']}" for k, v in out["by_handle"].items()))
     print(f"wrote {SET_FILE}")
     if args.figure:
-        figure(objects[:20])
+        figure(new[:20])
     return 0
 
 
@@ -118,7 +139,7 @@ def figure(objects: list[dict]) -> None:
         name = o["name"]
         obj = object_from_config(ObjectConfig(asset=name))
         sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
-        hooks = hook_library(name)
+        hooks = hook_library(name, hangs=False)
         pose = None
         for h in hooks:
             for T in (h["T"], twin_of(h["T"])):

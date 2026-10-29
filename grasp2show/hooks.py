@@ -33,7 +33,9 @@ from .transforms import make_T, rotation_angle
 ROD_RADIUS = 0.008      # m: a candidate hole is at least this far from the object all around (the
                         #    exact fit of the fingertips is checked on the hole's cross-section)
 REACH = 0.06            # m: the loop must be within this distance all around
-FREE_ALONG = 1.0        # m: the rod's line must be free on both sides (the hole goes through: not a cup)
+FREE_IN = 0.15          # m: the rod's line is free this far on the side the fingers come from (finger + palm)
+FREE_OUT = 0.025        # m: and this far on the other side (the fingertip pokes through)
+SLAB = 0.03             # m: a handle is thinner than this along its hole (else: a cavity, e.g. inside a cup)
 
 
 def _fibonacci_dirs(n: int) -> np.ndarray:
@@ -59,7 +61,7 @@ def collision_mesh(obj) -> trimesh.Trimesh:
     return trimesh.util.concatenate([trimesh.load(f, force="mesh") for f in obj.collision_files])
 
 
-def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 4000, n_probe: int = 64,
+def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 4000, n_probe: int = 128,
                n_ring: int = 16, min_ring_hits: int = 15) -> list[tuple[np.ndarray, np.ndarray, int]]:
     """Through-holes a closed-finger rod fits in: list of (point, axis d (unit), ring hits).
 
@@ -69,7 +71,9 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
     nearby hit directions (smallest eigenvector of their scatter). A fixed set of trial axes would
     have to be dense: a thin 6 mm handle is missed if the trial axis is off by more than ~6 deg.
     Then the test: rays in the plane perpendicular to d hit within REACH in almost every
-    direction, none closer than the rod's radius, and the rod's own line is free both ways."""
+    direction, none closer than the rod's radius, the rod's own line is free (FREE_IN on one
+    side, FREE_OUT on the other), and SLAB further along the axis on both sides the ring is open
+    again: a hole through a thin handle, not the inside of a cup or tube."""
     surf, fid = trimesh.sample.sample_surface(mesh, n_points, seed=int(rng.integers(1 << 31)))
     pts = surf + mesh.face_normals[fid] * rng.uniform(ROD_RADIUS, 0.04, (n_points, 1))
     _, dist, _ = trimesh.proximity.closest_point(mesh, pts)
@@ -82,7 +86,7 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
     dd = np.full(len(o), np.inf)
     dd[idx] = np.linalg.norm(loc - o[idx], axis=1)
     near = dd.reshape(len(pts), n_probe) < REACH
-    keep = near.sum(1) >= n_probe // 3
+    keep = near.sum(1) >= 8                                         # a thin ring is hit by few probe rays
     pts, near = pts[keep], near[keep]
     if len(pts) == 0:
         return []
@@ -93,13 +97,16 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
         d = V[:, 0]
         axes.append(d if d[2] >= 0 else -d)
     axes = np.array(axes)
-    # axial rays: the line of the rod must be free on both sides
+    # axial rays: the line of the rod must be free on the side the fingers come from (FREE_IN) and
+    # a little on the other (FREE_OUT). A handle whose plane is tilted can have the body on the
+    # far side of its axis; requiring the whole line free (as before) missed those.
     o = np.repeat(pts, 2, axis=0)
     ax = np.stack([axes, -axes], 1).reshape(-1, 3)
     loc, idx, _ = mesh.ray.intersects_location(o, ax, multiple_hits=False)
-    blocked = np.zeros(len(o), bool)
-    blocked[idx[np.linalg.norm(loc - o[idx], axis=1) < FREE_ALONG]] = True
-    ok = ~blocked.reshape(-1, 2).any(1)
+    free = np.full(len(o), np.inf)
+    free[idx] = np.linalg.norm(loc - o[idx], axis=1)
+    fp, fm = free[0::2], free[1::2]
+    ok = ((fp >= FREE_IN) & (fm >= FREE_OUT)) | ((fm >= FREE_IN) & (fp >= FREE_OUT))
     pts, axes = pts[ok], axes[ok]
     if len(pts) == 0:
         return []
@@ -115,7 +122,20 @@ def find_loops(mesh: trimesh.Trimesh, rng: np.random.Generator, n_points: int = 
     dd = dd.reshape(len(pts), n_ring)
     hits = (dd < REACH).sum(1)
     good = (hits >= min_ring_hits) & (dd.min(1) >= ROD_RADIUS)
-    return [(p, d.copy(), int(h)) for p, d, h in zip(pts[good], axes[good], hits[good])]
+    pts, axes, hits, R = pts[good], axes[good], hits[good], np.concatenate(rings).reshape(-1, n_ring, 3)[good]
+    if len(pts) == 0:
+        return []
+    # a hole, not a cavity: SLAB along the axis on both sides the ring is open again (a handle is
+    # thin; inside a cup or a tube the wall still surrounds the rod there)
+    open_both = np.ones(len(pts), bool)
+    for sgn in (1.0, -1.0):
+        q = pts + sgn * SLAB * axes
+        o = np.repeat(q, n_ring, axis=0)
+        loc, idx, _ = mesh.ray.intersects_location(o, R.reshape(-1, 3), multiple_hits=False)
+        dq = np.full(len(o), np.inf)
+        dq[idx] = np.linalg.norm(loc - o[idx], axis=1)
+        open_both &= (dq.reshape(len(q), n_ring) < REACH).sum(1) <= n_ring - n_ring // 4   # a quarter escapes
+    return [(p, d.copy(), int(h)) for p, d, h in zip(pts[open_both], axes[open_both], hits[open_both])]
 
 
 def hook_poses(loops, rng: np.random.Generator, n_roll: int = 8, max_loops: int = 20,

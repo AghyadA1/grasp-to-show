@@ -14,6 +14,8 @@ Reported on the unseen objects:
                 handle and lift-tested in simulation (the same test that labels the data):
                 precision = share that lift the object; hit rate = objects with a hook where at
                 least one prediction lifts; and the time this takes vs the analytic pipeline.
+                raw: the network's own poses; refined: the analytic fingertip fit around the
+                holes it found (hooknet.refine_hooks; the network replaces the hole search).
 Usage:  python scripts/train_hook_net.py                 (GPU if available)
         python scripts/train_hook_net.py --epochs 3      (quick check)
 Outputs: data/models/hook_net.pt, data/models/hook_net_metrics.json, media/hook_net_eval.png
@@ -117,12 +119,15 @@ def evaluate(net, s: HookSet, device) -> dict:
             "objects": len(s.names), "with_hooks": int(sum(obj_y))}
 
 
-def lift_check(net, s: HookSet, k: int, device) -> dict:
-    """Predicted hooks, nudged and lift-tested in the floating-gripper simulator."""
+def lift_check(net, s: HookSet, k: int, device, refine: bool) -> dict:
+    """Predicted hooks, nudged clear of the handle and lift-tested in the floating-gripper
+    simulator: raw (the network's poses, both approach signs) or refined (the analytic fingertip
+    fit around the predicted holes, hooknet.refine_hooks)."""
     from grasp2show.config import ObjectConfig, SceneConfig
     from grasp2show.gripper_sim import GripperSim
     from grasp2show.hanging import nudge
     from grasp2show.hooks import lift_test
+    from grasp2show.learn.hooknet import refine_hooks
     from grasp2show.objects import object_from_config
 
     n_pred = n_lift = hit = has = 0
@@ -131,8 +136,10 @@ def lift_check(net, s: HookSet, k: int, device) -> dict:
     for i, name in enumerate(s.names):
         t0 = time.perf_counter()
         hooks = predict_hooks(net, s.clouds[i], k=k, device=device)
-        t1 = time.perf_counter()
         obj = object_from_config(ObjectConfig(asset=name))
+        if refine:
+            hooks = refine_hooks(obj, hooks)[: 4 * k]
+        t1 = time.perf_counter()
         sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
         ok = 0
         for h in hooks:
@@ -144,9 +151,9 @@ def lift_check(net, s: HookSet, k: int, device) -> dict:
         n_lift += ok
         has += bool(s.mask[i].any())
         hit += bool(s.mask[i].any()) and ok > 0
-        per[name] = {"predicted": len(hooks), "lift": int(ok), "analytic_hooks": int(s.mask[i].sum())}
-    return {"precision": n_lift / max(n_pred, 1), "hit_rate": hit / max(has, 1), "predicted": n_pred,
-            "objects_with_hooks": has, "net_ms_per_object": 1000 * t_net / len(s.names),
+        per[name] = {"candidates": len(hooks), "lift": int(ok), "analytic_hooks": int(s.mask[i].sum())}
+    return {"precision": n_lift / max(n_pred, 1), "hit_rate": hit / max(has, 1), "candidates": n_pred,
+            "objects_with_hooks": has, "found_s_per_object": t_net / len(s.names),
             "check_s_per_object": t_sim / len(s.names), "per_object": per}
 
 
@@ -231,21 +238,24 @@ def main() -> int:
     out_dir = ROOT / "data" / "models"
     out_dir.mkdir(parents=True, exist_ok=True)
     torch.save({"state": net.state_dict(), "names_train": [names[i] for i in train]}, out_dir / f"{args.tag}.pt")
-    metrics = {"train": len(train), "val": len(val), "best_val_point_auc": best,
-               "test": {**evaluate(net, data.subset(test), args.device),
-                        **lift_check(net, data.subset(test), args.verify_k, args.device)},
-               "real_scans": {**evaluate(net, data.subset(real), args.device),
-                              **lift_check(net, data.subset(real), args.verify_k, args.device)}}
+    metrics = {"train": len(train), "val": len(val), "best_val_point_auc": best}
+    for key, idx in (("test", test), ("real_scans", real)):
+        sub = data.subset(idx)
+        metrics[key] = {**evaluate(net, sub, args.device),
+                        "raw": lift_check(net, sub, args.verify_k, args.device, refine=False),
+                        "refined": lift_check(net, sub, args.verify_k, args.device, refine=True)}
     gen_details = {d["name"]: d for d in meta["gen"].get("details", [])}
     t_an = [gen_details[names[i]]["seconds"] for i in test if names[i] in gen_details]
     metrics["test"]["analytic_s_per_object"] = float(np.mean(t_an)) if t_an else float("nan")
     (out_dir / f"{args.tag}_metrics.json").write_text(json.dumps(metrics, indent=1))
     for k_ in ("test", "real_scans"):
         mm = metrics[k_]
-        print(f"{k_}: point AUC {mm['point_auc']:.3f}, object AUC {mm['object_auc']:.3f}, lift precision "
-              f"{mm['precision']:.0%} of {mm['predicted']} predicted hooks, hit rate {mm['hit_rate']:.0%} of "
-              f"{mm['objects_with_hooks']} objects with hooks, network {mm['net_ms_per_object']:.0f} ms + lift "
-              f"checks {mm['check_s_per_object']:.1f} s per object", flush=True)
+        print(f"{k_}: point AUC {mm['point_auc']:.3f}, object AUC {mm['object_auc']:.3f}", flush=True)
+        for mode in ("raw", "refined"):
+            r = mm[mode]
+            print(f"  {mode:8s} lift precision {r['precision']:.0%} of {r['candidates']} candidates, hit rate "
+                  f"{r['hit_rate']:.0%} of {r['objects_with_hooks']} objects with hooks; finding "
+                  f"{r['found_s_per_object']:.2f} s + lift checks {r['check_s_per_object']:.1f} s per object", flush=True)
     show = [i for i in test if data.mask[i].any()][:3] + [i for i in test if not data.mask[i].any()][:1] + real[:2]
     figure(net, data, show, ROOT / "media" / f"{args.tag}_eval.png", args.device)
     print(f"wrote {out_dir / (args.tag + '.pt')}, metrics, media/{args.tag}_eval.png")

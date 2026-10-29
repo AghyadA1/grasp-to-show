@@ -16,7 +16,10 @@ without any hook are all negative: the network must also learn when there is not
 The anchor is the fingertip that is in the hole: the TCP when both fingers go through, the
 finger at TCP + (w/2) y with the gripper open at w when one does (the TCP is then outside, 4 cm
 off). So the closing axis is signed for one-finger hooks (it points from the anchor's finger to
-the other one, back across the TCP), and sign-free for two-finger hooks (the twins).
+the other one, back across the TCP), and sign-free for two-finger hooks (the twins). The approach
+axis is sign-free too: a hole can be threaded from either side, and neighbouring points are
+labelled with hooks from both, so a signed target would average to nothing; both signs are
+decoded (refine_hooks then fits the fingertips analytically around the predicted hole).
 """
 from __future__ import annotations
 
@@ -133,7 +136,7 @@ def loss_fn(o: dict, pos: torch.Tensor, tgt: torch.Tensor, pos_weight: torch.Ten
     if not pos.any():
         return bce, parts
     a, c, off, one = tgt[..., 0:3], tgt[..., 3:6], tgt[..., 6:9], tgt[..., 9]
-    la = (1 - (o["approach"] * a).sum(-1))[pos].mean()
+    la = (1 - (o["approach"] * a).sum(-1).abs())[pos].mean()         # through the hole from either side
     dot = (o["closing"] * c).sum(-1)
     lc = (1 - torch.where(one > 0.5, dot, dot.abs()))[pos].mean()   # signed for one finger, else sign-free
     lo = nn.functional.smooth_l1_loss(o["offset"][pos] * 100, off[pos] * 100)    # cm
@@ -158,14 +161,15 @@ def hook_pose(point: np.ndarray, approach: np.ndarray, closing: np.ndarray, offs
 @torch.no_grad()
 def predict_hooks(net: HookNet, cloud: np.ndarray, k: int = 10, min_prob: float = 0.5, sep: float = 0.01,
                   device="cpu") -> list[dict]:
-    """Up to k hook candidates for one cloud (object frame): the most probable points, at least
-    `sep` apart in TCP position. Each: dict T, width, kind, prob."""
+    """Hook candidates for one cloud (object frame): the k most probable points, at least `sep`
+    apart, each decoded with both approach signs (2k poses). Each: dict T, width, kind, prob,
+    anchor (the predicted fingertip in the hole), axis (the predicted hole axis)."""
     net.eval()
     o = split(net(torch.as_tensor(cloud[None], device=device)))
     p = torch.sigmoid(o["logit"][0]).cpu().numpy()
     out, tcps = [], []
     for i in np.argsort(-p):
-        if p[i] < min_prob or len(out) == k:
+        if p[i] < min_prob or len(tcps) == k:
             break
         one = float(torch.sigmoid(o["one_logit"][0, i])) > 0.5
         w = OPEN_WIDTH if one else 0.0
@@ -174,6 +178,27 @@ def predict_hooks(net: HookNet, cloud: np.ndarray, k: int = 10, min_prob: float 
         a = cloud[i, :3] + o["offset"][0, i].cpu().numpy()
         if any(np.linalg.norm(a - t) < sep for t in tcps):
             continue
-        out.append({"T": T, "width": w, "kind": "one" if one else "two", "prob": float(p[i])})
+        flip = np.diag([-1.0, 1.0, -1.0, 1.0])                         # 180 deg about y: through from the other side
+        T2 = hook_pose(cloud[i, :3], -o["approach"][0, i].cpu().numpy(), o["closing"][0, i].cpu().numpy(),
+                       o["offset"][0, i].cpu().numpy(), w)
+        assert np.allclose(T2[:3, :3], T[:3, :3] @ flip[:3, :3], atol=1e-6)
+        for Tk in (T, T2):
+            out.append({"T": Tk, "width": w, "kind": "one" if one else "two", "prob": float(p[i]), "anchor": a,
+                        "axis": T[:3, 2].copy()})
         tcps.append(a)
     return out
+
+
+def refine_hooks(obj, preds: list[dict], merge: float = 0.015, turns: int = 6) -> list[dict]:
+    """The analytic fingertip fit (hooks.fit_hook_poses) around the holes the network found: its
+    anchors, merged within `merge`, are the holes' centres and its axes their axes. The global
+    search for holes (ray casting the whole object) is what the network replaces; the fit itself
+    needs millimetres, which a regression does not give, and is cheap for one or two holes."""
+    from ..hooks import fit_hook_poses
+
+    holes = []
+    for h in preds:
+        if all(np.linalg.norm(h["anchor"] - c) > merge for c, _ in holes):
+            holes.append((h["anchor"], h["axis"]))
+    loops = [(c, d, 16) for c, d in holes]
+    return fit_hook_poses(obj, loops, turns=turns, max_holes=len(loops)) if loops else []

@@ -39,7 +39,7 @@ def test_predictions_are_valid_hook_poses():
     net = HookNet()
     cloud = np.hstack([np.random.default_rng(0).uniform(-0.05, 0.05, (256, 3)), np.tile([0, 0, 1.0], (256, 1))])
     hooks = predict_hooks(net, cloud.astype(np.float32), k=5, min_prob=0.0)
-    assert 1 <= len(hooks) <= 5
+    assert 2 <= len(hooks) <= 10 and len(hooks) % 2 == 0          # each point decoded with both approach signs
     for h in hooks:
         R = h["T"][:3, :3]
         assert np.allclose(R.T @ R, np.eye(3), atol=1e-5) and np.isclose(np.linalg.det(R), 1.0)

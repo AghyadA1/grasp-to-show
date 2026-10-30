@@ -123,7 +123,7 @@ def hook_job(args):
     from grasp2show.chooser import hook_robustness
     from grasp2show.config import ObjectConfig, SceneConfig
     from grasp2show.gripper_sim import GripperSim
-    from grasp2show.hanging import hang_table, nudge, save_hook_file
+    from grasp2show.hanging import deepen, hang_table, hook_mu_min, nudge, save_hook_file
     from grasp2show.hooks import lift_test
     from grasp2show.learn.hooknet import anchor
     from grasp2show.objects import object_from_config
@@ -134,18 +134,32 @@ def hook_job(args):
         sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
         hooks = []
         for c in sorted(cands, key=lambda c: -c["prob"]):
-            T = nudge(sim, c["T"], c["width"], step=0.003, reach=3, depths=(-0.006, 0.0, 0.006))
-            if T is None or not lift_test(sim, T, c["width"], close=False)["success"]:
-                continue
-            a = anchor(T, c["width"] > 0.01)
-            if any(np.linalg.norm(a - anchor(h["T"], h["width"] > 0.01)) < 0.01 and
-                   abs(T[:3, 2] @ h["T"][:3, 2]) > 0.9 for h in hooks):
-                continue                                          # the same hook again
-            hooks.append({"T": T, "width": float(c["width"]), "kind": c["kind"], "prob": float(c["prob"])})
+            # the network proposes one finger through the handle (gripper open) almost always; the
+            # same place with both fingers through (closed, the TCP at that fingertip) cannot slide
+            # off sideways past the other finger, so it is tried first
+            variants = [c]
+            if c["width"] > 0.01:
+                T2 = c["T"].copy()
+                T2[:3, 3] = anchor(c["T"], True)
+                variants = [{**c, "T": T2, "width": 0.0, "kind": "two"}, c]
+            for v in variants:
+                T = nudge(sim, v["T"], v["width"], step=0.003, reach=3, depths=(-0.006, 0.0, 0.006))
+                if T is None:
+                    continue
+                T = deepen(sim, T, v["width"])            # as far through the handle as fits
+                if not lift_test(sim, T, v["width"], close=False)["success"]:
+                    continue
+                a = anchor(T, v["width"] > 0.01)
+                if any(np.linalg.norm(a - anchor(h["T"], h["width"] > 0.01)) < 0.01 and
+                       abs(T[:3, 2] @ h["T"][:3, 2]) > 0.9 for h in hooks):
+                    continue                                      # the same hook again
+                hooks.append({"T": T, "width": float(v["width"]), "kind": v["kind"], "prob": float(c["prob"])})
+                break                                             # the two-finger one if it lifts
             if len(hooks) == 6:
                 break
         for h in hooks:
             h["robust"] = hook_robustness(sim, h["T"], h["width"])
+            h["mu_min"] = hook_mu_min(sim, h["T"], h["width"])
         hang_table(sim, hooks)
         save_hook_file(HOOKS / f"{name}.npz", hooks)
     except Exception as e:  # noqa: BLE001 (an object that does not load: left out, say why)
@@ -245,13 +259,16 @@ def episode(args) -> dict:
 
     t1 = time.time()
     f_h = HOOKS / f"{name}.npz"
-    hooks = load_hook_file(f_h) if f_h.exists() else []
+    all_hooks = load_hook_file(f_h) if f_h.exists() else []
+    hooks = [h for h in all_hooks if h.get("mu_min", 0.0) <= mu + 1e-9]     # those that hold at this friction
+    rec["hook_n_all"] = len(all_hooks)
     opts = hook_options(sc.fc, GripperSim(sc.cfg, sc.obj), hooks, T_start=sc.ep.resting_pose()) if hooks else []
     rec.update(hook_features(hooks, opts))
     done = {}
     for v in VARIANTS:
         ok = rank_hooks(opts, hooks if v == "robust" else None)
-        tries, h_why = [], "no hook" if not hooks else "no hook passes the checks" if not ok else "plan"
+        tries, h_why = [], ("no hook" if not all_hooks else "no hook holds at this friction" if not hooks else
+                            "no hook passes the checks" if not ok else "plan")
         for o in ok[:12]:
             key = (o.hook, o.twin, o.pitch_deg, o.extra_deg)
             if key not in done:
@@ -420,7 +437,7 @@ def main() -> int:
     objs = objects(args.gen, args.smoke)
     log(f"== chooser {time.strftime('%Y-%m-%d %H:%M')}: {sum(g == 'real' for g in objs.values())} real and "
         f"{sum(g == 'gen' for g in objs.values())} generated objects, {args.scenes} scenes each")
-    rec_f = out / "records_v3.jsonl"       # v3: stickers clear of handles, hook swing about its finger
+    rec_f = out / "records_v4.jsonl"       # v4: hooks deeper, tilted up before lifting, two-finger, friction-checked
     if args.stage in ("all", "prepare", "episodes"):
         from self_train_hooks import download_missing
 
@@ -443,7 +460,7 @@ def main() -> int:
                 dev = "cuda" if torch.cuda.is_available() else "cpu"
                 net = load_hook_net(args.model, dev)
                 todo = [n for n in names if not (HOOKS / f"{n}.npz").exists()
-                        or "robust" not in np.load(HOOKS / f"{n}.npz").files]
+                        or "mu_min" not in np.load(HOOKS / f"{n}.npz").files]     # (friction each hook needs; tilt-then-lift)
                 log(f"hooks: {len(todo)} objects")
                 jobs = []
                 for n in todo:

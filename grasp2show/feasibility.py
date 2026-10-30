@@ -127,6 +127,7 @@ class FeasibilityChecker:
         self.fingers = {m.body("left_finger").id, m.body("right_finger").id}
         self.hand = m.body("hand").id
         self.hooked = False      # plan_hook: the held object hangs on a finger and may lean on the hand
+        self.engaging = False    # a hook's fingers turning up in the handle, the object still standing
         self.obj_body = m.body(self.obj.name).id
         self.obj_qadr = m.jnt_qposadr[m.joint(f"{self.obj.name}_free").id]
         self.qr_geom = m.geom(f"{self.obj.name}_qr").id
@@ -170,6 +171,8 @@ class FeasibilityChecker:
                     continue                                   # the grasp itself
                 if holding and self.hooked and other == self.hand:
                     continue                                   # a hooked object rests on the hand too
+                if self.engaging and (other in self.fingers or other == self.hand or other == 0):
+                    continue                                   # a hook engaging: object still on the table
                 if not holding and other == 0:
                     continue                                   # object resting on the table
             name = f"{m.body(b1).name}-{m.body(b2).name}"

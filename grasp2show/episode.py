@@ -175,7 +175,8 @@ class PickAndShow:
                       q_target: np.ndarray, lift: float = 0.15, checker=None, width: float = 0.0,
                       T_show: np.ndarray | None = None, T_tcp_held: np.ndarray | None = None,
                       open_width: float | None = None, finger_floor: float | None = None,
-                      T_lift: np.ndarray | None = None, T_start: np.ndarray | None = None):
+                      T_lift: np.ndarray | None = None, T_start: np.ndarray | None = None,
+                      lift_poses: list[np.ndarray] | None = None):
         """Joint paths for one twin and one target, seeded with the configurations found by the
         feasibility checks (q_start at the grasp, q_target at the show pose).
         approach: joint-space home -> pre-grasp; descend, lift, present: tracked Cartesian lines;
@@ -191,7 +192,9 @@ class PickAndShow:
         the hand about the vertical (a hook's show pose keeps the carry's tilt). T_lift: the hand's
         pose at the end of the lift (default: 15 cm above the grasp, same orientation; a hook
         raises its fingers on the way up, hanging.carry_pose). T_start: where the object really lies
-        (default: its nominal start pose; a hook needs the settled one, see resting_pose)."""
+        (default: its nominal start pose; a hook needs the settled one, see resting_pose).
+        lift_poses: the lift as world hand poses (a hook: hanging.tilt_then_lift); its first part,
+        while the object still stands, is collision-checked with the object at rest."""
         T_start = start_pose(self.cfg, self.obj) if T_start is None else T_start
         T_grasp = T_start @ T_obj_tcp
         T_pre = T_grasp @ make_T(np.eye(3), [0, 0, -0.10])
@@ -237,7 +240,21 @@ class PickAndShow:
         descend = self.track(cartesian_line(T_pre, T_grasp, 15), q_pre)
         if descend is None:
             return None, "descent not trackable"
-        if np.allclose(T_lift[:3, :3], T_grasp[:3, :3]):
+        if lift_poses is not None:
+            up = self.track(lift_poses, descend[-1])
+            if up is None:
+                return None, "lift not trackable"
+            half = len(up) // 2                              # the turn about the fingertip, object standing:
+            if checker is not None:                          # only the arm and the table matter here
+                checker.engaging = True
+            try:
+                clear = all(free(a, b, holding=False, n=4) for a, b in itertools.pairwise(up[:half + 1]))
+            finally:
+                if checker is not None:
+                    checker.engaging = False
+            if not clear:
+                return None, "fingers cannot turn up in the handle"
+        elif np.allclose(T_lift[:3, :3], T_grasp[:3, :3]):
             up = self.track(cartesian_line(T_grasp, T_lift, 20), descend[-1])
         else:      # straight up until the object hangs, then turn into the lift pose's orientation
             T_mid = T_grasp.copy()

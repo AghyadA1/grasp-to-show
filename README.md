@@ -975,6 +975,17 @@ hook got that far rarely, for three reasons found and fixed:
 - the carry's collision check counted the object leaning on the hand, which only stops its swing.
 The carry planner also got a last resort: RRT-Connect in joint space with the fingers kept up.
 
+Second run: the chooser beat always-pinch (33 % vs 28 %; generated objects 23 % vs 12 %), and the
+robust ranking won for both strategies (pinch 75 % vs 68 %, hook 51 % vs 43 % where they
+differed). Half the hooks that ran still dropped the object, more often when heavy or slippery.
+Filmed and measured: 10 of 12 drops were in the lift, the handle loading a level finger that
+passed only millimetres through it; and every hook had been tested at friction 1.0 (the
+fingers' default), while half of them fail at 0.25. Now (physics, not learning): each hook goes
+as deep through the handle as fits (`hanging.deepen`), the fingers turn up about the hooking
+fingertip before the weight comes on (`hanging.tilt_then_lift`), the closed two-finger version
+is tried first, and each hook carries the lowest friction it holds at (`hanging.hook_mu_min`); a
+scene uses only the hooks that hold at its friction.
+
 `media/hook_net_choices_real.png`, `media/hook_net_choices_generated.png`: what the hook network
 chooses on held-out objects (`scripts/figure_hook_net.py`).
 

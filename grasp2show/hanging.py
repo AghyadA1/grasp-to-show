@@ -26,7 +26,7 @@ import numpy as np
 from .feasibility import FeasibilityChecker, PoseCheck, Visibility, twin_of
 from .franka_ik import ik
 from .gripper_sim import GripperSim
-from .motion import cartesian_line, min_jerk
+from .motion import min_jerk
 from .scene import start_pose
 from .transforms import inv_T, make_T, rot_z, rotation_angle
 
@@ -64,12 +64,48 @@ def carry_pose(T_obj_tcp: np.ndarray, lift: float, pitch_deg: float = PITCH_UP) 
     return T
 
 
+LIFT_VERSION = 2      # 2: tilt the fingers up about the hooking fingertip first, then lift (tilt_then_lift)
+
+
+def tilt_then_lift(T_obj_tcp: np.ndarray, width: float, lift: float = 0.15, pitch_deg: float = PITCH_UP,
+                   n: int = 24) -> list[np.ndarray]:
+    """The hook's lift, as hand poses (object frame): first the fingers turn up to pitch_deg
+    about the hooking fingertip (TCP + y w/2: it stays where it is, under the handle) while the
+    object still stands, then the hand rises `lift` straight up. In the first episodes the hand
+    rose with the fingers level and turned them up on the way: the handle took the weight on a
+    level (or, with the arm's tracking error, slightly tip-down) finger and slid off the tip;
+    10 of 12 drops happened there. With the finger raised first, the weight comes on a finger
+    that slopes towards the palm, so the handle slides down it and wedges (carry_pose)."""
+    R = T_obj_tcp[:3, :3]
+    R_c = carry_pose(T_obj_tcp, 0.0, pitch_deg)[:3, :3]
+    dR = R_c @ R.T
+    ang = rotation_angle(dR)
+    p = T_obj_tcp[:3, 3] + R[:, 1] * width / 2                   # the hooking fingertip
+    out = []
+    if ang > 1e-6:
+        w = np.array([dR[2, 1] - dR[1, 2], dR[0, 2] - dR[2, 0], dR[1, 0] - dR[0, 1]])
+        a = w / np.linalg.norm(w)
+        for s in np.linspace(0, 1, n // 2):
+            Rs = _rot_axis(a, s * ang)
+            T = np.eye(4)
+            T[:3, :3] = Rs @ R
+            T[:3, 3] = p + Rs @ (T_obj_tcp[:3, 3] - p)
+            out.append(T)
+    else:
+        out.append(T_obj_tcp.copy())
+    T0 = out[-1]
+    for s in np.linspace(0, 1, n // 2)[1:]:
+        T = T0.copy()
+        T[2, 3] += s * lift
+        out.append(T)
+    return out
+
+
 def settle(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, mass_scale: float = 1.0,
            lift: float = 0.15, hold: float = 2.5, pitch_deg: float = PITCH_UP) -> Hang:
-    """The hook lift (hooks.lift_test) as the robot will do it: fingers at `width` through the
-    loop, gravity on, the hand lifted 7.5 cm straight up (the object now hangs), then another 7.5 cm
-    while its fingers turn up to the carry pose (carry_pose), then held until the swing has settled. The object starts upright (its frame =
-    the world frame), the hand at T_obj_tcp."""
+    """The hook lift as the robot will do it (tilt_then_lift: fingers at `width` through the loop,
+    turned up about the hooking fingertip, then lifted with gravity on), then held until the swing
+    has settled. The object starts upright (its frame = the world frame), the hand at T_obj_tcp."""
     m, d, dt = sim.model, sim.data, sim.model.opt.timestep
     body = sim._obj_body
     mass0, inertia0 = m.body_mass[body], m.body_inertia[body].copy()
@@ -80,13 +116,11 @@ def settle(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, mass_scale: flo
         for _ in range(max(round(sim.T_CLOSE / dt), 1)):
             mujoco.mj_step(m, d)
         m.opt.gravity[:] = [0, 0, -9.81]
-        T_carry = carry_pose(T_obj_tcp, lift, pitch_deg)
-        T_mid = T_obj_tcp.copy()
-        T_mid[:3, 3] += [0, 0, lift / 2]          # straight up until it hangs, then raise the fingers
-        path = cartesian_line(T_obj_tcp, T_mid, 25) + cartesian_line(T_mid, T_carry, 25)
+        path = tilt_then_lift(T_obj_tcp, width, lift, pitch_deg, n=50)
+        T_carry = path[-1]
         n = max(round(1.2 / dt), 1)
         for k in range(1, n + 1):
-            sim._set_hand(path[min(int(min_jerk(k / n) * 50), 49)])
+            sim._set_hand(path[min(int(min_jerk(k / n) * len(path)), len(path) - 1)])
             mujoco.mj_step(m, d)
         n_hold, tail = max(round(hold / dt), 1), max(round(0.5 / dt), 1)
         Rs = []
@@ -155,6 +189,47 @@ def nudge(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, tol: float = 0.0
         if pen < key - 1e-5:
             best, key = T, pen
     return best if key <= tol else None
+
+
+MU_LEVELS = (1.0, 0.6, 0.4, 0.25, 0.15)
+
+
+def hook_mu_min(sim: GripperSim, T_obj_tcp: np.ndarray, width: float) -> float:
+    """The lowest finger-object friction (of MU_LEVELS) at which the hook still lifts the object
+    (hooks.lift_test, both surfaces set: MuJoCo takes the larger); inf if not even at 1.0. A hook
+    holds by its shape AND by friction: on the Franka's tapered fingertip a slippery handle slides
+    off where a grippy one stays (first chooser runs: half the hooks that lift at mu = 1 fail at
+    0.25, and they were all tested at 1, the fingers' default)."""
+    from .hooks import lift_test
+
+    m = sim.model
+    geoms = [g for g in range(m.ngeom) if m.geom_bodyid[g] in (sim._gripper_bodies | {sim._obj_body})
+             and (m.geom_contype[g] or m.geom_conaffinity[g])]
+    f0 = m.geom_friction[geoms].copy()
+    best = np.inf
+    try:
+        for mu in MU_LEVELS:
+            m.geom_friction[geoms] = f0
+            m.geom_friction[geoms, 0], m.geom_friction[geoms, 1] = mu, 0.01 * mu
+            if not lift_test(sim, T_obj_tcp, width, close=False)["success"]:
+                break
+            best = mu
+    finally:
+        m.geom_friction[geoms] = f0
+    return float(best)
+
+
+def deepen(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, depths=(0.025, 0.02, 0.015, 0.01, 0.005)) -> np.ndarray:
+    """The hook pushed further through the handle along the approach, as far as it stays clear
+    (max_penetration): the deepest of `depths` that does, else unchanged. A fingertip that only
+    passes a few millimetres through the hole lets the handle roll off its tip while the object
+    leaves the table and turns to hang; deeper, the handle has finger to slide down instead."""
+    for dz in depths:
+        T = T_obj_tcp.copy()
+        T[:3, 3] += T_obj_tcp[:3, 2] * dz
+        if max_penetration(sim, T, width) == 0.0:
+            return T
+    return T_obj_tcp
 
 
 def usable_hooks(obj, sim: GripperSim, turns: int = 12, limit: int = 40, seed: int = 0) -> list[dict]:
@@ -320,10 +395,14 @@ def plan_hook(ep, fc: FeasibilityChecker, o: HookOption, shape: bool = False):
         swung.append(make_T(R, pivot - R @ pivot) @ o.hang.T_tcp_obj)
     fc.hooked = True                       # the swing is stopped by the hand: leaning on it is no collision
     try:
-        paths, why = ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, checker=fc, width=o.width,
-                                      T_show=o.T_show, T_tcp_held=[o.hang.T_tcp_obj, *swung], open_width=o.width,
-                                      finger_floor=float(np.sin(np.radians(max(o.pitch_deg - 15.0, 0.0)))),
-                                      T_lift=o.T_start @ o.hang.T_carry, T_start=o.T_start)
+        lift_poses = [o.T_start @ P for P in tilt_then_lift(o.T_obj_tcp, o.width, 0.15, o.pitch_deg)]
+        kw = {"checker": fc, "width": o.width, "T_show": o.T_show, "T_tcp_held": [o.hang.T_tcp_obj, *swung],
+                  "open_width": o.width, "finger_floor": float(np.sin(np.radians(max(o.pitch_deg - 15.0, 0.0)))),
+                  "T_lift": lift_poses[-1], "T_start": o.T_start}
+        paths, why = ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, lift_poses=lift_poses, **kw)
+        if paths is None and why in ("lift not trackable", "fingers cannot turn up in the handle"):
+            # the turn about the fingertip does not fit here: rise first and turn on the way, as before
+            paths, why = ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, **kw)
     finally:
         fc.hooked = False
     if paths is not None and shape:
@@ -339,7 +418,7 @@ def load_hook_file(f: Path) -> list[dict]:
     file has the hanging poses."""
     z = np.load(f)
     hooks = [{"T": T, "width": float(w), "kind": str(k)} for T, w, k in zip(z["T"], z["width"], z["kind"])]
-    for key in ("prob", "robust"):
+    for key in ("prob", "robust", "mu_min"):
         if key in z.files:
             for h, p in zip(hooks, z[key]):
                 h[key] = float(p)
@@ -358,7 +437,7 @@ def save_hook_file(f: Path, hooks: list[dict]) -> None:
     """Hooks (and their hanging poses, if hang_table added them) to f (.npz)."""
     base = {"T": np.array([h["T"] for h in hooks]).reshape(-1, 4, 4), "width": np.array([h["width"] for h in hooks]),
             "kind": np.array([h["kind"] for h in hooks])}
-    for key in ("prob", "robust"):
+    for key in ("prob", "robust", "mu_min"):
         if hooks and key in hooks[0]:
             base[key] = np.array([h[key] for h in hooks])
     if hooks and "hangs" in hooks[0]:
@@ -372,7 +451,8 @@ def save_hook_file(f: Path, hooks: list[dict]) -> None:
                     swing[i, k, j], tilt[i, k, j] = g.swing_deg, g.tilt_deg
                     if g.T_tcp_obj is not None:
                         hang_T[i, k, j], carry[i, k, j] = g.T_tcp_obj, g.T_carry
-        base.update(pitches=np.array(PITCHES), hang_T=hang_T, carry=carry, swing=swing, tilt=tilt)
+        base.update(pitches=np.array(PITCHES), hang_T=hang_T, carry=carry, swing=swing, tilt=tilt,
+                    lift_version=np.array(LIFT_VERSION))
     f.parent.mkdir(parents=True, exist_ok=True)
     np.savez(f, **base)
 

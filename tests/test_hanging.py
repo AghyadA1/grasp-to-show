@@ -71,3 +71,16 @@ def test_rrt_connect_goes_around_an_obstacle():
     assert path is not None
     assert np.allclose(path[0], q0) and np.allclose(path[-1], g)
     assert all(edge_ok(a, b) for a, b in itertools.pairwise(path))
+
+
+def test_tilt_then_lift_keeps_the_fingertip_and_ends_raised():
+    from grasp2show.hanging import tilt_then_lift
+
+    T = np.eye(4)
+    T[:3, :3] = np.array([[0, 0, 1.0], [0, 1.0, 0], [-1.0, 0, 0]])   # approach (z) along +x, level
+    path = tilt_then_lift(T, 0.08, lift=0.15, pitch_deg=25.0)
+    tip = lambda P: P[:3, 3] + P[:3, 1] * 0.04
+    half = len(path) // 2
+    assert all(np.allclose(tip(P), tip(T), atol=1e-9) for P in path[:half])   # turns about the fingertip
+    assert np.isclose(np.degrees(np.arcsin(path[-1][2, 2])), 25.0, atol=1e-6)  # fingers raised 25 deg
+    assert np.isclose(path[-1][2, 3] - path[half - 1][2, 3], 0.15)             # then straight up

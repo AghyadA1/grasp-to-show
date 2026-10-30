@@ -133,11 +133,16 @@ class Scenario:
 
     def __init__(self, asset: str, yaw_deg: float, grasps: dict, n_rolls: int = 12,
                  start_xy: tuple[float, float] | None = None, camera: CameraConfig | None = None,
-                 mass_scale: float = 1.0):
+                 mass_scale: float = 1.0, mu: float | None = None):
         """mass_scale: the object is that many times heavier (mass and inertia scaled after the
-        loader's 50 g - 1.5 kg clip, so the checks and the simulator agree)."""
-        self.asset, self.yaw_deg = asset, yaw_deg
+        loader's 50 g - 1.5 kg clip, so the checks and the simulator agree). mu: finger-object
+        friction, known to the checks and set in the simulator (PickAndShow.set_friction: MuJoCo
+        takes the larger of the two surfaces' coefficients, and the fingers' default is 1.0, so
+        the object's own coefficient alone changes nothing); None: as before."""
+        self.asset, self.yaw_deg, self.mu = asset, yaw_deg, mu
         extra = {} if start_xy is None else {"start_xy": tuple(start_xy)}
+        if mu is not None:
+            extra["friction"] = (float(mu), 0.01 * float(mu), 0.0001)
         cam = {} if camera is None else {"camera": camera}
         self.cfg = SceneConfig(obj=ObjectConfig(asset=asset, start_yaw=np.radians(yaw_deg), **extra), **cam)
         self.obj = object_from_config(self.cfg.obj)
@@ -188,7 +193,8 @@ class Scenario:
                                            checker=self.fc, width=float(self.W[c.grasp]))
         if paths is None:
             return EpisodeRecord(**common, success=False, reason=f"plan: {why}")
-        r = self.ep.execute(Grasp(f"g{c.grasp}", T_obj_tcp, float(self.W[c.grasp])), paths, obj_offset=obj_offset)
+        r = self.ep.execute(Grasp(f"g{c.grasp}", T_obj_tcp, float(self.W[c.grasp])), paths, obj_offset=obj_offset,
+                            mu=self.mu)
         if r.success:
             reason = ""
         elif r.collisions:

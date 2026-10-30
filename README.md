@@ -945,6 +945,27 @@ every label is a lift test (`grasp2show/hookteach.py`, `scripts/self_train_hooks
   hit rate, coverage of the teacher's distinct hooks, precision, and hooks found that the
   teacher missed (`media/self_train_hooks.png`).
 
+### Hook or pinch: the chooser (running)
+
+A pinch holds by friction (two fingers at 20 N carry about 4 mu kg when centred, less with
+torque or motion); a hook carries the weight as a normal force on the finger, nearly
+independent of friction. So the scenes vary both, as real objects do: friction mu log-uniform
+0.15-1.0 (wet glazed porcelain or glass to rubber) and the object's weight x0.5-8 (empty to
+filled), at most 3 kg. In each scene both strategies are planned with their own checks and
+both are executed; the chooser (`grasp2show/chooser.py`) predicts each one's success from what
+the checks found and picks one before anything moves. Cross-validated by object against
+always-pinch, always-hook, a rule (pinch if its checks pass with a positive lift margin, else
+hook) and the oracle (`scripts/choose_episodes.py`, `media/chooser.png`).
+
+Found on the way: the fingers' MuJoCo friction is 1.0 and MuJoCo takes the larger of the two
+surfaces' coefficients, so an object's own friction changes nothing unless the episode sets
+both (`PickAndShow.execute(mu=...)`, now passed by `Scenario(mu=...)`). The pinch grasps are
+sampled more densely for this study (300 contact pairs: with 60, a mug kept 10 lifting grasps,
+since its body is too wide and only its rim and handle fit).
+
+`media/hook_net_choices_real.png`, `media/hook_net_choices_generated.png`: what the hook network
+chooses on held-out objects (`scripts/figure_hook_net.py`).
+
 ## C++ kernels
 
 `cpp/` is an optional C++17 package (nanobind bindings, no other dependencies) with the two hot

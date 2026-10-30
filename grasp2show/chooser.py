@@ -1,0 +1,188 @@
+"""Hook or pinch? The chooser (part 3).
+
+Each scene is an object at a start pose, a scanner pose, and two things the robot is told about
+the object: its weight and the friction between its surface and the fingers. Both strategies
+are then planned with their own checks, and the chooser picks one before anything moves:
+
+  pinch  the analytic pipeline ("aware": lift / target stability with this friction and weight,
+         reach, collisions, QR visibility) on the object's antipodal grasps;
+  hook   the self-trained hook network's proposals (grasp2show/learn/hooknet.py), lift-tested
+         once per object, with where the object hangs on each (hanging.hang_table), then the
+         hook checks (reach, collisions, QR visibility) for this scene (hanging.hook_options).
+
+Why friction and weight. A pinch holds by friction: two fingers pressing 20 N each can carry
+about 2 mu F / g (4 mu kg) when the grip is centred, less when the object's weight pulls at a
+distance (torque) or when it is moved. A hook carries the object on the finger's surface: the
+weight is a normal force, nearly independent of friction, up to what the arm can lift. So a wet
+glass mug (mu ~ 0.2) full of water slips out of a pinch and hangs fine on a finger, while a light
+rubbery box is best pinched (faster, steadier, no swing). The scenes span both:
+  mu   log-uniform 0.15-1.0 (wet glazed porcelain or glass ~0.15-0.3, plastic ~0.3-0.5, rubber ~1)
+  mass the object's own times a factor log-uniform 0.5-8 (empty to filled / heavier material),
+       at most 3 kg (the Panda's payload).
+
+The chooser predicts each strategy's success from what the checks found (features below) with
+a small network per strategy, trained on simulated episodes where both were executed, and picks
+the larger (the pinch when they tie: it is faster and does not swing). A rule chooser (pinch if
+all its checks pass with a positive lift margin, else the hook if one passes, else the pinch) and
+the oracle (whichever succeeded) bound it.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+MU_RANGE = (0.15, 1.0)
+MASS_FACTOR = (0.5, 8.0)
+MAX_MASS = 3.0
+G = 9.81
+LIMIT_SCALE = 0.5
+
+
+def sample_conditions(rng: np.random.Generator, mass0: float) -> tuple[float, float]:
+    """(mu, mass_scale) for one scene: see the module docstring."""
+    mu = float(np.exp(rng.uniform(np.log(MU_RANGE[0]), np.log(MU_RANGE[1]))))
+    f = float(np.exp(rng.uniform(np.log(MASS_FACTOR[0]), np.log(MASS_FACTOR[1]))))
+    f = min(f, MAX_MASS / mass0)
+    return round(mu, 3), round(f, 3)
+
+
+# ---------------------------------------------------------------- features
+
+PINCH_KEYS = ("pinch_any", "pinch_n_ok", "pinch_best", "pinch_lift", "pinch_stab", "pinch_vis", "pinch_n_lift_ok")
+HOOK_KEYS = ("hook_n", "hook_any", "hook_n_ok", "hook_pixels", "hook_angle", "hook_swing", "hook_tilt",
+             "hook_pitch", "hook_one", "hook_prob")
+SCENE_KEYS = ("mu", "log_mass", "load", "ext_max", "ext_min")
+FEATURES = SCENE_KEYS + PINCH_KEYS + HOOK_KEYS
+
+
+def pinch_features(sc) -> dict:
+    """What the pinch checks found in this scene (experiment.Scenario, lift margins at this
+    friction and weight): is there a choice passing every check, how many, the best one's
+    smallest normalised margin and its parts."""
+    best, n_ok, parts_best = -np.inf, 0, None
+    for i, r in sc.reports.items():
+        for tw in r.twins:
+            if not tw.start_ok:
+                continue
+            for t in tw.targets:
+                if not t.reach.ok:
+                    continue
+                vis = (t.visibility.fraction - 0.9) / 0.1 if t.visibility is not None else -1.0
+                parts = [sc.lift_margin[i], tw.start.limit_margin / LIMIT_SCALE, t.reach.limit_margin / LIMIT_SCALE,
+                         t.stability_margin, vis]
+                ok = t.stability_margin > 0 and t.visibility is not None and t.visibility.ok() and sc.lift_margin[i] > 0
+                n_ok += ok
+                if min(parts) > best:
+                    best, parts_best = min(parts), parts
+    if parts_best is None:
+        return {"pinch_any": 0.0, "pinch_n_ok": 0.0, "pinch_best": -2.0, "pinch_lift": -2.0, "pinch_stab": -2.0,
+                "pinch_vis": -2.0, "pinch_n_lift_ok": float(np.log1p(np.sum(sc.lift_margin > 0)))}
+    c = lambda x: float(np.clip(x, -2.0, 2.0))
+    return {"pinch_any": 1.0, "pinch_n_ok": float(np.log1p(n_ok)), "pinch_best": c(best), "pinch_lift": c(parts_best[0]),
+            "pinch_stab": c(parts_best[3]), "pinch_vis": c(parts_best[4]),
+            "pinch_n_lift_ok": float(np.log1p(np.sum(sc.lift_margin > 0)))}
+
+
+def hook_features(hooks: list[dict], opts: list) -> dict:
+    """What the hook checks found: how many hooks the network's proposals gave (that lifted the
+    object once), how many (hook, twin) options pass reach / collision / visibility here, and the
+    best option's QR size and angle, swing and tilt while hanging, carry pitch, one finger or two,
+    and the network's probability for that hook."""
+    ok = [o for o in opts if o.ok]
+    out = {"hook_n": float(np.log1p(len(hooks))), "hook_any": float(bool(ok)), "hook_n_ok": float(np.log1p(len(ok)))}
+    if not ok:
+        return {**out, "hook_pixels": 0.0, "hook_angle": 90.0 / 45.0, "hook_swing": 0.0, "hook_tilt": 0.0,
+                "hook_pitch": 0.0, "hook_one": 0.0, "hook_prob": 0.0}
+    o = ok[0]
+    return {**out, "hook_pixels": float(o.vis.pixels) / 100.0, "hook_angle": float(o.vis.angle_deg) / 45.0,
+            "hook_swing": float(np.nan_to_num(o.hang.swing_deg)) / 30.0,
+            "hook_tilt": float(np.nan_to_num(o.hang.tilt_deg)) / 30.0, "hook_pitch": float(o.pitch_deg) / 40.0,
+            "hook_one": float(o.width > 0.01), "hook_prob": float(hooks[o.hook].get("prob", 0.0))}
+
+
+def scene_features(mu: float, mass: float, extents, finger_force: float = 20.0) -> dict:
+    e = np.sort(np.asarray(extents, float))
+    return {"mu": mu, "log_mass": float(np.log(mass)), "load": float(mass * G / (2 * mu * finger_force)),
+            "ext_max": float(e[-1]) * 10, "ext_min": float(e[0]) * 10}
+
+
+def vector(rec: dict) -> np.ndarray:
+    return np.array([float(rec[k]) for k in FEATURES], np.float32)
+
+
+# ---------------------------------------------------------------- choosers
+
+def rule_choice(rec: dict) -> str:
+    """Pinch if a pinch choice passes every check with a positive lift margin at this friction
+    and weight; else the hook if one passes its checks; else the pinch (its best effort)."""
+    if rec["pinch_n_ok"] > 0 and rec["pinch_lift"] > 0:
+        return "pinch"
+    if rec["hook_any"] > 0:
+        return "hook"
+    return "pinch"
+
+
+@dataclass
+class Chooser:
+    """Two small networks (pinch, hook) predicting each strategy's success from FEATURES."""
+    mean: np.ndarray
+    std: np.ndarray
+    state: dict
+    margin: float = 0.0          # the hook must be predicted this much likelier to be chosen
+
+    @staticmethod
+    def net():
+        import torch
+        from torch import nn
+
+        torch.manual_seed(0)
+        return nn.Sequential(nn.Linear(len(FEATURES), 32), nn.ReLU(), nn.Dropout(0.1), nn.Linear(32, 32), nn.ReLU(),
+                             nn.Linear(32, 2))
+
+    @classmethod
+    def fit(cls, X: np.ndarray, y_pinch: np.ndarray, y_hook: np.ndarray, epochs: int = 400, wd: float = 1e-3,
+            margin: float = 0.0) -> Chooser:
+        import torch
+
+        mean, std = X.mean(0), X.std(0) + 1e-6
+        net = cls.net()
+        opt = torch.optim.Adam(net.parameters(), lr=3e-3, weight_decay=wd)
+        x = torch.as_tensor((X - mean) / std, dtype=torch.float32)
+        y = torch.as_tensor(np.stack([y_pinch, y_hook], 1), dtype=torch.float32)
+        for _ in range(epochs):
+            net.train()
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(net(x), y)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+        return cls(mean, std, {k: v.detach().clone() for k, v in net.state_dict().items()}, margin)
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """(N, 2) predicted success probabilities: pinch, hook."""
+        import torch
+
+        net = self.net()
+        net.load_state_dict(self.state)
+        net.eval()
+        with torch.no_grad():
+            return torch.sigmoid(net(torch.as_tensor((X - self.mean) / self.std, dtype=torch.float32))).numpy()
+
+    def choose(self, X: np.ndarray) -> np.ndarray:
+        """(N,) "pinch" / "hook"."""
+        p = self.predict(X)
+        return np.where(p[:, 1] > p[:, 0] + self.margin, "hook", "pinch")
+
+    def save(self, path) -> None:
+        import torch
+
+        torch.save({"mean": self.mean, "std": self.std, "state": self.state, "margin": self.margin,
+                    "features": FEATURES}, path)
+
+    @classmethod
+    def load(cls, path) -> Chooser:
+        import torch
+
+        z = torch.load(path, weights_only=False)
+        assert tuple(z["features"]) == FEATURES, "the chooser was trained on other features"
+        return cls(z["mean"], z["std"], z["state"], z["margin"])

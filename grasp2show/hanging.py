@@ -323,6 +323,47 @@ def plan_hook(ep, fc: FeasibilityChecker, o: HookOption, shape: bool = False):
 HOOK_CACHE = Path(__file__).resolve().parents[1] / "data" / "hooks"
 
 
+def load_hook_file(f: Path) -> list[dict]:
+    """Hooks saved by save_hook_file: dicts T, width, kind (and prob, if saved), and hangs if the
+    file has the hanging poses."""
+    z = np.load(f)
+    hooks = [{"T": T, "width": float(w), "kind": str(k)} for T, w, k in zip(z["T"], z["width"], z["kind"])]
+    if "prob" in z.files:
+        for h, p in zip(hooks, z["prob"]):
+            h["prob"] = float(p)
+    if "hang_T" in z.files:                          # cached hanging poses
+        for i, h in enumerate(hooks):
+            h["hangs"] = {}
+            for k in range(2):
+                for j, p in enumerate(z["pitches"]):
+                    ok = not np.isnan(z["hang_T"][i, k, j, 0, 0])
+                    h["hangs"][(k, float(p))] = Hang(z["hang_T"][i, k, j] if ok else None, float(z["swing"][i, k, j]),
+                                                     float(z["tilt"][i, k, j]), z["carry"][i, k, j] if ok else None)
+    return hooks
+
+
+def save_hook_file(f: Path, hooks: list[dict]) -> None:
+    """Hooks (and their hanging poses, if hang_table added them) to f (.npz)."""
+    base = {"T": np.array([h["T"] for h in hooks]).reshape(-1, 4, 4), "width": np.array([h["width"] for h in hooks]),
+            "kind": np.array([h["kind"] for h in hooks])}
+    if hooks and "prob" in hooks[0]:
+        base["prob"] = np.array([h["prob"] for h in hooks])
+    if hooks and "hangs" in hooks[0]:
+        n, P = len(hooks), len(PITCHES)
+        hang_T, carry = np.full((n, 2, P, 4, 4), np.nan), np.full((n, 2, P, 4, 4), np.nan)
+        swing, tilt = np.full((n, 2, P), np.nan), np.full((n, 2, P), np.nan)
+        for i, h in enumerate(hooks):
+            for k in range(2):
+                for j, p in enumerate(PITCHES):
+                    g = h["hangs"][(k, p)]
+                    swing[i, k, j], tilt[i, k, j] = g.swing_deg, g.tilt_deg
+                    if g.T_tcp_obj is not None:
+                        hang_T[i, k, j], carry[i, k, j] = g.T_tcp_obj, g.T_carry
+        base.update(pitches=np.array(PITCHES), hang_T=hang_T, carry=carry, swing=swing, tilt=tilt)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(f, **base)
+
+
 def hook_library(name: str, hangs: bool = True) -> list[dict]:
     """Usable hooks of an object and where the object hangs on each (hanging.hang_table), computed
     once per object and cached in data/hooks/<name>.npz. Each hook: dict T, width, kind, and (if
@@ -334,44 +375,19 @@ def hook_library(name: str, hangs: bool = True) -> list[dict]:
     f = HOOK_CACHE / f"{name}.npz"
     obj = sim = None
     if f.exists():
-        z = np.load(f)
-        hooks = [{"T": T, "width": float(w), "kind": str(k)} for T, w, k in zip(z["T"], z["width"], z["kind"])]
-        if "hang_T" in z.files:                          # cached hanging poses
-            for i, h in enumerate(hooks):
-                h["hangs"] = {}
-                for k in range(2):
-                    for j, p in enumerate(z["pitches"]):
-                        ok = not np.isnan(z["hang_T"][i, k, j, 0, 0])
-                        h["hangs"][(k, float(p))] = Hang(z["hang_T"][i, k, j] if ok else None, float(z["swing"][i, k, j]),
-                                                         float(z["tilt"][i, k, j]), z["carry"][i, k, j] if ok else None)
-            return hooks
-        if not hangs:
+        hooks = load_hook_file(f)
+        if not hangs or (hooks and "hangs" in hooks[0]) or not hooks:
             return hooks
     else:
         obj = object_from_config(ObjectConfig(asset=name))
         sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
         hooks = usable_hooks(obj, sim)
         if not hangs:
-            HOOK_CACHE.mkdir(parents=True, exist_ok=True)
-            np.savez(f, T=np.array([h["T"] for h in hooks]).reshape(-1, 4, 4),
-                     width=np.array([h["width"] for h in hooks]), kind=np.array([h["kind"] for h in hooks]))
+            save_hook_file(f, hooks)
             return hooks
     if sim is None:
         obj = object_from_config(ObjectConfig(asset=name))
         sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
     hang_table(sim, hooks)
-    n, P = len(hooks), len(PITCHES)
-    hang_T, carry = np.full((n, 2, P, 4, 4), np.nan), np.full((n, 2, P, 4, 4), np.nan)
-    swing, tilt = np.full((n, 2, P), np.nan), np.full((n, 2, P), np.nan)
-    for i, h in enumerate(hooks):
-        for k in range(2):
-            for j, p in enumerate(PITCHES):
-                g = h["hangs"][(k, p)]
-                swing[i, k, j], tilt[i, k, j] = g.swing_deg, g.tilt_deg
-                if g.T_tcp_obj is not None:
-                    hang_T[i, k, j], carry[i, k, j] = g.T_tcp_obj, g.T_carry
-    HOOK_CACHE.mkdir(parents=True, exist_ok=True)
-    np.savez(f, T=np.array([h["T"] for h in hooks]).reshape(-1, 4, 4), width=np.array([h["width"] for h in hooks]),
-             kind=np.array([h["kind"] for h in hooks]), pitches=np.array(PITCHES), hang_T=hang_T, carry=carry,
-             swing=swing, tilt=tilt)
+    save_hook_file(f, hooks)
     return hooks

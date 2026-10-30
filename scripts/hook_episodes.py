@@ -65,7 +65,7 @@ def run_hook(sc: Scenario, hooks: list[dict], tries: int = 5) -> dict:
         paths, why = plan_hook(sc.ep, sc.fc, o)
         if paths is None:
             continue
-        r = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED)
+        r = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED, mu=sc.mu)
         reason = "" if r.success else ("collision" if r.collisions else "dropped" if not r.held else "qr")
         return {**rec, "success": bool(r.success), "reason": reason, "kind": hooks[o.hook]["kind"],
                 "pred_angle_deg": round(o.vis.angle_deg, 1), "pred_pixels": round(o.vis.pixels, 1),

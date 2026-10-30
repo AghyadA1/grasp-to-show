@@ -20,6 +20,12 @@ rubbery box is best pinched (faster, steadier, no swing). The scenes span both:
   mass the object's own times a factor log-uniform 0.5-8 (empty to filled / heavier material),
        at most 3 kg (the Panda's payload).
 
+Each strategy runs its best candidate: the pinch's (grasp, side, turn) with the largest smallest
+margin (experiment.choose "aware"), the hook's (hook, side, carry pitch, turn) likewise
+(hook_score); if its motion cannot be planned, the next. The episodes also run each strategy's
+2nd and 3rd candidates, to measure how good the rankings are (did the best-ranked one succeed
+when another would have?).
+
 The chooser predicts each strategy's success from what the checks found (features below) with
 a small network per strategy, trained on simulated episodes where both were executed, and picks
 the larger (the pinch when they tie: it is faster and does not swing). A rule chooser (pinch if
@@ -50,7 +56,7 @@ def sample_conditions(rng: np.random.Generator, mass0: float) -> tuple[float, fl
 # ---------------------------------------------------------------- features
 
 PINCH_KEYS = ("pinch_any", "pinch_n_ok", "pinch_best", "pinch_lift", "pinch_stab", "pinch_vis", "pinch_n_lift_ok")
-HOOK_KEYS = ("hook_n", "hook_any", "hook_n_ok", "hook_pixels", "hook_angle", "hook_swing", "hook_tilt",
+HOOK_KEYS = ("hook_n", "hook_any", "hook_n_ok", "hook_best", "hook_pixels", "hook_angle", "hook_swing", "hook_tilt",
              "hook_pitch", "hook_one", "hook_prob")
 SCENE_KEYS = ("mu", "log_mass", "load", "ext_max", "ext_min")
 FEATURES = SCENE_KEYS + PINCH_KEYS + HOOK_KEYS
@@ -84,18 +90,32 @@ def pinch_features(sc) -> dict:
             "pinch_n_lift_ok": float(np.log1p(np.sum(sc.lift_margin > 0)))}
 
 
+def hook_score(o) -> float:
+    """A feasible hook option's smallest normalised margin, as the pinch's "aware" ranking: the QR's
+    size above 50 px and angle below 45 deg, and the joint-limit margins at the grasp, the
+    pre-grasp and the show pose."""
+    parts = [(o.vis.pixels - 50.0) / 50.0, (45.0 - o.vis.angle_deg) / 45.0]
+    parts += [c.limit_margin / LIMIT_SCALE for c in (o.start, o.pre, o.show) if c is not None]
+    return float(min(parts))
+
+
+def rank_hooks(opts: list) -> list:
+    """Feasible hook options, best first (hook_score)."""
+    return sorted([o for o in opts if o.ok], key=hook_score, reverse=True)
+
+
 def hook_features(hooks: list[dict], opts: list) -> dict:
     """What the hook checks found: how many hooks the network's proposals gave (that lifted the
     object once), how many (hook, twin) options pass reach / collision / visibility here, and the
     best option's QR size and angle, swing and tilt while hanging, carry pitch, one finger or two,
     and the network's probability for that hook."""
-    ok = [o for o in opts if o.ok]
+    ok = rank_hooks(opts)
     out = {"hook_n": float(np.log1p(len(hooks))), "hook_any": float(bool(ok)), "hook_n_ok": float(np.log1p(len(ok)))}
     if not ok:
-        return {**out, "hook_pixels": 0.0, "hook_angle": 90.0 / 45.0, "hook_swing": 0.0, "hook_tilt": 0.0,
-                "hook_pitch": 0.0, "hook_one": 0.0, "hook_prob": 0.0}
+        return {**out, "hook_best": -2.0, "hook_pixels": 0.0, "hook_angle": 90.0 / 45.0, "hook_swing": 0.0,
+                "hook_tilt": 0.0, "hook_pitch": 0.0, "hook_one": 0.0, "hook_prob": 0.0}
     o = ok[0]
-    return {**out, "hook_pixels": float(o.vis.pixels) / 100.0, "hook_angle": float(o.vis.angle_deg) / 45.0,
+    return {**out, "hook_best": float(np.clip(hook_score(o), -2.0, 2.0)), "hook_pixels": float(o.vis.pixels) / 100.0, "hook_angle": float(o.vis.angle_deg) / 45.0,
             "hook_swing": float(np.nan_to_num(o.hang.swing_deg)) / 30.0,
             "hook_tilt": float(np.nan_to_num(o.hang.tilt_deg)) / 30.0, "hook_pitch": float(o.pitch_deg) / 40.0,
             "hook_one": float(o.width > 0.01), "hook_prob": float(hooks[o.hook].get("prob", 0.0))}

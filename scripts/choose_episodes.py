@@ -12,7 +12,9 @@ Stages (all by default; each resumable):
             data/grasps_choose: with grasps_v2's 60 a mug kept 10 lifting grasps, now about 80), and the hook network's hooks: its 8 best points (both directions),
             nudged clear and lift-tested, up to 6 that lift, with where the object hangs on each
             (data/hooks_net/<name>.npz);
-  episodes  data/choose/records.jsonl (one line per scene: features and both outcomes);
+  episodes  data/choose/records.jsonl (one line per scene: features and both outcomes). Each
+            strategy runs its best-ranked candidate (what the robot would do) and, for the record,
+            its 2nd and 3rd (how good is its ranking?);
   fit       the chooser, 5-fold cross-validated by object (no object in both training and test):
             success of always-pinch, always-hook, the rule chooser, the learned chooser, the
             oracle; overall, on real and generated objects, and over friction and weight. Then
@@ -48,6 +50,7 @@ OUT = ROOT / "data" / "choose"
 HOOKS = ROOT / "data" / "hooks_net"
 GRASPS = ROOT / "data" / "grasps_choose"     # denser than grasps_v2: 300 contact pairs, rims included
 CLOUDS = ROOT / "data" / "hook_clouds"
+TOP = 3              # candidates executed per strategy and scene (the first is the one the robot would run)
 
 
 def crc(s: str) -> int:
@@ -152,7 +155,7 @@ def hook_job(args):
 def episode(args) -> dict:
     """One scene: both strategies' checks (features), both executed (outcomes)."""
     name, k, group, scale = args
-    from grasp2show.chooser import hook_features, pinch_features, scene_features
+    from grasp2show.chooser import hook_features, pinch_features, rank_hooks, scene_features
     from grasp2show.config import ObjectConfig, random_camera
     from grasp2show.experiment import Scenario, choose
     from grasp2show.gripper_sim import GripperSim
@@ -174,31 +177,36 @@ def episode(args) -> dict:
     rec = {"object": name, "scene": k, "group": group, "mu": mu, "mass_scale": f, "mass_kg": round(sc.obj.mass, 3),
            **scene_features(mu, sc.obj.mass, sc.obj.mesh.extents), **pinch_features(sc)}
     t1 = time.time()
-    p = sc.run("pinch", choose("aware", sc.reports, sc.lift_margin))
-    rec.update(pinch_success=bool(p.success), pinch_reason=p.reason, pinch_s=round(time.time() - t1, 1))
+    tries, why = [], "no grasp"                       # the best TOP choices that can be planned, best first
+    for c in choose("aware", sc.reports, sc.lift_margin, k=20):
+        e = sc._execute(c)
+        if e.reason.startswith("plan"):
+            why = why if tries else e.reason
+            continue
+        tries.append((bool(e.success), e.reason))
+        if len(tries) == TOP:
+            break
+    rec.update(pinch_success=bool(tries and tries[0][0]), pinch_reason=tries[0][1] if tries else why,
+               pinch_tries=[t[0] for t in tries], pinch_s=round(time.time() - t1, 1))
     t1 = time.time()
     f_h = HOOKS / f"{name}.npz"
     hooks = load_hook_file(f_h) if f_h.exists() else []
     opts = hook_options(sc.fc, GripperSim(sc.cfg, sc.obj), hooks, T_start=sc.ep.resting_pose()) if hooks else []
     rec.update(hook_features(hooks, opts))
-    ok = [o for o in opts if o.ok]
-    if not hooks:
-        h_ok, h_why = False, "no hook"
-    elif not ok:
-        h_ok, h_why = False, "no hook passes the checks"
-    else:
-        h_ok, h_why = False, "plan"
-        for o in ok[:5]:
-            paths, why = plan_hook(sc.ep, sc.fc, o)
-            if paths is None:
-                h_why = f"plan: {why}"
-                continue
-            res = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED, mu=mu)
-            h_ok = bool(res.success)
-            h_why = "" if h_ok else ("collision" if res.collisions else "dropped" if not res.held else "qr")
+    ok = rank_hooks(opts)
+    tries, h_why = [], "no hook" if not hooks else "no hook passes the checks" if not ok else "plan"
+    for o in ok[:12]:
+        paths, why = plan_hook(sc.ep, sc.fc, o)
+        if paths is None:
+            h_why = h_why if tries else f"plan: {why}"
+            continue
+        res = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED, mu=mu)
+        tries.append((bool(res.success), "" if res.success else
+                      "collision" if res.collisions else "dropped" if not res.held else "qr"))
+        if len(tries) == TOP:
             break
-    rec.update(hook_success=h_ok, hook_reason=h_why, hook_s=round(time.time() - t1, 1),
-               seconds=round(time.time() - t0, 1))
+    rec.update(hook_success=bool(tries and tries[0][0]), hook_reason=tries[0][1] if tries else h_why,
+               hook_tries=[t[0] for t in tries], hook_s=round(time.time() - t1, 1), seconds=round(time.time() - t0, 1))
     return rec
 
 
@@ -234,6 +242,8 @@ def evaluate(recs: list[dict], margin: float = 0.0) -> tuple[dict, np.ndarray]:
                     "always_pinch": float(yp[m].mean()), "always_hook": float(yh[m].mean()),
                     "rule": succ(rule), "learned": succ(choice), "oracle": float(np.maximum(yp, yh)[m].mean()),
                     "learned_hook_share": float(np.mean(choice[m] == "hook")),
+                    "pinch_any_of_top3": float(np.mean([any(r.get("pinch_tries", [])) for r, mm in zip(recs, m) if mm])),
+                    "hook_any_of_top3": float(np.mean([any(r.get("hook_tries", [])) for r, mm in zip(recs, m) if mm])),
                     "only_hook_works": float(np.mean((yh > yp)[m])), "only_pinch_works": float(np.mean((yp > yh)[m]))}
     return out, np.stack([prob[:, 0], prob[:, 1], choice == "hook"], 1)
 
@@ -387,7 +397,8 @@ def main() -> int:
         log(f"{g:4s} ({v['scenes']} scenes, {v['objects']} objects): always pinch {v['always_pinch']:.0%}, always hook "
             f"{v['always_hook']:.0%}, rule {v['rule']:.0%}, learned {v['learned']:.0%} (hook chosen "
             f"{v['learned_hook_share']:.0%}), oracle {v['oracle']:.0%}; only the hook worked in "
-            f"{v['only_hook_works']:.0%}, only the pinch in {v['only_pinch_works']:.0%}")
+            f"{v['only_hook_works']:.0%}, only the pinch in {v['only_pinch_works']:.0%}; any of the top 3 succeeds: "
+            f"pinch {v['pinch_any_of_top3']:.0%}, hook {v['hook_any_of_top3']:.0%}")
     plot(recs, res, pred, ROOT / "media" / ("chooser_smoke.png" if args.smoke else "chooser.png"))
     X = np.stack([vector(r) for r in recs])
     ch = Chooser.fit(X, np.array([r["pinch_success"] for r in recs], float),

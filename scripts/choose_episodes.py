@@ -34,7 +34,7 @@ import sys
 import time
 import zlib
 from collections import defaultdict
-from dataclasses import asdict, replace
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -117,10 +117,11 @@ def cloud_for(name: str) -> np.ndarray:
 
 def hook_job(args):
     """Lift-test the network's proposals, keep up to 6 distinct ones that lift (most probable
-    first), and where the object hangs on each; saved to data/hooks_net/<name>.npz."""
+    first), their robustness (chooser.hook_robustness) and where the object hangs on each;
+    saved to data/hooks_net/<name>.npz."""
     name, cands = args
+    from grasp2show.chooser import hook_robustness
     from grasp2show.config import ObjectConfig, SceneConfig
-    from grasp2show.feasibility import twin_of  # noqa: F401  (hang_table uses both twins)
     from grasp2show.gripper_sim import GripperSim
     from grasp2show.hanging import hang_table, nudge, save_hook_file
     from grasp2show.hooks import lift_test
@@ -143,6 +144,8 @@ def hook_job(args):
             hooks.append({"T": T, "width": float(c["width"]), "kind": c["kind"], "prob": float(c["prob"])})
             if len(hooks) == 6:
                 break
+        for h in hooks:
+            h["robust"] = hook_robustness(sim, h["T"], h["width"])
         hang_table(sim, hooks)
         save_hook_file(HOOKS / f"{name}.npz", hooks)
     except Exception as e:  # noqa: BLE001 (an object that does not load: left out, say why)
@@ -150,14 +153,50 @@ def hook_job(args):
     return name, len(hooks), time.time() - t0, ""
 
 
+MAX_ROBUST = 150     # pinch grasps tested for robustness per object (the rest count as r = 0.5)
+
+
+def pinch_robust_job(name: str):
+    """Robustness of every grasp that lifts (chooser.pinch_robustness), up to MAX_ROBUST of them:
+    data/grasps_choose/<name>.robust.npy (NaN: not tested)."""
+    from grasp2show.chooser import pinch_robustness
+    from grasp2show.config import ObjectConfig, SceneConfig
+    from grasp2show.gripper_sim import GripperSim
+    from grasp2show.objects import object_from_config
+
+    f = GRASPS / f"{name}.robust.npy"
+    if f.exists():
+        return name, "", 0.0
+    t0 = time.time()
+    try:
+        z = np.load(GRASPS / f"{name}.npz")
+        obj = object_from_config(ObjectConfig(asset=name))
+        sim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
+        r = np.full(len(z["success"]), np.nan)
+        idx = np.flatnonzero(z["success"])
+        idx = np.random.default_rng(crc(name)).permutation(idx)[:MAX_ROBUST]
+        for i in idx:
+            r[i] = pinch_robustness(sim, z["T_obj_tcp"][i].astype(float), float(z["width"][i]))
+    except Exception as e:  # noqa: BLE001 (an object that does not load: left out, say why)
+        return name, f"{type(e).__name__}: {e}", time.time() - t0
+    np.save(f, r)
+    return name, "", time.time() - t0
+
+
 # ---------------------------------------------------------------- episodes
 
+POSE_ERR_MM, POSE_ERR_DEG = 2.0, 1.5     # where the object really is vs where the robot thinks (1 sigma)
+VARIANTS = ("score", "robust")
+
+
 def episode(args) -> dict:
-    """One scene: both strategies' checks (features), both executed (outcomes)."""
+    """One scene: both strategies' checks (features) and, for both rankings ("score": the
+    checks' margins; "robust": also the candidate's robustness), each strategy's top TOP
+    candidates executed with the same unknown error in the object's pose."""
     name, k, group, scale = args
-    from grasp2show.chooser import hook_features, pinch_features, rank_hooks, scene_features
+    from grasp2show.chooser import hook_features, pinch_features, rank_hooks, rank_pinch, scene_features
     from grasp2show.config import ObjectConfig, random_camera
-    from grasp2show.experiment import Scenario, choose
+    from grasp2show.experiment import Scenario
     from grasp2show.gripper_sim import GripperSim
     from grasp2show.hanging import HOOK_SPEED, hook_options, load_hook_file, plan_hook
     from grasp2show.objects import object_from_config
@@ -170,43 +209,70 @@ def episode(args) -> dict:
     cam = replace(cam, width=int(cam.width * scale), height=int(cam.height * scale))
     mass0 = object_from_config(ObjectConfig(asset=name)).mass
     mu, f = sample_conditions(r, mass0)
+    e_xy = np.clip(r.normal(0, POSE_ERR_MM / 1000, 2), -2.5 * POSE_ERR_MM / 1000, 2.5 * POSE_ERR_MM / 1000)
+    e_yaw = float(np.clip(r.normal(0, np.radians(POSE_ERR_DEG)), -np.radians(2.5 * POSE_ERR_DEG),
+                          np.radians(2.5 * POSE_ERR_DEG)))
+    off = (float(e_xy[0]), float(e_xy[1]), e_yaw)
     z = np.load(GRASPS / f"{name}.npz")
     sc = Scenario(name, yaw, {kk: z[kk] for kk in ("T_obj_tcp", "width", "success")}, start_xy=xy, camera=cam,
                   mass_scale=f, mu=mu)
     sc.lift_margin = np.where(sc.lift_ok, sc.lift_margin, -1.0)   # this friction and weight, not clipped
+    f_r = GRASPS / f"{name}.robust.npy"
+    R = np.nan_to_num(np.load(f_r), nan=0.5) if f_r.exists() else np.full(len(sc.T), 0.5)
     rec = {"object": name, "scene": k, "group": group, "mu": mu, "mass_scale": f, "mass_kg": round(sc.obj.mass, 3),
+           "pose_error": [round(off[0] * 1000, 2), round(off[1] * 1000, 2), round(float(np.degrees(off[2])), 2)],
            **scene_features(mu, sc.obj.mass, sc.obj.mesh.extents), **pinch_features(sc)}
+
     t1 = time.time()
-    tries, why = [], "no grasp"                       # the best TOP choices that can be planned, best first
-    for c in choose("aware", sc.reports, sc.lift_margin, k=20):
-        e = sc._execute(c)
-        if e.reason.startswith("plan"):
-            why = why if tries else e.reason
-            continue
-        tries.append((bool(e.success), e.reason))
-        if len(tries) == TOP:
-            break
-    rec.update(pinch_success=bool(tries and tries[0][0]), pinch_reason=tries[0][1] if tries else why,
-               pinch_tries=[t[0] for t in tries], pinch_s=round(time.time() - t1, 1))
+    done: dict = {}
+    for v in VARIANTS:
+        ranked = rank_pinch(sc, R if v == "robust" else None)
+        tries, why = [], "no grasp"
+        for c in ranked:
+            key = (c.grasp, c.twin, c.roll_idx)
+            if key not in done:
+                done[key] = sc._execute(c, obj_offset=off)
+            e = done[key]
+            if e.reason.startswith("plan"):
+                why = why if tries else e.reason
+                continue
+            tries.append((bool(e.success), e.reason, float(R[c.grasp])))
+            if len(tries) == TOP:
+                break
+        rec.update({f"pinch_success_{v}": bool(tries and tries[0][0]), f"pinch_reason_{v}": tries[0][1] if tries else why,
+                    f"pinch_tries_{v}": [t[0] for t in tries], f"pinch_r_{v}": tries[0][2] if tries else 0.0})
+    rec["pinch_s"] = round(time.time() - t1, 1)
+
     t1 = time.time()
     f_h = HOOKS / f"{name}.npz"
     hooks = load_hook_file(f_h) if f_h.exists() else []
     opts = hook_options(sc.fc, GripperSim(sc.cfg, sc.obj), hooks, T_start=sc.ep.resting_pose()) if hooks else []
     rec.update(hook_features(hooks, opts))
-    ok = rank_hooks(opts)
-    tries, h_why = [], "no hook" if not hooks else "no hook passes the checks" if not ok else "plan"
-    for o in ok[:12]:
-        paths, why = plan_hook(sc.ep, sc.fc, o)
-        if paths is None:
-            h_why = h_why if tries else f"plan: {why}"
-            continue
-        res = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED, mu=mu)
-        tries.append((bool(res.success), "" if res.success else
-                      "collision" if res.collisions else "dropped" if not res.held else "qr"))
-        if len(tries) == TOP:
-            break
-    rec.update(hook_success=bool(tries and tries[0][0]), hook_reason=tries[0][1] if tries else h_why,
-               hook_tries=[t[0] for t in tries], hook_s=round(time.time() - t1, 1), seconds=round(time.time() - t0, 1))
+    done = {}
+    for v in VARIANTS:
+        ok = rank_hooks(opts, hooks if v == "robust" else None)
+        tries, h_why = [], "no hook" if not hooks else "no hook passes the checks" if not ok else "plan"
+        for o in ok[:12]:
+            key = (o.hook, o.twin, o.pitch_deg, o.extra_deg)
+            if key not in done:
+                paths, why = plan_hook(sc.ep, sc.fc, o)
+                if paths is None:
+                    done[key] = (None, f"plan: {why}")
+                else:
+                    res = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED,
+                                        mu=mu, obj_offset=off)
+                    done[key] = (bool(res.success), "" if res.success else
+                                 "collision" if res.collisions else "dropped" if not res.held else "qr")
+            ok_, why = done[key]
+            if ok_ is None:
+                h_why = h_why if tries else why
+                continue
+            tries.append((ok_, why, float(hooks[o.hook].get("robust", 0.5))))
+            if len(tries) == TOP:
+                break
+        rec.update({f"hook_success_{v}": bool(tries and tries[0][0]), f"hook_reason_{v}": tries[0][1] if tries else h_why,
+                    f"hook_tries_{v}": [t[0] for t in tries], f"hook_r_{v}": tries[0][2] if tries else 0.0})
+    rec.update(hook_s=round(time.time() - t1, 1), seconds=round(time.time() - t0, 1))
     return rec
 
 
@@ -216,10 +282,11 @@ def folds(names: list[str], k: int = 5) -> dict[str, int]:
     return {n: crc("fold" + n) % k for n in names}
 
 
-def evaluate(recs: list[dict], margin: float = 0.0) -> tuple[dict, np.ndarray]:
-    X = np.stack([vector(r) for r in recs])
-    yp = np.array([r["pinch_success"] for r in recs], float)
-    yh = np.array([r["hook_success"] for r in recs], float)
+def evaluate(recs: list[dict], v: str = "robust", margin: float = 0.0) -> tuple[dict, np.ndarray]:
+    """The chooser for ranking v, cross-validated by object, against the fixed policies."""
+    X = np.stack([vector(r, v) for r in recs])
+    yp = np.array([r[f"pinch_success_{v}"] for r in recs], float)
+    yh = np.array([r[f"hook_success_{v}"] for r in recs], float)
     fold = folds(sorted({r["object"] for r in recs}))
     fi = np.array([fold[r["object"]] for r in recs])
     choice = np.empty(len(recs), "<U5")
@@ -238,14 +305,33 @@ def evaluate(recs: list[dict], margin: float = 0.0) -> tuple[dict, np.ndarray]:
         if not m.any():
             continue
         succ = lambda c, m=m: float(np.mean(np.where(c[m] == "hook", yh[m], yp[m])))
+        any3 = lambda key, m=m: float(np.mean([any(r.get(key, [])) for r, mm in zip(recs, m) if mm]))
         out[grp] = {"scenes": int(m.sum()), "objects": len({r["object"] for r, mm in zip(recs, m) if mm}),
                     "always_pinch": float(yp[m].mean()), "always_hook": float(yh[m].mean()),
                     "rule": succ(rule), "learned": succ(choice), "oracle": float(np.maximum(yp, yh)[m].mean()),
                     "learned_hook_share": float(np.mean(choice[m] == "hook")),
-                    "pinch_any_of_top3": float(np.mean([any(r.get("pinch_tries", [])) for r, mm in zip(recs, m) if mm])),
-                    "hook_any_of_top3": float(np.mean([any(r.get("hook_tries", [])) for r, mm in zip(recs, m) if mm])),
+                    "pinch_any_of_top3": any3(f"pinch_tries_{v}"), "hook_any_of_top3": any3(f"hook_tries_{v}"),
                     "only_hook_works": float(np.mean((yh > yp)[m])), "only_pinch_works": float(np.mean((yp > yh)[m]))}
-    return out, np.stack([prob[:, 0], prob[:, 1], choice == "hook"], 1)
+    return out, np.stack([prob[:, 0], prob[:, 1], choice == "hook", yp, yh], 1)
+
+
+def ranking_table(recs: list[dict]) -> dict:
+    """Score vs robust ranking, per strategy: success of the candidate each would run, over the
+    scenes where that strategy had a candidate; and where the two picked different ones."""
+    out = {}
+    for s in ("pinch", "hook"):
+        m = [r for r in recs if r[f"{s}_tries_score"] or r[f"{s}_tries_robust"]]
+        diff = [r for r in m if r[f"{s}_r_score"] != r[f"{s}_r_robust"] or
+                r[f"{s}_tries_score"] != r[f"{s}_tries_robust"]]
+        out[s] = {"scenes_with_a_candidate": len(m),
+                  "score": float(np.mean([r[f"{s}_success_score"] for r in m])) if m else float("nan"),
+                  "robust": float(np.mean([r[f"{s}_success_robust"] for r in m])) if m else float("nan"),
+                  "scenes_where_they_differ": len(diff),
+                  "score_where_differ": float(np.mean([r[f"{s}_success_score"] for r in diff])) if diff else float("nan"),
+                  "robust_where_differ": float(np.mean([r[f"{s}_success_robust"] for r in diff])) if diff else float("nan"),
+                  "r_of_choice_score": float(np.mean([r[f"{s}_r_score"] for r in m])) if m else float("nan"),
+                  "r_of_choice_robust": float(np.mean([r[f"{s}_r_robust"] for r in m])) if m else float("nan")}
+    return out
 
 
 def plot(recs: list[dict], res: dict, pred: np.ndarray, path: Path) -> None:
@@ -274,8 +360,7 @@ def plot(recs: list[dict], res: dict, pred: np.ndarray, path: Path) -> None:
     ax = axs[1]
     mu = np.array([r["mu"] for r in recs])
     mass = np.array([r["mass_kg"] for r in recs])
-    yp = np.array([r["pinch_success"] for r in recs])
-    yh = np.array([r["hook_success"] for r in recs])
+    yp, yh = pred[:, 3].astype(bool), pred[:, 4].astype(bool)
     cat = np.where(yp & yh, 0, np.where(yp, 1, np.where(yh, 2, 3)))
     for c, (lab, col) in enumerate((("both", "#9D9D9D"), ("only pinch", "#4C78A8"), ("only hook", "#E45756"),
                                     ("neither", "#E0E0E0"))):
@@ -335,7 +420,7 @@ def main() -> int:
     objs = objects(args.gen, args.smoke)
     log(f"== chooser {time.strftime('%Y-%m-%d %H:%M')}: {sum(g == 'real' for g in objs.values())} real and "
         f"{sum(g == 'gen' for g in objs.values())} generated objects, {args.scenes} scenes each")
-    rec_f = out / "records.jsonl"
+    rec_f = out / "records_v2.jsonl"       # v2: both rankings, pose error
     if args.stage in ("all", "prepare", "episodes"):
         from self_train_hooks import download_missing
 
@@ -347,13 +432,18 @@ def main() -> int:
                 log(f"grasps: {len(todo)} objects to label")
                 for i, (n, r) in enumerate(pool.run(grasp_job, todo), 1):
                     log(f"  [{i}/{len(todo)}] {n}: " + ("lost" if r is None else r[1] or f"{r[2]:.0f} s"))
+                todo = [n for n in names if (GRASPS / f"{n}.npz").exists() and not (GRASPS / f"{n}.robust.npy").exists()]
+                log(f"pinch robustness: {len(todo)} objects")
+                for i, (n, r) in enumerate(pool.run(pinch_robust_job, todo), 1):
+                    log(f"  [{i}/{len(todo)}] {n}: " + ("lost" if r is None else r[1] or f"{r[2]:.0f} s"))
                 import torch
 
                 from grasp2show.learn.hooknet import load_hook_net, predict_hooks
 
                 dev = "cuda" if torch.cuda.is_available() else "cpu"
                 net = load_hook_net(args.model, dev)
-                todo = [n for n in names if not (HOOKS / f"{n}.npz").exists()]
+                todo = [n for n in names if not (HOOKS / f"{n}.npz").exists()
+                        or "robust" not in np.load(HOOKS / f"{n}.npz").files]
                 log(f"hooks: {len(todo)} objects")
                 jobs = []
                 for n in todo:
@@ -381,9 +471,10 @@ def main() -> int:
                             continue
                         fh.write(json.dumps(r, default=float) + "\n")
                         fh.flush()
+                        o_ = lambda s, v, r=r: "ok" if r[f"{s}_success_{v}"] else r[f"{s}_reason_{v}"][:18]
                         log(f"  [{i}/{len(jobs)}] {r['object'][:30]:30s} mu {r['mu']:.2f} {r['mass_kg']:.2f} kg: pinch "
-                            f"{'ok' if r['pinch_success'] else r['pinch_reason'][:24]}, hook "
-                            f"{'ok' if r['hook_success'] else r['hook_reason'][:24]} ({r['seconds']:.0f} s)")
+                            f"{o_('pinch', 'score')} / {o_('pinch', 'robust')}, hook {o_('hook', 'score')} / "
+                            f"{o_('hook', 'robust')} ({r['seconds']:.0f} s)")
                 log(f"episodes done ({(time.time() - t0) / 60:.0f} min)")
         finally:
             pool.close()
@@ -391,22 +482,32 @@ def main() -> int:
     if len({r["object"] for r in recs}) < 5:
         log(f"{len(recs)} scenes: too few objects to cross-validate a chooser")
         return 0
-    res, pred = evaluate(recs)
-    (out / "results.json").write_text(json.dumps(res, indent=1))
-    for g, v in res.items():
-        log(f"{g:4s} ({v['scenes']} scenes, {v['objects']} objects): always pinch {v['always_pinch']:.0%}, always hook "
-            f"{v['always_hook']:.0%}, rule {v['rule']:.0%}, learned {v['learned']:.0%} (hook chosen "
-            f"{v['learned_hook_share']:.0%}), oracle {v['oracle']:.0%}; only the hook worked in "
-            f"{v['only_hook_works']:.0%}, only the pinch in {v['only_pinch_works']:.0%}; any of the top 3 succeeds: "
-            f"pinch {v['pinch_any_of_top3']:.0%}, hook {v['hook_any_of_top3']:.0%}")
-    plot(recs, res, pred, ROOT / "media" / ("chooser_smoke.png" if args.smoke else "chooser.png"))
-    X = np.stack([vector(r) for r in recs])
-    ch = Chooser.fit(X, np.array([r["pinch_success"] for r in recs], float),
-                     np.array([r["hook_success"] for r in recs], float))
+    results = {"ranking": ranking_table(recs)}
+    for s_, t in results["ranking"].items():
+        log(f"{s_:5s} ranking, success of the candidate it would run: score {t['score']:.0%}, robust {t['robust']:.0%} "
+            f"({t['scenes_with_a_candidate']} scenes; they picked differently in {t['scenes_where_they_differ']}: "
+            f"score {t['score_where_differ']:.0%} vs robust {t['robust_where_differ']:.0%}; robustness of the "
+            f"chosen candidate {t['r_of_choice_score']:.2f} vs {t['r_of_choice_robust']:.2f})")
+    preds = {}
+    for v in VARIANTS:
+        results[v], preds[v] = evaluate(recs, v)
+        for g, x in results[v].items():
+            log(f"[{v}] {g:4s} ({x['scenes']} scenes, {x['objects']} objects): always pinch {x['always_pinch']:.0%}, "
+                f"always hook {x['always_hook']:.0%}, rule {x['rule']:.0%}, learned {x['learned']:.0%} (hook chosen "
+                f"{x['learned_hook_share']:.0%}), oracle {x['oracle']:.0%}; only the hook worked in "
+                f"{x['only_hook_works']:.0%}, only the pinch in {x['only_pinch_works']:.0%}; any of the top 3: "
+                f"pinch {x['pinch_any_of_top3']:.0%}, hook {x['hook_any_of_top3']:.0%}")
+    (out / "results.json").write_text(json.dumps(results, indent=1))
+    best = max(VARIANTS, key=lambda v: results[v]["all"]["learned"])
+    for v in VARIANTS:
+        plot(recs, results[v], preds[v], ROOT / "media" / f"chooser_{v}{'_smoke' if args.smoke else ''}.png")
+    X = np.stack([vector(r, best) for r in recs])
+    ch = Chooser.fit(X, np.array([r[f"pinch_success_{best}"] for r in recs], float),
+                     np.array([r[f"hook_success_{best}"] for r in recs], float))
     if not args.smoke:
         ch.save(ROOT / "data" / "models" / "chooser.pt")
-    log(f"features: {', '.join(FEATURES)}; wrote data/models/chooser.pt, media/chooser.png")
-    _ = asdict  # (kept for symmetry with the other episode scripts)
+    log(f"better ranking: {best}; features: {', '.join(FEATURES)}; wrote data/models/chooser.pt, "
+        f"media/chooser_score.png, media/chooser_robust.png")
     return 0
 
 

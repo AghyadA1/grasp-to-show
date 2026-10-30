@@ -328,9 +328,10 @@ def load_hook_file(f: Path) -> list[dict]:
     file has the hanging poses."""
     z = np.load(f)
     hooks = [{"T": T, "width": float(w), "kind": str(k)} for T, w, k in zip(z["T"], z["width"], z["kind"])]
-    if "prob" in z.files:
-        for h, p in zip(hooks, z["prob"]):
-            h["prob"] = float(p)
+    for key in ("prob", "robust"):
+        if key in z.files:
+            for h, p in zip(hooks, z[key]):
+                h[key] = float(p)
     if "hang_T" in z.files:                          # cached hanging poses
         for i, h in enumerate(hooks):
             h["hangs"] = {}
@@ -346,8 +347,9 @@ def save_hook_file(f: Path, hooks: list[dict]) -> None:
     """Hooks (and their hanging poses, if hang_table added them) to f (.npz)."""
     base = {"T": np.array([h["T"] for h in hooks]).reshape(-1, 4, 4), "width": np.array([h["width"] for h in hooks]),
             "kind": np.array([h["kind"] for h in hooks])}
-    if hooks and "prob" in hooks[0]:
-        base["prob"] = np.array([h["prob"] for h in hooks])
+    for key in ("prob", "robust"):
+        if hooks and key in hooks[0]:
+            base[key] = np.array([h[key] for h in hooks])
     if hooks and "hangs" in hooks[0]:
         n, P = len(hooks), len(PITCHES)
         hang_T, carry = np.full((n, 2, P, 4, 4), np.nan), np.full((n, 2, P, 4, 4), np.nan)

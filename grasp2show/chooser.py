@@ -20,6 +20,12 @@ rubbery box is best pinched (faster, steadier, no swing). The scenes span both:
   mass the object's own times a factor log-uniform 0.5-8 (empty to filled / heavier material),
        at most 3 kg (the Panda's payload).
 
+Two rankings are compared, for both strategies: "score" (the checks' margins only) and "robust"
+(the same plus the candidate's robustness r: the share of its small shifts that still hold, see
+below). Each scene adds the error a real robot has: the object lies a few millimetres and a
+degree or two from where the robot believes (unknown to the planner, the same for every
+candidate), so a choice on a knife edge can fail.
+
 Each strategy runs its best candidate: the pinch's (grasp, side, turn) with the largest smallest
 margin (experiment.choose "aware"), the hook's (hook, side, carry pitch, turn) likewise
 (hook_score); if its motion cannot be planned, the next. The episodes also run each strategy's
@@ -59,7 +65,8 @@ PINCH_KEYS = ("pinch_any", "pinch_n_ok", "pinch_best", "pinch_lift", "pinch_stab
 HOOK_KEYS = ("hook_n", "hook_any", "hook_n_ok", "hook_best", "hook_pixels", "hook_angle", "hook_swing", "hook_tilt",
              "hook_pitch", "hook_one", "hook_prob")
 SCENE_KEYS = ("mu", "log_mass", "load", "ext_max", "ext_min")
-FEATURES = SCENE_KEYS + PINCH_KEYS + HOOK_KEYS
+ROBUST_KEYS = ("pinch_r", "hook_r")       # robustness of the candidate each strategy would run
+FEATURES = SCENE_KEYS + PINCH_KEYS + HOOK_KEYS + ROBUST_KEYS
 
 
 def pinch_features(sc) -> dict:
@@ -90,6 +97,92 @@ def pinch_features(sc) -> dict:
             "pinch_n_lift_ok": float(np.log1p(np.sum(sc.lift_margin > 0)))}
 
 
+# ---------------------------------------------------------------- robustness (local support)
+#
+# A candidate that scores well may sit on a knife edge: the fit has 1 mm to spare, or the label
+# came from one lucky test, or the scan's shape is slightly wrong there. A candidate whose small
+# shifts also work has room for the errors a real robot makes (where the object is, what shape
+# it has). Counting nearby candidates that worked would measure where the proposers looked, not
+# robustness (the network proposes densely where it is confident), so each candidate is tested
+# shifted by the same fixed set of small displacements and turns: r = the share that still holds.
+
+PERTURB_MM, PERTURB_DEG = 3.0, 6.0
+
+
+def perturbations(mm: float = PERTURB_MM, deg: float = PERTURB_DEG, axes_shift="xyz", axes_turn="xz") -> list:
+    """Fixed small displacements of a grasp pose, in the TCP frame: +-mm along each of axes_shift,
+    +-deg about each of axes_turn."""
+    out = []
+    for a in axes_shift:
+        for s in (-1, 1):
+            T = np.eye(4)
+            T["xyz".index(a), 3] = s * mm / 1000
+            out.append(T)
+    for a in axes_turn:
+        for s in (-1, 1):
+            th = np.radians(s * deg)
+            c, sn = np.cos(th), np.sin(th)
+            R = {"x": [[1, 0, 0], [0, c, -sn], [0, sn, c]], "y": [[c, 0, sn], [0, 1, 0], [-sn, 0, c]],
+                 "z": [[c, -sn, 0], [sn, c, 0], [0, 0, 1]]}[a]
+            T = np.eye(4)
+            T[:3, :3] = R
+            out.append(T)
+    return out
+
+
+def hook_robustness(sim, T: np.ndarray, width: float) -> float:
+    """Share of the perturbed hooks (shifted +-3 mm along x, y, z, turned +-6 deg about the
+    approach and the across axes) that still lift the object (no nudge: the shift is the test)."""
+    from .hanging import max_penetration
+    from .hooks import lift_test
+
+    ok = 0
+    P = perturbations(axes_turn="xz")
+    for dT in P:
+        Tp = T @ dT
+        ok += max_penetration(sim, Tp, width) <= 0.001 and lift_test(sim, Tp, width, close=False)["success"]
+    return ok / len(P)
+
+
+def pinch_robustness(sim, T: np.ndarray, width: float) -> float:
+    """Share of the perturbed pinches (shifted +-3 mm along the approach and across the fingers,
+    turned +-6 deg about those axes; a shift along the closing axis is taken up by the fingers)
+    that are collision-free and pass the lift-and-shake test."""
+    ok = 0
+    P = perturbations(axes_shift="xz", axes_turn="xz")
+    for dT in P:
+        Tp = T @ dT
+        ok += (not sim.in_collision(Tp, width)) and sim.shake_test(Tp, width).success
+    return ok / len(P)
+
+
+def robust_part(r: float) -> float:
+    """r as a margin like the others: 0 at r = 0.5, 1 at r = 1, -1 at r = 0."""
+    return 2.0 * (r - 0.5)
+
+
+def rank_pinch(sc, robust: np.ndarray | None = None, k: int = 20) -> list:
+    """The pinch's ranked choices (experiment.choose "aware": every check passes, the largest
+    smallest normalised margin first), with robust (per grasp, r) added as one more margin."""
+    from .experiment import Choice
+
+    scored = []
+    for i, r in sc.reports.items():
+        for tw in r.twins:
+            if not tw.start_ok:
+                continue
+            for j, t in enumerate(tw.targets):
+                if not (t.reach.ok and t.stability_margin > 0 and t.visibility is not None and t.visibility.ok()):
+                    continue
+                parts = [sc.lift_margin[i], tw.start.limit_margin / LIMIT_SCALE, t.reach.limit_margin / LIMIT_SCALE,
+                         t.stability_margin, (t.visibility.fraction - 0.9) / 0.1]
+                if robust is not None:
+                    parts.append(robust_part(float(robust[i])))
+                scored.append((min(parts), Choice(i, tw.twin, j, r.ok)))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [c for _, c in scored[:k]]
+
+
 def hook_score(o) -> float:
     """A feasible hook option's smallest normalised margin, as the pinch's "aware" ranking: the QR's
     size above 50 px and angle below 45 deg, and the joint-limit margins at the grasp, the
@@ -99,9 +192,11 @@ def hook_score(o) -> float:
     return float(min(parts))
 
 
-def rank_hooks(opts: list) -> list:
-    """Feasible hook options, best first (hook_score)."""
-    return sorted([o for o in opts if o.ok], key=hook_score, reverse=True)
+def rank_hooks(opts: list, hooks: list[dict] | None = None) -> list:
+    """Feasible hook options, best first (hook_score); with hooks carrying "robust" (r), r is
+    one more margin (robust_part)."""
+    key = hook_score if hooks is None else (lambda o: min(hook_score(o), robust_part(hooks[o.hook]["robust"])))
+    return sorted([o for o in opts if o.ok], key=key, reverse=True)
 
 
 def hook_features(hooks: list[dict], opts: list) -> dict:
@@ -127,8 +222,11 @@ def scene_features(mu: float, mass: float, extents, finger_force: float = 20.0) 
             "ext_max": float(e[-1]) * 10, "ext_min": float(e[0]) * 10}
 
 
-def vector(rec: dict) -> np.ndarray:
-    return np.array([float(rec[k]) for k in FEATURES], np.float32)
+def vector(rec: dict, variant: str = "robust") -> np.ndarray:
+    """The chooser's inputs for one scene; the robustness features are those of the candidates
+    the given ranking would run."""
+    get = lambda k: rec[f"{k}_{variant}"] if k in ROBUST_KEYS else rec[k]
+    return np.array([float(get(k)) for k in FEATURES], np.float32)
 
 
 # ---------------------------------------------------------------- choosers

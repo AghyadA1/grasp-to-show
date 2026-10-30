@@ -310,11 +310,22 @@ def plan_hook(ep, fc: FeasibilityChecker, o: HookOption, shape: bool = False):
     has died down after the 2 s hold; what remains is a static offset of the hanging pose). Returns (paths, None) or
     (None, reason)."""
     # the object swings on the finger while carried: check it hanging as found and swung +-SWING deg
-    swung = [make_T(_rot_axis([0.0, 0.0, 1.0], np.radians(a)), [0, 0, 0]) @ o.hang.T_tcp_obj for a in (-SWING, SWING)]
-    paths, why = ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, checker=fc, width=o.width, T_show=o.T_show,
-                                  T_tcp_held=[o.hang.T_tcp_obj, *swung], open_width=o.width,
-                                  finger_floor=float(np.sin(np.radians(max(o.pitch_deg - 15.0, 0.0)))),
-                                  T_lift=o.T_start @ o.hang.T_carry, T_start=o.T_start)
+    # about the finger it hangs from (the TCP's z axis through the hooking fingertip, at +w/2 on y:
+    # for a one-finger hook that is 4 cm from the TCP; turning about the TCP instead pushed the
+    # handle 15 mm into the palm and failed every carry)
+    pivot = np.array([0.0, o.width / 2, 0.0])
+    swung = []
+    for a in (-SWING, SWING):
+        R = _rot_axis([0.0, 0.0, 1.0], np.radians(a))
+        swung.append(make_T(R, pivot - R @ pivot) @ o.hang.T_tcp_obj)
+    fc.hooked = True                       # the swing is stopped by the hand: leaning on it is no collision
+    try:
+        paths, why = ep.plan_analytic(o.T_obj_tcp, None, o.start.q, o.show.q, checker=fc, width=o.width,
+                                      T_show=o.T_show, T_tcp_held=[o.hang.T_tcp_obj, *swung], open_width=o.width,
+                                      finger_floor=float(np.sin(np.radians(max(o.pitch_deg - 15.0, 0.0)))),
+                                      T_lift=o.T_start @ o.hang.T_carry, T_start=o.T_start)
+    finally:
+        fc.hooked = False
     if paths is not None and shape:
         paths["shaper_delay"] = 0.5 * swing_period(fc.obj, o.hang.T_tcp_obj)
     return paths, why

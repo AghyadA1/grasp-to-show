@@ -341,6 +341,32 @@ class PickAndShow:
                             "transit": [q0, qv, qc], "present": present}, None
         transit = self.track(cartesian_line(fk(up[-1]), T_preshow, 40), up[-1], max_step=0.5)
         if transit is None or not all(free(a, b, holding=True, n=4) for a, b in itertools.pairwise(transit)):
+            # last: a search in joint space (RRT-Connect) that keeps the fingers up and the held
+            # object clear, from the lift (or 25 cm above it) to pre-show configurations that can
+            # be tracked to the show pose
+            goals = []
+            for qc in S[:10]:
+                pres = self.track(cartesian_line(T_preshow, T_show, 8), qc)
+                if pres is not None:
+                    goals.append((qc, pres))
+                if len(goals) == 4:
+                    break
+            if not goals:
+                return None, why
+
+            def ok(qa, qb, n=8):
+                return not droops(qa, qb, n) and free(qa, qb, holding=True, n=n)
+
+            for lift_path in starts:
+                path = rrt_connect(lift_path[-1], [g for g, _ in goals], ok, np.random.default_rng(len(lift_path)),
+                                   lambda q: fk(q)[2, 2] >= finger_floor)
+                if path is None:
+                    continue
+                if not all(ok(a, b, 30) for a, b in itertools.pairwise(path)):
+                    continue
+                pres = next(p for g, p in goals if np.allclose(g, path[-1]))
+                return {"approach": approach, "descend": descend, "lift": lift_path, "transit": path,
+                        "present": pres}, None
             return None, why
         present = self.track(cartesian_line(T_preshow, T_show, 8), transit[-1])
         if present is None:
@@ -529,3 +555,61 @@ class PickAndShow:
             transport = TransportLog(log_every * dt, q, qd, qdd, tau, Tt, To)
         return EpisodeResult(grasp.name, not notes, text, qr_ok, held, slip_mm, slip_deg,
                              ok, state["collisions"], notes, rgb, transport)
+
+
+def rrt_connect(q0: np.ndarray, goals: list[np.ndarray], edge_ok, rng: np.random.Generator, state_ok=None,
+                iters: int = 300, step: float = 0.3, shortcut: int = 40) -> list[np.ndarray] | None:
+    """Bidirectional RRT (Kuffner and LaValle's RRT-Connect) in joint space, from q0 to any of
+    the goals. edge_ok(qa, qb): the straight joint segment is allowed (collision-free, constraint
+    held along it); state_ok(q): a sampled configuration is worth extending to. Steps of at most
+    `step` rad (max norm), then random shortcuts. Returns the waypoints or None."""
+    def steer(a, b):
+        d = b - a
+        m = np.abs(d).max()
+        return b if m <= step else a + d * (step / m)
+
+    A = [(np.asarray(q0, float), -1)]
+    B = [(np.asarray(g, float), -1) for g in goals]
+
+    def nearest(T, q):
+        return int(np.argmin([np.abs(n - q).max() for n, _ in T]))
+
+    def branch(T, i):
+        out = []
+        while i >= 0:
+            out.append(T[i][0])
+            i = T[i][1]
+        return out
+
+    for it in range(iters):
+        q_rand = rng.uniform(Q_MIN, Q_MAX)
+        if state_ok is not None and not state_ok(q_rand):
+            continue
+        i = nearest(A, q_rand)
+        q_new = steer(A[i][0], q_rand)
+        if not edge_ok(A[i][0], q_new):
+            A, B = B, A
+            continue
+        A.append((q_new, i))
+        j = nearest(B, q_new)                                      # connect the other tree greedily
+        while True:
+            q_b = steer(B[j][0], q_new)
+            if not edge_ok(B[j][0], q_b):
+                break
+            B.append((q_b, j))
+            j = len(B) - 1
+            if np.abs(q_b - q_new).max() < 1e-9:
+                pa, pb = branch(A, len(A) - 1), branch(B, j)
+                path = pa[::-1] + pb[1:]
+                if np.abs(path[0] - q0).max() > 1e-9:                  # A was the goal tree
+                    path = path[::-1]
+                for _ in range(shortcut):                          # shortcuts
+                    if len(path) < 3:
+                        break
+                    a, b = sorted(rng.choice(len(path), 2, replace=False))
+                    if b - a > 1 and edge_ok(path[a], path[b]):
+                        path = path[:a + 1] + path[b:]
+                return path
+        A, B = B, A
+    return None
+

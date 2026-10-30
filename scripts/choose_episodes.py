@@ -261,8 +261,8 @@ def episode(args) -> dict:
                 else:
                     res = sc.ep.execute(Grasp(f"hook{o.hook}", o.T_obj_tcp, o.width, "hook"), paths, speed=HOOK_SPEED,
                                         mu=mu, obj_offset=off)
-                    done[key] = (bool(res.success), "" if res.success else
-                                 "collision" if res.collisions else "dropped" if not res.held else "qr")
+                    done[key] = (bool(res.success), "" if res.success else "dropped" if not res.held else
+                                 "collision: " + ", ".join(res.collisions[:2]) if res.collisions else "qr")
             ok_, why = done[key]
             if ok_ is None:
                 h_why = h_why if tries else why
@@ -420,7 +420,7 @@ def main() -> int:
     objs = objects(args.gen, args.smoke)
     log(f"== chooser {time.strftime('%Y-%m-%d %H:%M')}: {sum(g == 'real' for g in objs.values())} real and "
         f"{sum(g == 'gen' for g in objs.values())} generated objects, {args.scenes} scenes each")
-    rec_f = out / "records_v2.jsonl"       # v2: both rankings, pose error
+    rec_f = out / "records_v3.jsonl"       # v3: stickers clear of handles, hook swing about its finger
     if args.stage in ("all", "prepare", "episodes"):
         from self_train_hooks import download_missing
 

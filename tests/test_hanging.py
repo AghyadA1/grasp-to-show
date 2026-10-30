@@ -1,4 +1,5 @@
 """Hanging presentation (grasp2show/hanging.py): the show pose of a hooked object."""
+import itertools
 from types import SimpleNamespace
 
 import numpy as np
@@ -50,3 +51,23 @@ def test_carry_pose_raises_the_fingers():
     np.testing.assert_allclose(h0, h1, atol=1e-12)                   # same heading, only raised
     up = make_T(_rot([1.0, 0.0, 0.0], -0.9), [0, 0, 0])             # already pointing up: unchanged
     np.testing.assert_allclose(carry_pose(up, 0.1)[:3, :3], up[:3, :3])
+
+
+def test_rrt_connect_goes_around_an_obstacle():
+    from grasp2show.episode import rrt_connect
+    from grasp2show.franka_ik import Q_MAX, Q_MIN
+
+    mid = 0.5 * (Q_MIN + Q_MAX)
+    q0, g = mid.copy(), mid.copy()
+    q0[0], g[0] = mid[0] - 1.0, mid[0] + 1.0
+
+    def blocked(q):                                   # a wall across joint 0, open only at joint 1 > mid + 0.5
+        return abs(q[0] - mid[0]) < 0.2 and q[1] < mid[1] + 0.5
+
+    def edge_ok(a, b):
+        return not any(blocked((1 - s) * a + s * b) for s in np.linspace(0, 1, 20))
+
+    path = rrt_connect(q0, [g], edge_ok, np.random.default_rng(0), iters=3000)
+    assert path is not None
+    assert np.allclose(path[0], q0) and np.allclose(path[-1], g)
+    assert all(edge_ok(a, b) for a, b in itertools.pairwise(path))

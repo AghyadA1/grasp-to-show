@@ -125,6 +125,8 @@ class FeasibilityChecker:
         m = self.m
         self.robot = {m.body(b).id for b in PANDA_BODIES}
         self.fingers = {m.body("left_finger").id, m.body("right_finger").id}
+        self.hand = m.body("hand").id
+        self.hooked = False      # plan_hook: the held object hangs on a finger and may lean on the hand
         self.obj_body = m.body(self.obj.name).id
         self.obj_qadr = m.jnt_qposadr[m.joint(f"{self.obj.name}_free").id]
         self.qr_geom = m.geom(f"{self.obj.name}_qr").id
@@ -166,6 +168,8 @@ class FeasibilityChecker:
                 other = (pair - {self.obj_body}).pop() if len(pair) == 2 else self.obj_body
                 if holding and other in self.fingers:
                     continue                                   # the grasp itself
+                if holding and self.hooked and other == self.hand:
+                    continue                                   # a hooked object rests on the hand too
                 if not holding and other == 0:
                     continue                                   # object resting on the table
             name = f"{m.body(b1).name}-{m.body(b2).name}"

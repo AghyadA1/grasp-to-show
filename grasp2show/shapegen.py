@@ -694,7 +694,7 @@ def write(g: Generated, root: Path, density: float, mass_range=(0.05, 1.5)) -> d
     scale = float(np.clip(m, *mass_range) / m)                 # keep the mass in the usual range
     m, inertia = m * scale, inertia * scale
     body = trimesh.util.concatenate(g.body)
-    qr = find_qr_patch(body, n_candidates=60, seed=g.params["seed"])
+    qr = find_qr_patch(body, n_candidates=60, seed=g.params["seed"], occluders=g.mesh)   # not under the handle
     if qr is None:
         return None
     d = root / g.name

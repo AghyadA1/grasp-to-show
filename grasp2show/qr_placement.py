@@ -34,8 +34,32 @@ class QRPlacement:
         return cls(np.asarray(d["T_obj_qr"]), float(d["side"]), float(d["flatness"]))
 
 
+def qr_clear(mesh: trimesh.Trimesh, T_obj_qr: np.ndarray, side: float, cone_deg: float = 25.0,
+             dist: float = 0.5) -> float:
+    """Share of sight lines to the sticker that nothing of the object blocks: from its centre and
+    corners, along its normal and tilted +-cone_deg each way (a camera within that cone of the
+    normal), 2 mm off the surface out to `dist`. The placement tests below look only 3 cm out, so
+    a handle or a bail further out could hide a sticker under it."""
+    n, u, v = T_obj_qr[:3, 0], T_obj_qr[:3, 1], T_obj_qr[:3, 2]
+    c = T_obj_qr[:3, 3]
+    h = 0.45 * side
+    pts = [c] + [c + a * h * u + b * h * v for a in (-1, 1) for b in (-1, 1)]
+    t = np.tan(np.radians(cone_deg))
+    dirs = [n] + [(n + t * w) / np.linalg.norm(n + t * w) for w in (u, -u, v, -v)]
+    O = np.array([p + 0.002 * n for p in pts for _ in dirs])
+    D = np.array([d for _ in pts for d in dirs])
+    locs, idx, _ = mesh.ray.intersects_location(O, D, multiple_hits=False)
+    blocked = np.zeros(len(O), bool)
+    if len(idx):
+        blocked[idx[np.linalg.norm(locs - O[idx], axis=1) < dist]] = True
+    return float(1.0 - blocked.mean())
+
+
 def find_qr_face(mesh: trimesh.Trimesh, min_side: float = 0.03, max_side: float = 0.045,
-                 flat_tol: float = 0.002, grid: int = 7, up=(0, 0, 1)) -> QRPlacement | None:
+                 flat_tol: float = 0.002, grid: int = 7, up=(0, 0, 1), occluders: trimesh.Trimesh | None = None,
+                 min_clear: float = 0.95) -> QRPlacement | None:
+    """occluders: the whole object (with its handle); spots it hides (qr_clear < min_clear) are
+    skipped. None: the mesh itself."""
     obb = mesh.bounding_box_oriented
     T, ext = obb.primitive.transform, obb.primitive.extents
     R, c0 = T[:3, :3], T[:3, 3]
@@ -67,6 +91,8 @@ def find_qr_face(mesh: trimesh.Trimesh, min_side: float = 0.03, max_side: float 
             # Patch frame: x = normal, y/z in the face; sit on the highest point of the surface.
             Rq = np.column_stack([n, u, np.cross(n, u)])
             Tq = make_T(Rq, centre + n * h.max())
+            if qr_clear(mesh if occluders is None else occluders, Tq, side) < min_clear:
+                continue                           # a handle or a bail in front of it
             is_side = abs(n @ up) < 0.3
             key = (round(side, 3), is_side, -flat)
             if best_key is None or key > best_key:
@@ -76,7 +102,8 @@ def find_qr_face(mesh: trimesh.Trimesh, min_side: float = 0.03, max_side: float 
 
 def find_qr_patch(mesh: trimesh.Trimesh, min_side: float = 0.03, max_side: float = 0.045,
                   flat_tol: float = 0.004, grid: int = 7, up=(0, 0, 1), n_candidates: int = 80,
-                  seed: int = 0) -> QRPlacement | None:
+                  seed: int = 0, occluders: trimesh.Trimesh | None = None,
+                  min_clear: float = 0.95) -> QRPlacement | None:
     """A QR sticker spot on any shape (not only on the faces of the bounding box).
 
     Candidate centres are sampled on the surface; at each, the patch plane is the surface's
@@ -88,6 +115,7 @@ def find_qr_patch(mesh: trimesh.Trimesh, min_side: float = 0.03, max_side: float
     off a curved surface). The smallest size is tested first, larger ones only where it fits.
     """
     up = np.asarray(up, float)
+    occ = mesh if occluders is None else occluders            # (a generated body's handle is not in mesh)
     pts, fid = trimesh.sample.sample_surface(mesh, n_candidates, seed=seed)
     normals = mesh.face_normals[fid]
     best, best_key = None, None
@@ -125,7 +153,10 @@ def find_qr_patch(mesh: trimesh.Trimesh, min_side: float = 0.03, max_side: float
         key = (round(side, 3), is_side, -flat)
         if best_key is None or key > best_key:
             Rq = np.column_stack([n, u, np.cross(n, u)])
-            best, best_key = QRPlacement(make_T(Rq, c + n * top), side, flat), key
+            Tq = make_T(Rq, c + n * top)
+            if qr_clear(occ, Tq, side) < min_clear:
+                continue                                  # a handle or a bail in front of it
+            best, best_key = QRPlacement(Tq, side, flat), key
             if side >= max_side and is_side and flat < 0.5 * flat_tol:
                 break                                    # cannot do meaningfully better
     return best

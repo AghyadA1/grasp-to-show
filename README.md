@@ -963,6 +963,18 @@ both (`PickAndShow.execute(mu=...)`, now passed by `Scenario(mu=...)`). The pinc
 sampled more densely for this study (300 contact pairs: with 60, a mug kept 10 lifting grasps,
 since its body is too wide and only its rim and handle fit).
 
+First run (1,410 scenes, 235 held-out objects): the learned chooser was within a point of the
+oracle (28 % vs 29 %), and the robust ranking beat the score ranking for the pinch (58 % vs 54 %;
+76 % vs 67 % where they picked differently), not for the hook (too few hooks got that far). The
+hook got that far rarely, for three reasons found and fixed:
+- generated objects' QR stickers were often under the handle (the spot was chosen on the body,
+  rays cast 3 cm out); now a spot must be clear of the whole object within 25 deg of its normal
+  (`qr_placement.qr_clear`, `scripts/fix_generated_qr.py`: about 1 in 5 moved);
+- the hanging object's swing check turned it about the TCP, not about the finger it hangs from
+  (4 cm off for a one-finger hook: the handle went 15 mm into the palm, every carry "collided");
+- the carry's collision check counted the object leaning on the hand, which only stops its swing.
+The carry planner also got a last resort: RRT-Connect in joint space with the fingers kept up.
+
 `media/hook_net_choices_real.png`, `media/hook_net_choices_generated.png`: what the hook network
 chooses on held-out objects (`scripts/figure_hook_net.py`).
 

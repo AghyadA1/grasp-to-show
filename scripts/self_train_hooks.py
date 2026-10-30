@@ -69,6 +69,51 @@ def seed_of(name: str) -> int:
     return zlib.crc32(name.encode()) & 0x7FFFFFFF
 
 
+# ---------------------------------------------------------------- workers
+
+class Workers:
+    """A process pool that survives a worker dying. With multiprocessing.Pool, a worker that
+    crashes (on Windows, silently) is replaced but its job never returns, and imap waits forever
+    (the first run stopped at 1337/1340 teacher jobs this way). Here results come back as they
+    finish; if nothing finishes for `stall` seconds, the jobs still out are given up (returned
+    with result None) and the pool is restarted."""
+
+    def __init__(self, n: int, stall: float = 600.0):
+        self.n, self.stall = n, stall
+        self.pool = Pool(n)
+
+    def run(self, fn, jobs: list):
+        """Yields (job, result or None), in the order they finish."""
+        pending = {i: self.pool.apply_async(fn, (j,)) for i, j in enumerate(jobs)}
+        last = time.time()
+        while pending:
+            done = [i for i, a in pending.items() if a.ready()]
+            for i in done:
+                a = pending.pop(i)
+                try:
+                    res = a.get()
+                except Exception:  # noqa: BLE001 (an error inside the job: give it up, keep going)
+                    res = None
+                yield jobs[i], res
+                last = time.time()
+            if not done:
+                if time.time() - last > self.stall:
+                    for i in sorted(pending):
+                        yield jobs[i], None
+                    self.restart()
+                    return
+                time.sleep(0.2)
+
+    def restart(self) -> None:
+        self.pool.terminate()
+        self.pool.join()
+        self.pool = Pool(self.n)
+
+    def close(self) -> None:
+        self.pool.terminate()
+        self.pool.join()
+
+
 # ---------------------------------------------------------------- objects
 
 def object_pools(smoke: bool) -> dict:
@@ -308,7 +353,7 @@ def clusters(anchors: np.ndarray, r: float) -> np.ndarray:
     return np.array(out).reshape(-1, 3)
 
 
-def evaluate(net, data: Data, pool: Pool, k: int, device, seed: int) -> dict:
+def evaluate(net, data: Data, pool: Workers, k: int, device, seed: int) -> dict:
     import torch
     from train_scorer import auc
 
@@ -328,7 +373,7 @@ def evaluate(net, data: Data, pool: Pool, k: int, device, seed: int) -> dict:
             pp.append(torch.sigmoid(split(net(torch.as_tensor(c[None], device=device)))["logit"])[0].cpu().numpy())
         jobs.append((data.names[i], net_candidates(net, c, rng, k, 0, device), 0, 0))
         t_net += time.perf_counter() - t0
-    res = {r[0]: r for r in pool.imap_unordered(round_job, jobs)}
+    res = {j[0]: (r if r is not None else (j[0], None, 0.0, "lost")) for j, r in pool.run(round_job, jobs)}
     n_c = n_l = hit = has = 0
     cov, disc = [], 0
     per = {}
@@ -416,19 +461,38 @@ def main() -> int:
         f"{len(pools['test_gen'])} held-out generated, {len(pools['test_real_handles'])} + "
         f"{len(pools['test_scans_other'])} held-out scans (with / mostly without handles); device {device}, "
         f"{args.workers} workers")
+    skip_f = out / "skipped.txt"                          # objects whose worker crashed or hung: left out
+    skipped = set(skip_f.read_text().split()) if skip_f.exists() else set()
+    if skipped:
+        log(f"leaving out {len(skipped)} objects that crashed or hung before: {', '.join(sorted(skipped))}")
+    pools = {g: [n for n in ns if n not in skipped] for g, ns in pools.items()}
+
+    def give_up(name: str) -> None:
+        skipped.add(name)
+        skip_f.write_text("\n".join(sorted(skipped)))
+        log(f"  {name}: its worker crashed or hung; left out from now on")
+
     everything = download_missing(sorted(set().union(*pools.values())))
-    with Pool(args.workers) as pool:
+    pool = Workers(args.workers)
+    try:
         t0 = time.time()
-        bad = [(n, e) for n, e in pool.imap_unordered(cloud_job, everything) if e]
-        for n, e in bad:
-            log(f"  no cloud for {n}: {e}")
+        bad = []
+        for n, r in pool.run(cloud_job, everything):
+            if r is None or r[1]:
+                bad.append(n)
+                log(f"  no cloud for {n}: {r[1] if r else 'worker lost'}")
         log(f"clouds ready ({time.time() - t0:.0f} s)")
-        todo = [n for n in everything if not (STORE / f"{n}.npz").exists() and n not in dict(bad)]
+        todo = [n for n in everything if not (STORE / f"{n}.npz").exists() and n not in bad]
         log(f"teacher: {len(todo)} objects to teach ({len(everything) - len(todo)} done before)")
         t0 = time.time()
-        for i, (n, nt, nl, sec, err) in enumerate(pool.imap_unordered(teach_job, [(n, seed_of(n)) for n in todo]), 1):
+        for i, ((n, _), r) in enumerate(pool.run(teach_job, [(n, seed_of(n)) for n in todo]), 1):
+            if r is None:
+                give_up(n)
+                continue
+            _, nt, nl, sec, err = r
             log(f"  [{i}/{len(todo)}] {n}: " + (f"FAILED {err}" if err else f"{nl}/{nt} lift ({sec:.0f} s)"))
         log(f"teacher done ({(time.time() - t0) / 60:.0f} min)")
+        pools = {g: [n for n in ns if n not in skipped] for g, ns in pools.items()}
 
         state_f = out / "state.json"
         state = json.loads(state_f.read_text()) if state_f.exists() else {"round_done": 0, "history": []}
@@ -465,7 +529,11 @@ def main() -> int:
                          args.n_random, seed_of(n) + r) for i, n in enumerate(data.names)]
                 t0 = time.time()
                 found = tried = 0
-                for i, (n, t, _, err) in enumerate(pool.imap_unordered(round_job, jobs), 1):
+                for i, (job, res) in enumerate(pool.run(round_job, jobs), 1):
+                    if res is None:
+                        give_up(job[0])
+                        continue
+                    n, t, _, err = res
                     if t is None:
                         log(f"  {n}: FAILED {err}")
                         continue
@@ -486,6 +554,8 @@ def main() -> int:
             state_f.write_text(json.dumps(state, indent=1, default=float))
             plot(state["history"], ROOT / "media" / ("self_train_hooks_smoke.png" if args.smoke else "self_train_hooks.png"))
             log(f"  round {r} took {(time.time() - t_round) / 60:.0f} min")
+    finally:
+        pool.close()
     hist = state["history"]
     score = lambda h: np.nanmean([h["test_gen"]["hit_rate"], h["test_real_handles"]["hit_rate"],
                                   h["test_gen"]["coverage"], h["test_real_handles"]["coverage"]])

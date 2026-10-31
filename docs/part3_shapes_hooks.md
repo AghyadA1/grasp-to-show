@@ -339,3 +339,21 @@ judge (the 1,340 objects' tests relabelled: on one object 42 of 88 lifting hooks
 `media/hook_net_choices_real.png`, `media/hook_net_choices_generated.png`: what the hook network
 chooses on held-out objects (`scripts/figure_hook_net.py`).
 
+### Robustness for way B (no gain: the network already prefers robust grasps)
+
+`scripts/way_b_robust.py`: the frozen way B network (`heatmap_net_v4.pt`) on the 31 unseen objects
+of set v2 x 8 scenes (248 scenes, 1280 x 960 scanner, an unknown 2 mm / 1.5 deg error in the
+object's pose), its grasps ranked three ways, each running its first plannable grasp:
+
+| ranking | success | boxes | rounded | irregular | vs score (won / lost) |
+|---|---|---|---|---|---|
+| score (as always) | 62 % | 88 % | 44 % | 30 % | |
+| cluster (score averaged over 1.5 cm) | 59 % | 83 % | 42 % | 31 % | 14 / 20 (p = 0.39) |
+| robust (score x simulated robustness) | 63 % | 92 % | 44 % | 28 % | 12 / 9 (p = 0.66) |
+
+Unlike the analytic pinch (75 % vs 68 %), way B gains nothing measurable: the grasps it already
+picks are robust (0.78 of their shifts hold; the robust ranking's 0.88), because it learned from
+labels spread over the surface and prefers regions where many grasps work (part 1), so averaging
+its scores again only blurs them. Its failures are elsewhere: collisions with the table or the
+scanner (35), no plannable grasp (29), slip (17), the QR (14).
+

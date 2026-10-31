@@ -64,7 +64,8 @@ def carry_pose(T_obj_tcp: np.ndarray, lift: float, pitch_deg: float = PITCH_UP) 
     return T
 
 
-LIFT_VERSION = 2      # 2: tilt the fingers up about the hooking fingertip first, then lift (tilt_then_lift)
+LIFT_VERSION = 3      # 2: tilt the fingers up about the hooking fingertip first, then lift (tilt_then_lift);
+                      # 3: and only (side, pitch) pairs whose lift from the table holds (table_lift_test)
 
 
 def tilt_then_lift(T_obj_tcp: np.ndarray, width: float, lift: float = 0.15, pitch_deg: float = PITCH_UP,
@@ -138,6 +139,46 @@ def settle(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, mass_scale: flo
                     T_carry)
     finally:
         m.body_mass[body], m.body_inertia[body] = mass0, inertia0
+        m.opt.gravity[:] = 0.0
+
+
+def table_lift_test(sim: GripperSim, T_obj_tcp: np.ndarray, width: float, pitch_deg: float, mu: float,
+                    lift: float = 0.15, duration: float = 2.0, hold: float = 1.0) -> bool:
+    """The hook's lift rehearsed as the robot does it (sim built with table=True): the object
+    stands on the table with gravity on from the start, the fingers at `width` through the
+    handle turn up about the hooking fingertip and the hand rises (tilt_then_lift, over
+    `duration` like the robot's lift), then holds; finger-object friction mu (both surfaces).
+    True if the object then hangs on the gripper, risen with it. The floating test (no table,
+    object hung from the start) passed hooks that the robot dropped: one finger in a narrow gap
+    at the top of a slim handle, or beside a knob with no real lip, drags the standing object as
+    it turns up and slips out (filmed; their robustness to small shifts was as high as the
+    good ones')."""
+    m, d, dt = sim.model, sim.data, sim.model.opt.timestep
+    geoms = [g for g in range(m.ngeom) if m.geom_bodyid[g] in (sim._gripper_bodies | {sim._obj_body})
+             and (m.geom_contype[g] or m.geom_conaffinity[g])]
+    f0 = m.geom_friction[geoms].copy()
+    try:
+        m.geom_friction[geoms, 0], m.geom_friction[geoms, 1] = mu, 0.01 * mu
+        sim._reset(np.eye(3), T_obj_tcp, width)
+        if sim._contacts(min_depth=0.001)[1]:
+            return False
+        m.opt.gravity[:] = [0, 0, -9.81]
+        d.ctrl[0] = width
+        for _ in range(max(round(0.3 / dt), 1)):                  # standing, settled
+            mujoco.mj_step(m, d)
+        com0 = (sim._obj_pose() @ np.r_[np.asarray(sim.obj.com), 1.0])[2]
+        path = tilt_then_lift(T_obj_tcp, width, lift, pitch_deg, n=50)
+        n = max(round(duration / dt), 1)
+        for k in range(1, n + 1):
+            sim._set_hand(path[min(int(min_jerk(k / n) * len(path)), len(path) - 1)])
+            mujoco.mj_step(m, d)
+        for _ in range(max(round(hold / dt), 1)):
+            mujoco.mj_step(m, d)
+        touching, _ = sim._contacts()
+        com = (sim._obj_pose() @ np.r_[np.asarray(sim.obj.com), 1.0])[2]
+        return bool(touching & sim._fingers) and com - com0 > 0.5 * lift
+    finally:
+        m.geom_friction[geoms] = f0
         m.opt.gravity[:] = 0.0
 
 
@@ -248,7 +289,7 @@ def usable_hooks(obj, sim: GripperSim, turns: int = 12, limit: int = 40, seed: i
     return out
 
 
-def hang_table(sim: GripperSim, hooks: list[dict], pitches=PITCHES) -> list[dict]:
+def hang_table(sim: GripperSim, hooks: list[dict], pitches=PITCHES, table_sim: GripperSim | None = None) -> list[dict]:
     """Where the object hangs for every hook, twin and carry pitch, once per object: adds
     h["hangs"] = {(twin, pitch): Hang} to each hook. A hanging pose depends only on the object
     and the hook (the object starts upright; its yaw on the table is a turn about the vertical,
@@ -258,6 +299,12 @@ def hang_table(sim: GripperSim, hooks: list[dict], pitches=PITCHES) -> list[dict
     for h in hooks:
         h["hangs"] = {(k, p): settle(sim, Tg, float(h["width"]), 1.0, pitch_deg=p)
                       for k, Tg in enumerate((h["T"], twin_of(h["T"]))) for p in pitches}
+        if table_sim is not None:      # and the lift rehearsed from the table (table_lift_test)
+            mu = float(min(max(h.get("mu_min", 1.0), 0.15), 1.0))
+            for (k, p), g in h["hangs"].items():
+                Tg = h["T"] if k == 0 else twin_of(h["T"])
+                if g.T_tcp_obj is not None and not table_lift_test(table_sim, Tg, float(h["width"]), p, mu):
+                    h["hangs"][(k, p)] = Hang(None, np.nan, np.nan)
     return hooks
 
 

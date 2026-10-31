@@ -44,6 +44,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 os.environ.setdefault("G2S_OBJECT_SET", "v2")
 from grasp2show.chooser import FEATURES, Chooser, rule_choice, sample_conditions, vector
+from grasp2show.hanging import LIFT_VERSION
 from grasp2show.parallel import Workers
 
 OUT = ROOT / "data" / "choose"
@@ -160,7 +161,7 @@ def hook_job(args):
         for h in hooks:
             h["robust"] = hook_robustness(sim, h["T"], h["width"])
             h["mu_min"] = hook_mu_min(sim, h["T"], h["width"])
-        hang_table(sim, hooks)
+        hang_table(sim, hooks, table_sim=GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj, table=True))
         save_hook_file(HOOKS / f"{name}.npz", hooks)
     except Exception as e:  # noqa: BLE001 (an object that does not load: left out, say why)
         return name, -1, time.time() - t0, f"{type(e).__name__}: {e}"
@@ -460,7 +461,7 @@ def main() -> int:
                 dev = "cuda" if torch.cuda.is_available() else "cpu"
                 net = load_hook_net(args.model, dev)
                 todo = [n for n in names if not (HOOKS / f"{n}.npz").exists()
-                        or "mu_min" not in np.load(HOOKS / f"{n}.npz").files]     # (friction each hook needs; tilt-then-lift)
+                        or int(np.load(HOOKS / f"{n}.npz").get("lift_version", 0)) < LIFT_VERSION]     # (table lift rehearsed)
                 log(f"hooks: {len(todo)} objects")
                 jobs = []
                 for n in todo:

@@ -47,7 +47,9 @@ class GripperSim:
     LIFT, SHAKE_AMP, SHAKE_ROT, SHAKE_HZ = 0.10, 0.02, 0.25, 2.0
     DROP_MM = 20.0   # object moved more than this relative to the TCP => it fell out / slid away
 
-    def __init__(self, cfg: SceneConfig, obj: ObjectModel):
+    def __init__(self, cfg: SceneConfig, obj: ObjectModel, table: bool = False):
+        """table: a table top under the upright object (its base at the object's lowest point), for
+        tests that start with the object standing (hanging.table_lift_test)."""
         self.cfg, self.obj = cfg, obj
         hand = mujoco.MjSpec.from_file(str(menagerie_panda_dir() / "hand.xml"))
         configure_hand(hand, cfg)
@@ -70,6 +72,10 @@ class GripperSim:
         world.add_equality(type=mujoco.mjtEq.mjEQ_WELD, objtype=mujoco.mjtObj.mjOBJ_BODY,
                            name1="target", name2="g_hand", solref=[0.01, 1.0],
                            data=[0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0])
+        if table:
+            z0 = float(obj.mesh.bounds[0, 2])
+            world.worldbody.add_geom(name="table", type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.4, 0.4, 0.02],
+                                     pos=[0, 0, z0 - 0.02], friction=list(obj.friction))
         body = world.worldbody.add_body(name=obj.name)
         body.add_freejoint(name="obj_free")
         obj.add_to_body(world, body, qr_material=None, solref=cfg.grasp_solref)

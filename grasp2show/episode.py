@@ -67,6 +67,11 @@ class EpisodeResult:
     # contact first happened (after the lift): an object that slid in the grip (or was never
     # lifted) until it touched the table is a slip, not a collision
     slip_at_collision: dict = field(default_factory=dict)
+    # where the object was lost, if it was: (phase, seconds into it, slip mm, slip deg) at the
+    # first moment it had moved SLIP_CAUSE_MM / _DEG in the hand (a pinch) or was falling,
+    # touching nothing for 0.05 s (a hook); and the slip (mm, deg) at the end of every phase
+    lost: tuple | None = None
+    phase_slip: dict = field(default_factory=dict)
 
     def reason(self, slip_tol_mm: float = 20.0, slip_tol_deg: float = 15.0, hook: bool = False) -> str:
         """Why it failed ("" if it did not): collision (an unexpected contact the grip did not
@@ -504,7 +509,32 @@ class PickAndShow:
         g_open = grasp.width if hook else min(grasp.width + 0.025, self.cfg.gripper.max_width)
         g_hold = grasp.width if hook else 0.0
         render_every = max(round(1.0 / (fps * dt)), 1)
-        state = {"step": 0, "holding": False, "collisions": [], "log": None, "ref": None, "slip_at": {}}
+        state = {"step": 0, "holding": False, "collisions": [], "log": None, "ref": None, "slip_at": {},
+                 "phase": "", "phase_step": 0, "lost": None, "no_touch": 0, "phase_slip": {}}
+
+        def in_hand_slip():
+            dT = inv_T(state["ref"]) @ inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
+            return float(np.linalg.norm(dT[:3, 3]) * 1e3), float(np.degrees(rotation_angle(dT[:3, :3])))
+
+        def phase(name):
+            if state["ref"] is not None and state["phase"]:
+                state["phase_slip"][state["phase"]] = tuple(round(x, 1) for x in in_hand_slip())
+            state["phase"], state["phase_step"] = name, state["step"]
+
+        def watch():
+            """the first moment the object is lost from the grip"""
+            if state["ref"] is None or state["lost"] is not None:
+                return
+            if hook:                  # falling: touching neither a finger nor anything else for 0.05 s
+                touch = any(self._obj in (m.geom_bodyid[c.geom1], m.geom_bodyid[c.geom2]) for c in d.contact[: d.ncon])
+                state["no_touch"] = 0 if touch else state["no_touch"] + 1
+                lost = state["no_touch"] * dt >= 0.05
+            else:
+                lost = state["step"] % 5 == 0 and any(
+                    x >= lim for x, lim in zip(in_hand_slip(), (SLIP_CAUSE_MM, SLIP_CAUSE_DEG)))
+            if lost:
+                state["lost"] = (state["phase"], round((state["step"] - state["phase_step"]) * dt, 2),
+                                 *(round(x, 1) for x in in_hand_slip()))
         tcp_id, obj_id = m.site("tcp").id, self._obj
 
         def follow(q_traj, width):
@@ -512,6 +542,7 @@ class PickAndShow:
                 d.ctrl[:7], d.ctrl[7] = q, width
                 mujoco.mj_step(m, d)
                 state["step"] += 1
+                watch()
                 for c in sorted(self._unexpected_contacts(state["holding"])):
                     if c not in state["collisions"]:
                         state["collisions"].append(c)
@@ -548,16 +579,21 @@ class PickAndShow:
                 continue
             dq = float(np.abs(np.diff(np.asarray(paths[name]), axis=0)).max())
             seg[name] = max(seg[name], 1.7 * dq)
+        phase("approach")
         hold(HOME_Q, g_open, 0.3)
         follow(path_trajectory(paths["approach"], seg["approach"], dt), g_open)
         if hook:       # threading a fingertip through a handle with 1-3 mm to spare: settle, go slowly
             hold(paths["descend"][0], g_open, 0.5)
+        phase("descend")
         follow(path_trajectory(paths["descend"], seg["descend"] * (2.5 if hook else 1.0), dt), g_open)
+        phase("close")
         hold(paths["descend"][-1], g_hold, 0.6)       # close: force-limited squeeze (a hook: stays)
         state["ref"] = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)   # in the hand, as grasped
         if log_every > 0:
             state["log"] = []
+        phase("lift")
         follow(path_trajectory(paths["lift"], seg["lift"] / speed, dt), g_hold)
+        phase("settle")
         hold(paths["lift"][-1], g_hold, (1.0 if hook else 0.3) / speed)   # a hanging object settles
         state["holding"] = True                       # from here only finger contacts allowed
         T_tcp_obj_ref = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
@@ -567,12 +603,17 @@ class PickAndShow:
                 t_src = np.arange(1, len(traj) + 1) * dt
                 t_new = np.arange(1, max(round(len(traj) / speed), 1) + 1) * dt * speed
                 traj = np.column_stack([np.interp(t_new, t_src, traj[:, j]) for j in range(traj.shape[1])])
+            phase("transport")
             follow(traj, g_hold)
         else:
+            phase("transit")
             follow(shaped(path_trajectory(paths["transit"], seg["transit"] / speed, dt)), g_hold)
+            phase("present")
             follow(shaped(path_trajectory(paths["present"], seg["present"] / speed, dt)), g_hold)
         log, state["log"] = state["log"], None
+        phase("hold")
         hold(paths["present"][-1], g_hold, 2.0 if hook else 1.0)   # a hanging object's swing dies down
+        phase("")
 
         # -- ground truth: slip in the hand, still held, QR decoded by the scanner ---------
         T_tcp_obj = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
@@ -604,7 +645,8 @@ class PickAndShow:
             q, qd, qdd, tau, Tt, To = (np.array(x) for x in zip(*log))
             transport = TransportLog(log_every * dt, q, qd, qdd, tau, Tt, To)
         return EpisodeResult(grasp.name, not notes, text, qr_ok, held, slip_mm, slip_deg,
-                             ok, state["collisions"], notes, rgb, transport, state["slip_at"])
+                             ok, state["collisions"], notes, rgb, transport, state["slip_at"], state["lost"],
+                             state["phase_slip"])
 
 
 def rrt_connect(q0: np.ndarray, goals: list[np.ndarray], edge_ok, rng: np.random.Generator, state_ok=None,

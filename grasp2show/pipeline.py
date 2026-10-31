@@ -367,6 +367,7 @@ class Checked:
     wb: object = None           # experiment.Scenario of way B's grasps for this scene (None: no way B)
     wb_q: np.ndarray | None = None      # their scores
     wb_roll: np.ndarray | None = None   # the target each was proposed for
+    seconds: dict = field(default_factory=dict)   # time each strategy's checks took
 
     def pinch_ranked(self, robust: bool = True) -> list:
         return rank_pinch(self.sc, self.assets.robust if robust else None)
@@ -402,14 +403,17 @@ def check(scene: Scene, assets: Assets, wayb: WayB | None = None) -> Checked:
     from .gripper_sim import GripperSim
     from .hanging import hook_options
 
+    t0 = time.time()
     sc = Scenario(scene.asset, scene.yaw_deg, assets.grasps, start_xy=scene.start_xy, camera=scene.camera,
                   mass_scale=scene.mass_scale, mu=scene.mu)
     sc.lift_margin = np.where(sc.lift_ok, sc.lift_margin, -1.0)      # this friction and weight, not clipped
+    t1 = time.time()
     hooks = [h for h in assets.hooks if h.get("mu_min", 0.0) <= scene.mu + 1e-9]
     opts = hook_options(sc.fc, GripperSim(sc.cfg, sc.obj), hooks, T_start=sc.ep.resting_pose()) if hooks else []
     feats = {**scene_features(scene.mu, sc.obj.mass, sc.obj.mesh.extents), **pinch_features(sc),
              **hook_features(hooks, opts)}
     ck = Checked(scene, sc, assets, hooks, opts, feats)
+    ck.seconds = {"pinch": t1 - t0, "hook": time.time() - t1}
     if wayb is not None:
         add_wayb(ck, wayb, sc.cfg, sc.obj)
     return ck
@@ -421,6 +425,7 @@ def add_wayb(ck: Checked, wayb: WayB, cfg=None, obj=None) -> Checked:
     from .experiment import Scenario
     from .objects import object_from_config
 
+    t0 = time.time()
     scene = ck.scene
     if cfg is None:
         extra = {"friction": (float(scene.mu), 0.01 * float(scene.mu), 0.0001)}
@@ -438,6 +443,7 @@ def add_wayb(ck: Checked, wayb: WayB, cfg=None, obj=None) -> Checked:
         ck.wb.lift_margin = np.where(np.isfinite(ck.wb.lift_margin), ck.wb.lift_margin, -1.0)
         ck.wb_q, ck.wb_roll = np.array([x[3] for x in g]), np.array([x[2] for x in g])
     ck.features.update(wayb_features(ck.wb, ck.wayb_ranked(), ck.wayb_ranked(True, fallback=False), ck.wb_q))
+    ck.seconds["wayb"] = time.time() - t0
     return ck
 
 

@@ -438,7 +438,7 @@ def main() -> int:
     objs = objects(args.gen, args.smoke)
     log(f"== chooser {time.strftime('%Y-%m-%d %H:%M')}: {sum(g == 'real' for g in objs.values())} real and "
         f"{sum(g == 'gen' for g in objs.values())} generated objects, {args.scenes} scenes each")
-    rec_f = out / "records_v4.jsonl"       # v4: hooks deeper, tilted up before lifting, two-finger, friction-checked
+    rec_f = out / "records_v5.jsonl"       # v5: + hooks whose lift from the table held in rehearsal first
     if args.stage in ("all", "prepare", "episodes"):
         from self_train_hooks import download_missing
 

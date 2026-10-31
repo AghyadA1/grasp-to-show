@@ -194,8 +194,13 @@ def hook_score(o) -> float:
 
 def rank_hooks(opts: list, hooks: list[dict] | None = None) -> list:
     """Feasible hook options, best first (hook_score); with hooks carrying "robust" (r), r is
-    one more margin (robust_part)."""
-    key = hook_score if hooks is None else (lambda o: min(hook_score(o), robust_part(hooks[o.hook]["robust"])))
+    one more margin (robust_part); and an option whose lift from the table failed in rehearsal
+    (hanging.table_lift_test) comes after every one that held (a preference, not a filter: as a
+    filter it removed as many hooks that worked as hooks that would drop)."""
+    def key(o):
+        k = hook_score(o) if hooks is None else min(hook_score(o), robust_part(hooks[o.hook]["robust"]))
+        held = True if hooks is None else hooks[o.hook].get("table", {}).get((o.twin, o.pitch_deg), True)
+        return (held, k)
     return sorted([o for o in opts if o.ok], key=key, reverse=True)
 
 

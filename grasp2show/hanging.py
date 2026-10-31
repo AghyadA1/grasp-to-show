@@ -64,8 +64,8 @@ def carry_pose(T_obj_tcp: np.ndarray, lift: float, pitch_deg: float = PITCH_UP) 
     return T
 
 
-LIFT_VERSION = 3      # 2: tilt the fingers up about the hooking fingertip first, then lift (tilt_then_lift);
-                      # 3: and only (side, pitch) pairs whose lift from the table holds (table_lift_test)
+LIFT_VERSION = 4      # 2: tilt the fingers up about the hooking fingertip first, then lift (tilt_then_lift);
+                      # 3: and whether the lift from the table holds, per (side, pitch) (table_lift_test)
 
 
 def tilt_then_lift(T_obj_tcp: np.ndarray, width: float, lift: float = 0.15, pitch_deg: float = PITCH_UP,
@@ -299,12 +299,12 @@ def hang_table(sim: GripperSim, hooks: list[dict], pitches=PITCHES, table_sim: G
     for h in hooks:
         h["hangs"] = {(k, p): settle(sim, Tg, float(h["width"]), 1.0, pitch_deg=p)
                       for k, Tg in enumerate((h["T"], twin_of(h["T"]))) for p in pitches}
-        if table_sim is not None:      # and the lift rehearsed from the table (table_lift_test)
-            mu = float(min(max(h.get("mu_min", 1.0), 0.15), 1.0))
+        if table_sim is not None:      # and the lift rehearsed from the table (table_lift_test): a
+            mu = float(min(max(h.get("mu_min", 1.0), 0.15), 1.0))     # preference, not a filter
+            h["table"] = {}
             for (k, p), g in h["hangs"].items():
                 Tg = h["T"] if k == 0 else twin_of(h["T"])
-                if g.T_tcp_obj is not None and not table_lift_test(table_sim, Tg, float(h["width"]), p, mu):
-                    h["hangs"][(k, p)] = Hang(None, np.nan, np.nan)
+                h["table"][(k, p)] = g.T_tcp_obj is not None and table_lift_test(table_sim, Tg, float(h["width"]), p, mu)
     return hooks
 
 
@@ -469,6 +469,10 @@ def load_hook_file(f: Path) -> list[dict]:
         if key in z.files:
             for h, p in zip(hooks, z[key]):
                 h[key] = float(p)
+    if "table_ok" in z.files:                        # the table rehearsal per (side, pitch)
+        for i, h in enumerate(hooks):
+            h["table"] = {(k, float(p)): bool(z["table_ok"][i, k, j]) for k in range(2)
+                          for j, p in enumerate(z["pitches"])}
     if "hang_T" in z.files:                          # cached hanging poses
         for i, h in enumerate(hooks):
             h["hangs"] = {}
@@ -500,6 +504,8 @@ def save_hook_file(f: Path, hooks: list[dict]) -> None:
                         hang_T[i, k, j], carry[i, k, j] = g.T_tcp_obj, g.T_carry
         base.update(pitches=np.array(PITCHES), hang_T=hang_T, carry=carry, swing=swing, tilt=tilt,
                     lift_version=np.array(LIFT_VERSION))
+        if "table" in hooks[0]:
+            base["table_ok"] = np.array([[[h["table"][(k, p)] for p in PITCHES] for k in range(2)] for h in hooks])
     f.parent.mkdir(parents=True, exist_ok=True)
     np.savez(f, **base)
 

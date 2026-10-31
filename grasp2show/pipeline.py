@@ -270,14 +270,17 @@ class WayB:
 
         torch.set_num_threads(1)
         ck = torch.load(model, map_location="cpu", weights_only=False)
-        self.net = HeatmapNet(torch.zeros(1, 1024, 7))
-        self.net.load_state_dict({k: v for k, v in ck["state_dict"].items() if k != "clouds"}, strict=False)
+        sd = {k: v for k, v in ck["state_dict"].items() if k != "clouds"}
+        self.n_cond = int(sd["cond_mlp.0.weight"].shape[1])     # 25: v4; 27: v5 (friction and load too)
+        self.net = HeatmapNet(torch.zeros(1, 1024, 7), n_cond=self.n_cond)
+        self.net.load_state_dict(sd, strict=False)
         self.net.eval()
 
     def grasps(self, asset: str, cfg: SceneConfig, obj, k: int = WAYB_K, min_sep: float = 0.01):
         """Up to k (T_obj_tcp, width, target index, score) for this scene: the highest-scoring
         points, min_sep apart per target, whose open gripper does not hit the object. The network
-        is told the object's mass in this scene (it was trained at the scans' own masses)."""
+        is told the object's mass in this scene (v4 was trained at the scans' own masses; v5 at
+        many masses and frictions, and is told the friction too)."""
         import torch
 
         from .gripper_sim import GripperSim
@@ -289,7 +292,8 @@ class WayB:
         self.net.clouds = torch.as_tensor(feats[None])
         rolls = np.linspace(0, 2 * np.pi, 12, endpoint=False)
         T0 = start_pose(cfg, obj)
-        cond = np.stack([condition(T0, show_pose(cfg, obj, r), cfg.camera.pos, obj.mass, obj.com) for r in rolls])
+        mu = float(cfg.obj.friction[0]) if self.n_cond > 25 else None
+        cond = np.stack([condition(T0, show_pose(cfg, obj, r), cfg.camera.pos, obj.mass, obj.com, mu) for r in rolls])
         with torch.no_grad():
             pr = {kk: v.numpy() for kk, v in split_outputs(self.net(torch.zeros(12, dtype=torch.long),
                                                                     torch.as_tensor(cond))).items()}

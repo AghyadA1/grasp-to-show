@@ -177,11 +177,23 @@ def make_scanned(asset: str, friction, condim: int, density: float = DEFAULT_DEN
                        asset_dir=d, collision_files=cols)
 
 
+_MORE: dict = {}
+
+
+def _more_qr() -> dict:
+    """QR placements of the scans outside the active set (object_set_more.json: way B's extra
+    training objects, scripts/select_more_objects.py)."""
+    if "qr" not in _MORE:
+        f = OBJECT_SET_FILE.with_name("object_set_more.json")
+        _MORE["qr"] = json.loads(f.read_text())["qr"] if f.exists() else {}
+    return _MORE["qr"]
+
+
 def object_from_config(ocfg) -> ObjectModel:
     """Build the ObjectModel described by config.ObjectConfig."""
     if ocfg.asset is None:
         return make_box(ocfg.name, ocfg.half_size, ocfg.mass, ocfg.friction, ocfg.condim, ocfg.qr_size,
                         ocfg.qr_center_z, ocfg.rgba)
-    cached = load_object_set().get("qr", {}).get(ocfg.asset)
+    cached = load_object_set().get("qr", {}).get(ocfg.asset) or _more_qr().get(ocfg.asset)
     qr = QRPlacement.from_dict(cached) if cached else None
     return make_scanned(ocfg.asset, ocfg.friction, ocfg.condim, ocfg.density, ocfg.name, qr)

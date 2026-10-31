@@ -24,15 +24,23 @@ N_COND = 25
 N_OUT = 12   # feasible logit, score, approach (3), closing (3), offset (3), width
 
 
-def condition(T_start: np.ndarray, T_target: np.ndarray, cam_pos, mass: float, com: np.ndarray) -> np.ndarray:
+N_COND_MU = 27   # v5: plus friction and the load on a pinch
+
+
+def condition(T_start: np.ndarray, T_target: np.ndarray, cam_pos, mass: float, com: np.ndarray,
+              mu: float | None = None) -> np.ndarray:
     """(25,) task description in the object frame: gravity, world x axis and robot base position
-    at the start and at the target, camera direction at the target, mass, centre of mass."""
+    at the start and at the target, camera direction at the target, mass, centre of mass; with mu
+    (27,): also the finger-object friction and log of the load on a pinch, m g / (2 mu F)
+    (chooser.scene_features: > 1, friction cannot hold it even centred)."""
     out = []
     for T in (T_start, T_target):
         R, t = T[:3, :3], T[:3, 3]
         out += [R.T @ G, R.T @ np.array([1.0, 0, 0]), R.T @ (-t)]
     cam = T_target[:3, :3].T @ (np.asarray(cam_pos) - T_target[:3, 3])
     out += [cam / np.linalg.norm(cam), [mass], np.asarray(com) * 10]
+    if mu is not None:
+        out += [[mu, np.log(mass * 9.81 / (2 * mu * 20.0))]]
     return np.concatenate(out).astype(np.float32)
 
 
@@ -130,11 +138,11 @@ class EdgeConv(nn.Module):
 class HeatmapNet(nn.Module):
     """Per-point grasp quality and grasp parameters, conditioned on the task."""
 
-    def __init__(self, clouds: torch.Tensor, k: int = 16):
+    def __init__(self, clouds: torch.Tensor, k: int = 16, n_cond: int = N_COND):
         super().__init__()
         self.register_buffer("clouds", clouds)                                    # (O, P, 7)
         self.edge = EdgeConv(7, 64, k)
-        self.cond_mlp = nn.Sequential(nn.Linear(N_COND, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU())
+        self.cond_mlp = nn.Sequential(nn.Linear(n_cond, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU())
         self.point_mlp = nn.Sequential(nn.Conv1d(64 + 64, 128, 1), nn.BatchNorm1d(128), nn.ReLU(),
                                        nn.Conv1d(128, 256, 1), nn.BatchNorm1d(256), nn.ReLU())
         self.head = nn.Sequential(nn.Conv1d(64 + 256 + 256 + 64, 256, 1), nn.BatchNorm1d(256), nn.ReLU(),

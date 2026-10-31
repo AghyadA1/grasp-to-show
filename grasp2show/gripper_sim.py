@@ -131,6 +131,22 @@ class GripperSim:
         s = self.data.site("g_tcp")
         return make_T(s.xmat.reshape(3, 3), s.xpos)
 
+    def set_conditions(self, mu: float | None = None, mass_scale: float = 1.0) -> None:
+        """Finger-object friction mu (both surfaces: MuJoCo takes the larger; None: as built) and
+        the object mass_scale times heavier (mass and inertia) than built."""
+        m = self.model
+        if not hasattr(self, "_cond0"):
+            geoms = [g for g in range(m.ngeom) if m.geom_bodyid[g] in (self._gripper_bodies | {self._obj_body})
+                     and (m.geom_contype[g] or m.geom_conaffinity[g])]
+            self._cond0 = (geoms, m.geom_friction[geoms].copy(), float(m.body_mass[self._obj_body]),
+                           m.body_inertia[self._obj_body].copy())
+        geoms, f0, m0, I0 = self._cond0
+        m.geom_friction[geoms] = f0
+        if mu is not None:
+            m.geom_friction[geoms, 0], m.geom_friction[geoms, 1] = mu, 0.01 * mu
+        m.body_mass[self._obj_body] = m0 * mass_scale
+        m.body_inertia[self._obj_body] = I0 * mass_scale
+
     # -- public API ----------------------------------------------------------------------
     def in_collision(self, T_obj_tcp: np.ndarray, width: float, tol: float = 0.001) -> bool:
         """Does the open gripper intersect the object at this grasp (before closing)?"""

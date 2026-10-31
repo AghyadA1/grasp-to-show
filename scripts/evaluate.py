@@ -33,6 +33,7 @@ Usage:  python scripts/evaluate.py --workers 4                       (data/runs/
         python scripts/evaluate.py --run data/runs/2026-10-31_chooser --stage fit   (refit / replot)
         python scripts/evaluate.py --smoke                            (4 objects, 2 scenes)
         python scripts/evaluate.py --run data/runs/2026-10-31_chooser_table --stage wayb   (then --stage fit)
+        ... --stage wayb --wayb-model data/models/heatmap_net_v5.pt   (then --stage fit with it too)
 """
 from __future__ import annotations
 
@@ -54,7 +55,7 @@ os.environ.setdefault("G2S_OBJECT_SET", "v2")
 from grasp2show.chooser import Chooser, features_for, rule_choice, vector
 from grasp2show.hanging import LIFT_VERSION
 from grasp2show.parallel import Workers
-from grasp2show.pipeline import GRASP_DIR, SCANNER_SCALE, crc, hook_dir
+from grasp2show.pipeline import GRASP_DIR, SCANNER_SCALE, WAYB_MODEL, crc, hook_dir
 
 RUNS = ROOT / "data" / "runs"
 TOP = 3              # candidates executed per strategy, ranking and scene (the first is the one the robot runs)
@@ -178,14 +179,14 @@ def wayb_episode(args) -> dict:
     """Way B in one scene of records.jsonl (the same scene and unknown pose error): its first TOP
     choices that can be planned, for both rankings (WAYB_VARIANTS), executed."""
     global _WAYB
-    name, k, scale = args
+    name, k, scale, model = args
     from grasp2show.pipeline import Checked, WayB, add_wayb, execute_wayb, sample_scene
 
     t0 = time.time()
-    if _WAYB is None:
-        _WAYB = WayB()
+    if _WAYB is None or _WAYB[0] != model:
+        _WAYB = (model, WayB(Path(model)))
     scene, off = sample_scene(name, k, scale)
-    ck = add_wayb(Checked(scene, None, None, [], []), _WAYB)
+    ck = add_wayb(Checked(scene, None, None, [], []), _WAYB[1])
     rec = {"object": name, "scene": k, **ck.features}
     done: dict = {}
     for v in WAYB_VARIANTS:
@@ -377,6 +378,8 @@ def main() -> int:
     p.add_argument("--model", type=Path, default=ROOT / "data" / "models" / "hook_net_table.pt",
                    help="hook network (default: learn.hooknet.DEFAULT_HOOK_NET; not imported here: the workers "
                         "would all load torch)")
+    p.add_argument("--wayb-model", type=Path, default=WAYB_MODEL,
+                   help="way B's network for --stage wayb and fit (v4 -> wayb.jsonl, else wayb_<name>.jsonl)")
     p.add_argument("--smoke", action="store_true")
     args = p.parse_args()
     if args.smoke:
@@ -453,14 +456,14 @@ def main() -> int:
         finally:
             pool.close()
     recs = [json.loads(x) for x in rec_f.read_text().splitlines()] if rec_f.exists() else []
-    wb_f = out / "wayb.jsonl"
+    wb_f = out / ("wayb.jsonl" if args.wayb_model.name == WAYB_MODEL.name else f"wayb_{args.wayb_model.stem}.jsonl")
     if args.stage == "wayb":
         done = {(d["object"], d["scene"]) for d in map(json.loads, wb_f.read_text().splitlines())} \
             if wb_f.exists() else set()
         scale = float(json.loads((out / "config.json").read_text()).get("scanner_scale", args.scanner_scale)) \
             if (out / "config.json").exists() else args.scanner_scale
         seen = set(json.loads((ROOT / "grasp2show" / "object_set_v2.json").read_text())["train"])
-        jobs = [(r["object"], r["scene"], scale) for r in recs
+        jobs = [(r["object"], r["scene"], scale, str(args.wayb_model)) for r in recs
                 if (r["object"], r["scene"]) not in done and r["object"] not in seen]
         log(f"way B: {len(jobs)} scenes to run ({len(done)} done before; the objects it was trained on are left out)")
         t0 = time.time()
@@ -553,6 +556,14 @@ def compare_sets(recs: list[dict], wb_f: Path, out: Path, log, results: dict) ->
             drops[why.split(":")[0]] = drops.get(why.split(":")[0], 0) + 1
         log(f"  way B {v}: a grasp ran in {len(n)} scenes; outcomes: " + ", ".join(
             f"{k} {c}" for k, c in sorted(drops.items(), key=lambda t: -t[1])[:6]))
+    v4_f = wb_f.with_name("wayb.jsonl")
+    if v4_f != wb_f and v4_f.exists():                  # this network against v4, scene by scene
+        old = {(d["object"], d["scene"]): d for d in map(json.loads, v4_f.read_text().splitlines())}
+        both = [(r, old[(r["object"], r["scene"])]) for r in rs if (r["object"], r["scene"]) in old]
+        for v in WAYB_VARIANTS:
+            a_, b_ = (np.array([x[f"wayb_success_{v}"] for x in col]) for col in zip(*both))
+            log(f"  way B {v}: this network {a_.mean():.0%} vs v4 {b_.mean():.0%} on {len(both)} scenes "
+                f"(won {int(np.sum(a_ > b_))}, lost {int(np.sum(a_ < b_))})")
     results["sets"] = res
     best = max(res[k]["all"]["learned"] for k in SETS)
     pick = next(k for k in SETS if res[k]["all"]["learned"] >= best - 0.01)

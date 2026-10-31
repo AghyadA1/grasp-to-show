@@ -72,7 +72,7 @@ from grasp2show.hookteach import (
 )
 from grasp2show.parallel import Workers
 
-OUT = ROOT / "data" / ("self_train_table" if TABLE else "self_train")
+RUNS = ROOT / "data" / "runs"
 CLOUDS = ROOT / "data" / "hook_clouds"
 MODELS = ROOT / "data" / "models"
 N_STORED = 4096
@@ -207,9 +207,9 @@ def fixed_cloud(data: Data, i: int) -> np.ndarray:
 def train(data: Data, val_idx, epochs: int, lr: float, batch: int, device: str, init: dict | None,
           partial: float, log) -> tuple[object, float]:
     import torch
-    from train_scorer import auc
 
     from grasp2show.learn.hooknet import HookNet, loss_fn, split
+    from grasp2show.learn.metrics import auc
 
     torch.manual_seed(0)
     rng = np.random.default_rng(int(time.time()))
@@ -325,9 +325,9 @@ def clusters(anchors: np.ndarray, r: float) -> np.ndarray:
 
 def evaluate(net, data: Data, pool: Workers, k: int, device, seed: int) -> dict:
     import torch
-    from train_scorer import auc
 
     from grasp2show.learn.hooknet import split
+    from grasp2show.learn.metrics import auc
 
     if len(data) == 0:
         return {}
@@ -415,13 +415,15 @@ def main() -> int:
                    help="table: hooks must also survive the robot's lift rehearsed from a table "
                         "(the existing tests are relabelled, not redone)")
     p.add_argument("--init", type=Path, default=None, help="warm start the first round from this network")
+    p.add_argument("--run", type=Path, default=None,
+                   help="an existing run folder to resume (default: data/runs/<today>_self_train[_table])")
     args = p.parse_args()
     import torch
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     if args.smoke:
         args.rounds, args.epochs_first, args.epochs = 2, 2, 1
-    out = OUT / ("smoke" if args.smoke else "")
+    out = args.run or RUNS / f"{time.strftime('%Y-%m-%d')}_self_train{'_table' if TABLE else ''}{'_smoke' if args.smoke else ''}"
     out.mkdir(parents=True, exist_ok=True)
     log_f = open(out / "log.txt", "a", encoding="utf-8")  # noqa: SIM115 (open for the whole run)
 

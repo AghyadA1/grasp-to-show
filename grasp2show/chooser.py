@@ -230,7 +230,7 @@ def scene_features(mu: float, mass: float, extents, finger_force: float = 20.0) 
 def vector(rec: dict, variant: str = "robust") -> np.ndarray:
     """The chooser's inputs for one scene; the robustness features are those of the candidates
     the given ranking would run."""
-    get = lambda k: rec[f"{k}_{variant}"] if k in ROBUST_KEYS else rec[k]
+    get = lambda k: rec[f"{k}_{variant}"] if k in ROBUST_KEYS and variant else rec[k]
     return np.array([float(get(k)) for k in FEATURES], np.float32)
 
 

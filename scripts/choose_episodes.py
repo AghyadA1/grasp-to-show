@@ -50,9 +50,9 @@ from grasp2show.parallel import Workers
 OUT = ROOT / "data" / "choose"
 # the hook network's hooks, per network: data/hooks_net (hook_net_self.pt), data/hooks_net_<tag> for
 # hook_net_<tag>.pt (set before the workers start: they read it from the environment)
-if "--model" in sys.argv:
-    _stem = Path(sys.argv[sys.argv.index("--model") + 1]).stem.replace("hook_net_", "")
-    os.environ["G2S_HOOKS_TAG"] = "" if _stem == "self" else _stem
+_model = Path(sys.argv[sys.argv.index("--model") + 1]) if "--model" in sys.argv else Path("hook_net_table.pt")
+_stem = _model.stem.replace("hook_net_", "")
+os.environ.setdefault("G2S_HOOKS_TAG", "" if _stem == "self" else _stem)
 HOOK_TAG = os.environ.get("G2S_HOOKS_TAG", "")
 HOOKS = ROOT / "data" / ("hooks_net" + (f"_{HOOK_TAG}" if HOOK_TAG else ""))
 GRASPS = ROOT / "data" / "grasps_choose"     # denser than grasps_v2: 300 contact pairs, rims included
@@ -427,7 +427,9 @@ def main() -> int:
     p.add_argument("--gen", type=int, default=120, help="held-out generated objects")
     p.add_argument("--scanner-scale", type=float, default=2.0, help="1280 x 960 scanner (part 3's choice)")
     p.add_argument("--workers", type=int, default=min(4, max(1, (os.cpu_count() or 2) - 1)))
-    p.add_argument("--model", type=Path, default=ROOT / "data" / "models" / "hook_net_self.pt")
+    p.add_argument("--model", type=Path, default=ROOT / "data" / "models" / "hook_net_table.pt",
+                   help="hook network (default: the table-judged one, learn.hooknet.DEFAULT_HOOK_NET; not imported "
+                        "here: the workers would all load torch)")
     p.add_argument("--smoke", action="store_true")
     args = p.parse_args()
     out = OUT / ("smoke" if args.smoke else "")

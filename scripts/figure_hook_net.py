@@ -182,12 +182,12 @@ def main() -> int:
     from grasp2show.learn.hooknet import load_hook_net
 
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--model", type=Path, default=ROOT / "data" / "models" / "hook_net_self.pt")
+    p.add_argument("--model", type=Path, default=None, help="default: learn.hooknet.DEFAULT_HOOK_NET")
     p.add_argument("--objects", nargs="*", default=None)
     p.add_argument("--out", type=Path, default=None)
     p.add_argument("--cols", type=int, default=3)
     args = p.parse_args()
-    net = load_hook_net(args.model)
+    net = load_hook_net(args.model) if args.model else load_hook_net()
     sets = ({"custom": args.objects} if args.objects else
             {"real": REAL, "generated": generated_pick()})
     for key, names in sets.items():

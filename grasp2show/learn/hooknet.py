@@ -24,6 +24,7 @@ decoded (refine_hooks then fits the fingertips analytically around the predicted
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -206,9 +207,16 @@ class HookNet(nn.Module):
         return self.head(torch.cat([*e, f, g], 1))
 
 
-def load_hook_net(path, device="cpu") -> HookNet:
+# The hook network the pipeline uses: self-trained with the robot's lift rehearsed from a table as
+# the judge (scripts/self_train_hooks.py --judge table). hook_net_self.pt: judged by the floating
+# lift test (proposes weak hooks the robot drops: 27 % vs 20 % drops in the chooser study);
+# hook_net.pt: trained on the analytic hole finder's hooks (scripts/train_hook_net.py).
+DEFAULT_HOOK_NET = Path(__file__).resolve().parents[2] / "data" / "models" / "hook_net_table.pt"
+
+
+def load_hook_net(path=DEFAULT_HOOK_NET, device="cpu") -> HookNet:
     """A trained hook network: hook_net.pt (scripts/train_hook_net.py, two hops) or
-    hook_net_self.pt (scripts/self_train_hooks.py, three)."""
+    hook_net_self.pt / hook_net_table.pt (scripts/self_train_hooks.py, three)."""
     ck = torch.load(path, map_location=device)
     net = HookNet(hops=ck.get("hops", 2)).to(device)
     net.load_state_dict(ck["state"])

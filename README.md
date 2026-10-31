@@ -986,6 +986,16 @@ fingertip before the weight comes on (`hanging.tilt_then_lift`), the closed two-
 is tried first, and each hook carries the lowest friction it holds at (`hanging.hook_mu_min`); a
 scene uses only the hooks that hold at its friction.
 
+Third run, the remaining drops: the hand's deceleration along the finger was far within the
+limit in 15 of 17 (so not a carry-speed problem); filmed, they are weak hooks (one finger in a
+narrow gap at the top of a slim handle, beside a knob with no lip) that drag the standing object
+as the fingers turn up and slip out. The floating lift test passes them (no table) and their
+robustness to small shifts is as high as the good ones'. So each hook's lift is now rehearsed as
+the robot does it, from a table (`hanging.table_lift_test`), and options that held go first (as a
+filter it removed as many working hooks as weak ones). The network itself learned from the
+floating test; `scripts/self_train_hooks.py --judge table` retrains it with the rehearsal as the
+judge (the 1,340 objects' tests relabelled: on one object 42 of 88 lifting hooks held).
+
 `media/hook_net_choices_real.png`, `media/hook_net_choices_generated.png`: what the hook network
 chooses on held-out objects (`scripts/figure_hook_net.py`).
 

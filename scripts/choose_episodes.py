@@ -48,7 +48,13 @@ from grasp2show.hanging import LIFT_VERSION
 from grasp2show.parallel import Workers
 
 OUT = ROOT / "data" / "choose"
-HOOKS = ROOT / "data" / "hooks_net"
+# the hook network's hooks, per network: data/hooks_net (hook_net_self.pt), data/hooks_net_<tag> for
+# hook_net_<tag>.pt (set before the workers start: they read it from the environment)
+if "--model" in sys.argv:
+    _stem = Path(sys.argv[sys.argv.index("--model") + 1]).stem.replace("hook_net_", "")
+    os.environ["G2S_HOOKS_TAG"] = "" if _stem == "self" else _stem
+HOOK_TAG = os.environ.get("G2S_HOOKS_TAG", "")
+HOOKS = ROOT / "data" / ("hooks_net" + (f"_{HOOK_TAG}" if HOOK_TAG else ""))
 GRASPS = ROOT / "data" / "grasps_choose"     # denser than grasps_v2: 300 contact pairs, rims included
 CLOUDS = ROOT / "data" / "hook_clouds"
 TOP = 3              # candidates executed per strategy and scene (the first is the one the robot would run)
@@ -438,7 +444,7 @@ def main() -> int:
     objs = objects(args.gen, args.smoke)
     log(f"== chooser {time.strftime('%Y-%m-%d %H:%M')}: {sum(g == 'real' for g in objs.values())} real and "
         f"{sum(g == 'gen' for g in objs.values())} generated objects, {args.scenes} scenes each")
-    rec_f = out / "records_v5.jsonl"       # v5: + hooks whose lift from the table held in rehearsal first
+    rec_f = out / f"records_v5{'_' + HOOK_TAG if HOOK_TAG else ''}.jsonl"   # v5: + table-rehearsed hooks first
     if args.stage in ("all", "prepare", "episodes"):
         from self_train_hooks import download_missing
 
@@ -515,15 +521,16 @@ def main() -> int:
                 f"{x['learned_hook_share']:.0%}), oracle {x['oracle']:.0%}; only the hook worked in "
                 f"{x['only_hook_works']:.0%}, only the pinch in {x['only_pinch_works']:.0%}; any of the top 3: "
                 f"pinch {x['pinch_any_of_top3']:.0%}, hook {x['hook_any_of_top3']:.0%}")
-    (out / "results.json").write_text(json.dumps(results, indent=1))
+    sfx = f"_{HOOK_TAG}" if HOOK_TAG else ""
+    (out / f"results{sfx}.json").write_text(json.dumps(results, indent=1))
     best = max(VARIANTS, key=lambda v: results[v]["all"]["learned"])
     for v in VARIANTS:
-        plot(recs, results[v], preds[v], ROOT / "media" / f"chooser_{v}{'_smoke' if args.smoke else ''}.png")
+        plot(recs, results[v], preds[v], ROOT / "media" / f"chooser_{v}{sfx}{'_smoke' if args.smoke else ''}.png")
     X = np.stack([vector(r, best) for r in recs])
     ch = Chooser.fit(X, np.array([r[f"pinch_success_{best}"] for r in recs], float),
                      np.array([r[f"hook_success_{best}"] for r in recs], float))
     if not args.smoke:
-        ch.save(ROOT / "data" / "models" / "chooser.pt")
+        ch.save(ROOT / "data" / "models" / f"chooser{sfx}.pt")
     log(f"better ranking: {best}; features: {', '.join(FEATURES)}; wrote data/models/chooser.pt, "
         f"media/chooser_score.png, media/chooser_robust.png")
     return 0

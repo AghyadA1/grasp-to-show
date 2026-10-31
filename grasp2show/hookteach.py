@@ -35,7 +35,14 @@ from .hooks import find_loops, fit_hook_poses, lift_test
 
 OPEN_W = 0.08
 LIFTED, FELL, COLLIDES = 1, 0, -1
-STORE = Path(os.environ.get("G2S_HOOK_TEACH", Path(__file__).resolve().parents[1] / "data" / "hook_teach"))
+FLOAT_STORE = Path(__file__).resolve().parents[1] / "data" / "hook_teach"   # judged by the floating lift test
+STORE = Path(os.environ.get("G2S_HOOK_TEACH", FLOAT_STORE))
+# the judge of a hook: "lift" = the floating-gripper lift test (hooks.lift_test, object hung in the
+# air); "table" = that, and the robot's lift rehearsed with the object standing on a table, fingers
+# turned up 25 deg about the fingertip first, friction 0.5 (hanging.table_lift_test): the weak hooks
+# the floating test passes (one finger in a narrow gap, beside a knob with no lip) fail it
+JUDGE = os.environ.get("G2S_HOOK_JUDGE", "lift")
+TABLE_PITCH, TABLE_MU = 25.0, 0.5
 
 
 @dataclass
@@ -185,8 +192,9 @@ def random_candidates(obj, rng, n: int = 20) -> list[dict]:
     return out
 
 
-def test_candidates(sim: GripperSim, cands: list[dict]) -> Tested:
-    """Nudge clear and lift-test every candidate; keep every outcome."""
+def test_candidates(sim: GripperSim, cands: list[dict], table_sim: GripperSim | None = None) -> Tested:
+    """Nudge clear and lift-test every candidate; keep every outcome. table_sim: also rehearse the
+    lift from the table (JUDGE "table"); a hook that fails it is a FELL."""
     if not cands:
         return Tested.empty()
     Ts, ws, anchors, res, src = [], [], [], [], []
@@ -206,6 +214,8 @@ def test_candidates(sim: GripperSim, cands: list[dict]) -> Tested:
             r, T = COLLIDES, c["T"]
         else:
             r = LIFTED if lift_test(sim, T, c["width"], close=False)["success"] else FELL
+            if r == LIFTED and table_sim is not None and not table_ok(table_sim, T, c["width"]):
+                r = FELL
         Ts.append(T)
         ws.append(c["width"])
         anchors.append(anchor_of(T, c["width"]))
@@ -214,7 +224,14 @@ def test_candidates(sim: GripperSim, cands: list[dict]) -> Tested:
     return Tested(np.array(Ts), np.array(ws, float), np.array(anchors), np.array(res, int), np.array(src, "<U8"))
 
 
-def teach(obj, sim: GripperSim, seed: int = 0, n_holes: int = 3, budget=(40, 40, 20)) -> Tested:
+def table_ok(table_sim: GripperSim, T: np.ndarray, width: float) -> bool:
+    from .hanging import table_lift_test
+
+    return table_lift_test(table_sim, T, width, TABLE_PITCH, TABLE_MU)
+
+
+def teach(obj, sim: GripperSim, seed: int = 0, n_holes: int = 3, budget=(40, 40, 20),
+          table_sim: GripperSim | None = None) -> Tested:
     """All three proposers on one object, tested: budget = (holes, overhang, random); what the hole
     proposer does not use (no holes) goes to the other two."""
     rng = np.random.default_rng(seed)
@@ -223,7 +240,7 @@ def teach(obj, sim: GripperSim, seed: int = 0, n_holes: int = 3, budget=(40, 40,
     over = overhang_candidates(obj, rng, n=budget[1] + spare // 2)
     spare += budget[1] - len(over)
     rand = random_candidates(obj, rng, n=budget[2] + max(spare - spare // 2, 0))
-    return test_candidates(sim, holes + over + rand)
+    return test_candidates(sim, holes + over + rand, table_sim)
 
 
 # ---- the store and the per-object jobs (run in worker processes by scripts/self_train_hooks.py)
@@ -249,6 +266,39 @@ def _load(name: str):
 
     obj = object_from_config(ObjectConfig(asset=name))
     return obj, GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj)
+
+
+def _table_sim(name: str, obj) -> GripperSim | None:
+    """The table sim when JUDGE is "table", else None."""
+    if JUDGE != "table":
+        return None
+    from .config import ObjectConfig, SceneConfig
+
+    return GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj, table=True)
+
+
+def relabel_job(name: str) -> tuple[str, int, int, float, str]:
+    """Worker: an object's floating-test tests (FLOAT_STORE) judged again by the table rehearsal:
+    each hook that lifted keeps LIFTED only if its lift from the table holds; saved to STORE.
+    -> name, lifted before, lifted now, seconds, error."""
+    import time
+
+    t0 = time.time()
+    try:
+        z = np.load(FLOAT_STORE / f"{name}.npz")
+        t = Tested(z["T"], z["width"], z["anchor"], z["result"].copy(), z["source"])
+        from .config import ObjectConfig, SceneConfig
+
+        obj, _ = _load(name)
+        tsim = GripperSim(SceneConfig(obj=ObjectConfig(asset=name)), obj, table=True)
+        before = int((t.result == LIFTED).sum())
+        for i in np.flatnonzero(t.result == LIFTED):
+            if not table_ok(tsim, t.T[i], float(t.width[i])):
+                t.result[i] = FELL
+    except Exception as e:  # noqa: BLE001 (a scan that does not load: skip it, say why)
+        return name, 0, 0, time.time() - t0, f"{type(e).__name__}: {e}"
+    save_tested(name, t)
+    return name, before, int((t.result == LIFTED).sum()), time.time() - t0, ""
 
 
 def library_hooks(name: str) -> Tested:
@@ -278,7 +328,8 @@ def teach_job(args) -> tuple[str, int, int, float, str]:
     t0 = time.time()
     try:
         obj, sim = _load(name)
-        t = library_hooks(name).merged(teach(obj, sim, seed=seed))
+        lib = library_hooks(name) if JUDGE == "lift" else Tested.empty()   # (the library: floating test only)
+        t = lib.merged(teach(obj, sim, seed=seed, table_sim=_table_sim(name, obj)))
     except Exception as e:  # noqa: BLE001 (a scan that does not load: skip it, say why)
         return name, 0, 0, time.time() - t0, f"{type(e).__name__}: {e}"
     save_tested(name, t)
@@ -292,8 +343,8 @@ def test_job(args) -> tuple[str, Tested, float]:
     name, cands = args
     t0 = time.time()
     try:
-        _, sim = _load(name)
-        t = test_candidates(sim, cands)
+        obj, sim = _load(name)
+        t = test_candidates(sim, cands, _table_sim(name, obj))
     except Exception:  # noqa: BLE001 (one bad object must not stop a 12-hour run)
         t = Tested.empty()
     return name, t, time.time() - t0

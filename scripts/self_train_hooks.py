@@ -52,12 +52,27 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 os.environ.setdefault("G2S_OBJECT_SET", "v2")
+TABLE = "--judge" in sys.argv and sys.argv[sys.argv.index("--judge") + 1] == "table"
+TAG = "table" if TABLE else "self"           # data/self_train<_table>/, data/models/hook_net_<tag>*.pt
+if TABLE:                                    # judged by the table rehearsal: its own store, relabelled
+    os.environ["G2S_HOOK_JUDGE"] = "table"
+    os.environ["G2S_HOOK_TEACH"] = str(ROOT / "data" / "hook_teach_table")
 if "--smoke" in sys.argv:                                   # keep the smoke test's tests apart
-    os.environ["G2S_HOOK_TEACH"] = str(ROOT / "data" / "self_train" / "smoke" / "hook_teach")
-from grasp2show.hookteach import FELL, LIFTED, STORE, load_tested, save_tested, teach_job, test_candidates
+    os.environ["G2S_HOOK_TEACH"] = str(ROOT / "data" / f"self_train{'_table' if TABLE else ''}" / "smoke" / "hook_teach")
+from grasp2show.hookteach import (
+    FELL,
+    FLOAT_STORE,
+    LIFTED,
+    STORE,
+    load_tested,
+    relabel_job,
+    save_tested,
+    teach_job,
+    test_candidates,
+)
 from grasp2show.parallel import Workers
 
-OUT = ROOT / "data" / "self_train"
+OUT = ROOT / "data" / ("self_train_table" if TABLE else "self_train")
 CLOUDS = ROOT / "data" / "hook_clouds"
 MODELS = ROOT / "data" / "models"
 N_STORED = 4096
@@ -287,13 +302,13 @@ def net_candidates(net, cloud, rng, k_top: int, n_sampled: int, device) -> list[
 def round_job(args):
     """Worker: test the network's candidates on one object plus n_random exploration ones."""
     name, cands, n_random, seed = args
-    from grasp2show.hookteach import _load, random_candidates
+    from grasp2show.hookteach import _load, _table_sim, random_candidates
 
     t0 = time.time()
     try:
         obj, sim = _load(name)
         rnd = random_candidates(obj, np.random.default_rng(seed), n_random) if n_random else []
-        t = test_candidates(sim, cands + rnd)
+        t = test_candidates(sim, cands + rnd, _table_sim(name, obj))
     except Exception as e:  # noqa: BLE001 (one bad object must not stop a 12-hour run)
         return name, None, time.time() - t0, f"{type(e).__name__}: {e}"
     return name, t, time.time() - t0, ""
@@ -396,6 +411,10 @@ def main() -> int:
     p.add_argument("--eval-k", type=int, default=6)
     p.add_argument("--smoke", action="store_true", help="a few objects and epochs: check the pipeline")
     p.add_argument("--device", default=None)
+    p.add_argument("--judge", choices=("lift", "table"), default="lift",
+                   help="table: hooks must also survive the robot's lift rehearsed from a table "
+                        "(the existing tests are relabelled, not redone)")
+    p.add_argument("--init", type=Path, default=None, help="warm start the first round from this network")
     args = p.parse_args()
     import torch
 
@@ -438,6 +457,21 @@ def main() -> int:
                 log(f"  no cloud for {n}: {r[1] if r else 'worker lost'}")
         log(f"clouds ready ({time.time() - t0:.0f} s)")
         todo = [n for n in everything if not (STORE / f"{n}.npz").exists() and n not in bad]
+        if TABLE:                     # the floating test's results, judged again by the table rehearsal
+            rel = [n for n in todo if (FLOAT_STORE / f"{n}.npz").exists()]
+            log(f"relabelling {len(rel)} objects' tests with the table rehearsal")
+            t0 = time.time()
+            nb = na = 0
+            for i, (n, r) in enumerate(pool.run(relabel_job, rel), 1):
+                if r is None:
+                    give_up(n)
+                    continue
+                _, b, a, sec, err = r
+                nb, na = nb + b, na + a
+                log(f"  [{i}/{len(rel)}] {n}: " + (f"FAILED {err}" if err else f"{a} of {b} lifting hooks hold "
+                                                                         f"from the table ({sec:.0f} s)"))
+            log(f"relabelled ({(time.time() - t0) / 60:.0f} min): {na} of {nb} hooks hold from the table")
+            todo = [n for n in todo if n not in rel and n not in skipped]
         log(f"teacher: {len(todo)} objects to teach ({len(everything) - len(todo)} done before)")
         t0 = time.time()
         for i, ((n, _), r) in enumerate(pool.run(teach_job, [(n, seed_of(n)) for n in todo]), 1):
@@ -454,7 +488,10 @@ def main() -> int:
         test_sets = {g: Data(pools[g]) for g in ("test_gen", "test_real_handles", "test_scans_other")}
         init = None
         if state["round_done"]:
-            init = torch.load(MODELS / f"hook_net_self_r{state['round_done']}.pt", map_location=device)["state"]
+            init = torch.load(MODELS / f"hook_net_{TAG}_r{state['round_done']}.pt", map_location=device)["state"]
+        elif args.init is not None:
+            init = torch.load(args.init, map_location=device)["state"]
+            log(f"warm start from {args.init}")
         for r in range(state["round_done"] + 1, args.rounds + 1):
             t_round = time.time()
             data = Data(pools["train"])
@@ -462,12 +499,12 @@ def main() -> int:
             n_f = sum(len(f) for f in data.fell)
             log(f"== round {r}: {len(data)} objects, {n_l} lifting hooks, {n_f} failed tries in the labels")
             val_idx = list(np.random.default_rng(0).choice(len(data), max(2, len(data) // 10), replace=False))
-            first = init is None
+            first = state["round_done"] == 0 and r == 1
             net, val_auc = train(data, val_idx, args.epochs_first if first else args.epochs,
                                  args.lr if first else args.lr / 2, args.batch, device, init, args.partial, log)
             init = {k: v.detach().clone() for k, v in net.state_dict().items()}
             MODELS.mkdir(parents=True, exist_ok=True)
-            torch.save({"state": net.state_dict(), "hops": 3, "round": r}, MODELS / f"hook_net_self_r{r}.pt")
+            torch.save({"state": net.state_dict(), "hops": 3, "round": r}, MODELS / f"hook_net_{TAG}_r{r}.pt")
             t_train = time.time() - t_round
             metrics = {"round": r, "val_point_auc": val_auc, "train_objects": len(data), "lifting_hooks": n_l,
                        "failed_tries": n_f}
@@ -507,7 +544,7 @@ def main() -> int:
                                      for k, v in metrics.items()})
             (out / f"round_{r}.json").write_text(json.dumps(metrics, indent=1, default=float))
             state_f.write_text(json.dumps(state, indent=1, default=float))
-            plot(state["history"], ROOT / "media" / ("self_train_hooks_smoke.png" if args.smoke else "self_train_hooks.png"))
+            plot(state["history"], ROOT / "media" / f"self_train_hooks{'_table' if TABLE else ''}{'_smoke' if args.smoke else ''}.png")
             log(f"  round {r} took {(time.time() - t_round) / 60:.0f} min")
     finally:
         pool.close()
@@ -516,8 +553,8 @@ def main() -> int:
                                   h["test_gen"]["coverage"], h["test_real_handles"]["coverage"]])
     best = max(hist, key=score)
     if not args.smoke:
-        shutil.copy(MODELS / f"hook_net_self_r{best['round']}.pt", MODELS / "hook_net_self.pt")
-    log(f"best round {best['round']} -> data/models/hook_net_self.pt")
+        shutil.copy(MODELS / f"hook_net_{TAG}_r{best['round']}.pt", MODELS / f"hook_net_{TAG}.pt")
+    log(f"best round {best['round']} -> data/models/hook_net_{TAG}.pt")
     return 0
 
 

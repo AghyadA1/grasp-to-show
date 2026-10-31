@@ -459,8 +459,10 @@ def main() -> int:
             if wb_f.exists() else set()
         scale = float(json.loads((out / "config.json").read_text()).get("scanner_scale", args.scanner_scale)) \
             if (out / "config.json").exists() else args.scanner_scale
-        jobs = [(r["object"], r["scene"], scale) for r in recs if (r["object"], r["scene"]) not in done]
-        log(f"way B: {len(jobs)} scenes to run ({len(done)} done before)")
+        seen = set(json.loads((ROOT / "grasp2show" / "object_set_v2.json").read_text())["train"])
+        jobs = [(r["object"], r["scene"], scale) for r in recs
+                if (r["object"], r["scene"]) not in done and r["object"] not in seen]
+        log(f"way B: {len(jobs)} scenes to run ({len(done)} done before; the objects it was trained on are left out)")
         t0 = time.time()
         pool = Workers(args.workers)
         try:

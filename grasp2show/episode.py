@@ -46,6 +46,9 @@ def _acquire_renderer(model: mujoco.MjModel, height: int, width: int, token: obj
     return _ACTIVE["renderer"]
 
 
+SLIP_CAUSE_MM, SLIP_CAUSE_DEG = 10.0, 10.0    # moved this much in the hand: a later contact is the grip's fault
+
+
 @dataclass
 class EpisodeResult:
     grasp: str
@@ -60,6 +63,31 @@ class EpisodeResult:
     notes: list[str] = field(default_factory=list)
     scanner_rgb: np.ndarray | None = field(default=None, repr=False)
     transport: object | None = field(default=None, repr=False)   # transport.TransportLog
+    # how far the object had moved in the hand since it was grasped (mm, deg) when each object
+    # contact first happened (after the lift): an object that slid in the grip (or was never
+    # lifted) until it touched the table is a slip, not a collision
+    slip_at_collision: dict = field(default_factory=dict)
+
+    def reason(self, slip_tol_mm: float = 20.0, slip_tol_deg: float = 15.0, hook: bool = False) -> str:
+        """Why it failed ("" if it did not): collision (an unexpected contact the grip did not
+        cause), dropped, slip (gross slip in the grip, or a contact it caused: the object had
+        already moved SLIP_CAUSE_MM / SLIP_CAUSE_DEG in the hand), qr. A hooked object swings in
+        the hand by design: dropped, then any contact is a collision."""
+        if self.success:
+            return ""
+        if hook:
+            return "dropped" if not self.held else (
+                "collision: " + ", ".join(self.collisions[:2]) if self.collisions else "qr")
+        caused = [c for c in self.collisions if c in self.slip_at_collision and
+                  (self.slip_at_collision[c][0] >= SLIP_CAUSE_MM or self.slip_at_collision[c][1] >= SLIP_CAUSE_DEG)]
+        real = [c for c in self.collisions if c not in caused]
+        if real:
+            return "collision: " + ", ".join(real[:2])
+        if not self.held:
+            return "dropped"
+        if caused or self.slip_mm >= slip_tol_mm or self.slip_deg >= slip_tol_deg:
+            return "slip"
+        return "qr"
 
     def summary(self) -> str:
         verdict = "SUCCESS" if self.success else "FAIL"
@@ -476,7 +504,7 @@ class PickAndShow:
         g_open = grasp.width if hook else min(grasp.width + 0.025, self.cfg.gripper.max_width)
         g_hold = grasp.width if hook else 0.0
         render_every = max(round(1.0 / (fps * dt)), 1)
-        state = {"step": 0, "holding": False, "collisions": [], "log": None}
+        state = {"step": 0, "holding": False, "collisions": [], "log": None, "ref": None, "slip_at": {}}
         tcp_id, obj_id = m.site("tcp").id, self._obj
 
         def follow(q_traj, width):
@@ -487,6 +515,10 @@ class PickAndShow:
                 for c in sorted(self._unexpected_contacts(state["holding"])):
                     if c not in state["collisions"]:
                         state["collisions"].append(c)
+                        if state["ref"] is not None and c.startswith("object-"):
+                            dT = inv_T(state["ref"]) @ inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
+                            state["slip_at"][c] = (float(np.linalg.norm(dT[:3, 3]) * 1e3),
+                                                   float(np.degrees(rotation_angle(dT[:3, :3]))))
                 if on_frame is not None and state["step"] % render_every == 0:
                     on_frame(d)
                 if state["log"] is not None and state["step"] % log_every == 0:
@@ -522,6 +554,7 @@ class PickAndShow:
             hold(paths["descend"][0], g_open, 0.5)
         follow(path_trajectory(paths["descend"], seg["descend"] * (2.5 if hook else 1.0), dt), g_open)
         hold(paths["descend"][-1], g_hold, 0.6)       # close: force-limited squeeze (a hook: stays)
+        state["ref"] = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)   # in the hand, as grasped
         if log_every > 0:
             state["log"] = []
         follow(path_trajectory(paths["lift"], seg["lift"] / speed, dt), g_hold)
@@ -571,7 +604,7 @@ class PickAndShow:
             q, qd, qdd, tau, Tt, To = (np.array(x) for x in zip(*log))
             transport = TransportLog(log_every * dt, q, qd, qdd, tau, Tt, To)
         return EpisodeResult(grasp.name, not notes, text, qr_ok, held, slip_mm, slip_deg,
-                             ok, state["collisions"], notes, rgb, transport)
+                             ok, state["collisions"], notes, rgb, transport, state["slip_at"])
 
 
 def rrt_connect(q0: np.ndarray, goals: list[np.ndarray], edge_ok, rng: np.random.Generator, state_ok=None,

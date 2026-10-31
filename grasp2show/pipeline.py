@@ -463,8 +463,7 @@ def execute_hook(ck: Checked, option, obj_offset=None, on_frame=None, fps: int =
         return None, f"plan: {why}"
     res = ck.sc.ep.execute(Grasp(f"hook{option.hook}", option.T_obj_tcp, option.width, "hook"), paths,
                            speed=HOOK_SPEED, mu=ck.scene.mu, obj_offset=obj_offset, on_frame=on_frame, fps=fps)
-    return bool(res.success), ("" if res.success else "dropped" if not res.held else
-                               "collision: " + ", ".join(res.collisions[:2]) if res.collisions else "qr")
+    return bool(res.success), res.reason(hook=True)
 
 
 # ---------------------------------------------------------------- the pipeline

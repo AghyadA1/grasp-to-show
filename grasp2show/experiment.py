@@ -196,15 +196,6 @@ class Scenario:
             return EpisodeRecord(**common, success=False, reason=f"plan: {why}")
         r = self.ep.execute(Grasp(f"g{c.grasp}", T_obj_tcp, float(self.W[c.grasp])), paths, obj_offset=obj_offset,
                             mu=self.mu, on_frame=on_frame, fps=fps)
-        if r.success:
-            reason = ""
-        elif r.collisions:
-            reason = "collision: " + ", ".join(r.collisions[:2])
-        elif not r.held:
-            reason = "dropped"
-        elif r.slip_mm >= self.ep.slip_tol_mm or r.slip_deg >= self.ep.slip_tol_deg:
-            reason = "slip"
-        else:
-            reason = "qr"
+        reason = r.reason(self.ep.slip_tol_mm, self.ep.slip_tol_deg)
         return EpisodeRecord(**common, success=bool(r.success), reason=reason, qr_ok=bool(r.qr_ok),
                              held=bool(r.held), slip_mm=float(r.slip_mm), slip_deg=float(r.slip_deg))

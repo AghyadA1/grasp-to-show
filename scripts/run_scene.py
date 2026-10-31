@@ -55,9 +55,9 @@ def main() -> int:
     pipe = Pipeline()
     plan = pipe.plan(scene)
     m = plan.checked.sc.ep.model
-    print(f"{args.asset}: mu {scene.mu}, {plan.checked.sc.obj.mass:.2f} kg -> {plan.method} "
-          f"(predicted success: pinch {plan.p_pinch:.2f}, hook {plan.p_hook:.2f}); {len(plan.candidates)} candidates, "
-          f"{len(plan.fallback)} for the other strategy")
+    print(f"{args.asset}: mu {scene.mu}, {plan.checked.sc.obj.mass:.2f} kg -> {plan.method} (predicted success: "
+          + ", ".join(f"{s} {p:.2f}" for s, p in plan.probs.items()) + "; candidates: "
+          + ", ".join(f"{s} {len(c)}" for s, c in plan.ranked.items()) + ")")
     side = mujoco.Renderer(m, 480, 640)
     scan = mujoco.Renderer(m, 480, 640)
     cam = mujoco.MjvCamera()

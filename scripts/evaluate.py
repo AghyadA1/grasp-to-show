@@ -8,7 +8,16 @@ strategies run their checks (the chooser's inputs) and both are executed (its ta
 with two rankings of its candidates ("score": the checks' margins; "robust": also each
 candidate's robustness, the share of its small shifts that still hold), the first three of each.
 
-Stages (all by default; resumable: run the same command again):
+Way B (the frozen goal-conditioned network of parts 1 and 3, heatmap_net_v4.pt) is a third way
+to pick a pinch. Stage "wayb" runs it on the same scenes as records.jsonl (same pose error), two
+rankings of its grasps: "net" (the network's order, reach checked: how way B has always run) and
+"checked" (every check at this scene's friction and weight, the network's score as one more
+margin). Stage "fit" then compares choosers over sets of strategies on the same scenes:
+  A pinch + hook (the analytic pinch: what the pipeline had), B way B + hook,
+  C way B checked + hook, D pinch + way B checked + hook,
+on the objects way B never saw in training (the 81 v2 training objects are left out of it).
+
+Stages (all but wayb by default; resumable: run the same command again):
   prepare   per object, cached: pinch grasps and their robustness (data/grasps_choose), the hook
             network's hooks (data/hooks_net_<tag>, pipeline.test_hooks);
   episodes  <run>/records.jsonl, one line per scene;
@@ -23,6 +32,7 @@ Usage:  python scripts/evaluate.py --workers 4                       (data/runs/
         python scripts/evaluate.py --name heavy --scenes 10
         python scripts/evaluate.py --run data/runs/2026-10-31_chooser --stage fit   (refit / replot)
         python scripts/evaluate.py --smoke                            (4 objects, 2 scenes)
+        python scripts/evaluate.py --run data/runs/2026-10-31_chooser_table --stage wayb   (then --stage fit)
 """
 from __future__ import annotations
 
@@ -41,7 +51,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 os.environ.setdefault("G2S_OBJECT_SET", "v2")
-from grasp2show.chooser import Chooser, rule_choice, vector
+from grasp2show.chooser import Chooser, features_for, rule_choice, vector
 from grasp2show.hanging import LIFT_VERSION
 from grasp2show.parallel import Workers
 from grasp2show.pipeline import GRASP_DIR, SCANNER_SCALE, crc, hook_dir
@@ -49,6 +59,11 @@ from grasp2show.pipeline import GRASP_DIR, SCANNER_SCALE, crc, hook_dir
 RUNS = ROOT / "data" / "runs"
 TOP = 3              # candidates executed per strategy, ranking and scene (the first is the one the robot runs)
 VARIANTS = ("score", "robust")
+WAYB_VARIANTS = ("net", "checked")
+SUCCESS = {"pinch": "pinch_success_robust", "hook": "hook_success_robust", "wayb": "wayb_success_net",
+           "wayb_checked": "wayb_success_checked"}
+SETS = {"A": ("pinch", "hook"), "B": ("wayb", "hook"), "C": ("wayb_checked", "hook"),
+        "D": ("pinch", "wayb_checked", "hook")}
 
 
 # ---------------------------------------------------------------- objects
@@ -156,6 +171,51 @@ def episode(args) -> dict:
     return rec
 
 
+_WAYB = None
+
+
+def wayb_episode(args) -> dict:
+    """Way B in one scene of records.jsonl (the same scene and unknown pose error): its first TOP
+    choices that can be planned, for both rankings (WAYB_VARIANTS), executed."""
+    global _WAYB
+    name, k, scale = args
+    from grasp2show.pipeline import Checked, WayB, add_wayb, execute_wayb, sample_scene
+
+    t0 = time.time()
+    if _WAYB is None:
+        _WAYB = WayB()
+    scene, off = sample_scene(name, k, scale)
+    ck = add_wayb(Checked(scene, None, None, [], []), _WAYB)
+    rec = {"object": name, "scene": k, **ck.features}
+    done: dict = {}
+    for v in WAYB_VARIANTS:
+        tries, why = [], "no grasp"
+        for c in ck.wayb_ranked(v == "checked")[:20]:
+            key = (c.grasp, c.twin, c.roll_idx)
+            if key not in done:
+                done[key] = execute_wayb(ck, c, off)
+            ok, reason = done[key]
+            if ok is None:
+                why = why if tries else reason
+                continue
+            tries.append((ok, reason))
+            if len(tries) == TOP:
+                break
+        rec.update({f"wayb_success_{v}": bool(tries and tries[0][0]), f"wayb_reason_{v}": tries[0][1] if tries else why,
+                    f"wayb_tries_{v}": [t[0] for t in tries]})
+    rec["wayb_s"] = round(time.time() - t0, 1)
+    return rec
+
+
+def merge_wayb(recs: list[dict], path: Path) -> list[dict]:
+    """records.jsonl with wayb.jsonl's results joined in (scenes way B has not run are dropped
+    when it has run on any)."""
+    if not path.exists():
+        return recs
+    wb = {(d["object"], d["scene"]): d for d in map(json.loads, path.read_text().splitlines())}
+    return [{**r, **wb[(r["object"], r["scene"])]} for r in recs if (r["object"], r["scene"]) in wb]
+
+
 # ---------------------------------------------------------------- fit and report
 
 def folds(names: list[str], k: int = 5) -> dict[str, int]:
@@ -175,7 +235,7 @@ def evaluate(recs: list[dict], v: str = "robust", margin: float = 0.0) -> tuple[
         tr, te = fi != f, fi == f
         if te.sum() == 0 or tr.sum() == 0:
             continue
-        ch = Chooser.fit(X[tr], yp[tr], yh[tr], margin=margin)
+        ch = Chooser.fit(X[tr], np.stack([yp, yh], 1)[tr], margin=margin)
         prob[te] = ch.predict(X[te])
         choice[te] = ch.choose(X[te])
     rule = np.array([rule_choice(r) for r in recs])
@@ -193,6 +253,35 @@ def evaluate(recs: list[dict], v: str = "robust", margin: float = 0.0) -> tuple[
                     "pinch_any_of_top3": any3(f"pinch_tries_{v}"), "hook_any_of_top3": any3(f"hook_tries_{v}"),
                     "only_hook_works": float(np.mean((yh > yp)[m])), "only_pinch_works": float(np.mean((yp > yh)[m]))}
     return out, np.stack([prob[:, 0], prob[:, 1], choice == "hook", yp, yh], 1)
+
+
+def evaluate_set(recs: list[dict], strategies: tuple) -> tuple[dict, np.ndarray]:
+    """A chooser over `strategies`, cross-validated by object (5 folds): each strategy always,
+    the chooser, the oracle (any of them works); per group. Also the per-scene success of the
+    chooser's pick (for paired comparisons between sets)."""
+    feats = features_for(strategies)
+    X = np.stack([vector(r, "robust", feats) for r in recs])
+    Y = np.array([[r[SUCCESS[s]] for s in strategies] for r in recs], float)
+    fold = folds(sorted({r["object"] for r in recs}))
+    fi = np.array([fold[r["object"]] for r in recs])
+    pick = np.zeros(len(recs), int)
+    for f in range(5):
+        tr, te = fi != f, fi == f
+        if te.sum() == 0 or tr.sum() == 0:
+            continue
+        ch = Chooser.fit(X[tr], Y[tr], strategies=strategies, features=feats)
+        pick[te] = [strategies.index(c) for c in ch.choose(X[te])]
+    got = Y[np.arange(len(recs)), pick]
+    out = {}
+    for grp in ("all", "real", "gen"):
+        m = np.array([grp == "all" or r["group"] == grp for r in recs])
+        if not m.any():
+            continue
+        out[grp] = {"scenes": int(m.sum()), "objects": len({r["object"] for r, mm in zip(recs, m) if mm}),
+                    **{f"always_{s}": float(Y[m, i].mean()) for i, s in enumerate(strategies)},
+                    "learned": float(got[m].mean()), "oracle": float(Y[m].max(1).mean()),
+                    **{f"chose_{s}": float(np.mean(pick[m] == i)) for i, s in enumerate(strategies)}}
+    return out, got
 
 
 def ranking_table(recs: list[dict]) -> dict:
@@ -278,7 +367,7 @@ def plot(recs: list[dict], res: dict, pred: np.ndarray, path: Path) -> None:
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--stage", choices=("all", "prepare", "episodes", "fit"), default="all")
+    p.add_argument("--stage", choices=("all", "prepare", "episodes", "wayb", "fit"), default="all")
     p.add_argument("--name", default="chooser", help="the run's folder: data/runs/<today>_<name>")
     p.add_argument("--run", type=Path, default=None, help="an existing run folder (resume, or refit with --stage fit)")
     p.add_argument("--scenes", type=int, default=6, help="scenes per object")
@@ -364,6 +453,31 @@ def main() -> int:
         finally:
             pool.close()
     recs = [json.loads(x) for x in rec_f.read_text().splitlines()] if rec_f.exists() else []
+    wb_f = out / "wayb.jsonl"
+    if args.stage == "wayb":
+        done = {(d["object"], d["scene"]) for d in map(json.loads, wb_f.read_text().splitlines())} \
+            if wb_f.exists() else set()
+        scale = float(json.loads((out / "config.json").read_text()).get("scanner_scale", args.scanner_scale)) \
+            if (out / "config.json").exists() else args.scanner_scale
+        jobs = [(r["object"], r["scene"], scale) for r in recs if (r["object"], r["scene"]) not in done]
+        log(f"way B: {len(jobs)} scenes to run ({len(done)} done before)")
+        t0 = time.time()
+        pool = Workers(args.workers)
+        try:
+            with open(wb_f, "a", encoding="utf-8") as fh:
+                for i, (job, r) in enumerate(pool.run(wayb_episode, jobs), 1):
+                    if r is None:
+                        log(f"  {job[0]} scene {job[1]}: lost (worker crashed or hung)")
+                        continue
+                    fh.write(json.dumps(r, default=float) + "\n")
+                    fh.flush()
+                    o_ = lambda v, r=r: "ok" if r[f"wayb_success_{v}"] else r[f"wayb_reason_{v}"][:18]
+                    log(f"  [{i}/{len(jobs)}] {r['object'][:30]:30s} way B {o_('net')} / checked {o_('checked')} "
+                        f"({r['wayb_s']:.0f} s)")
+        finally:
+            pool.close()
+        log(f"way B done ({(time.time() - t0) / 60:.0f} min); now: --stage fit")
+        return 0
     if len({r["object"] for r in recs}) < 5:
         log(f"{len(recs)} scenes: too few objects to cross-validate a chooser")
         return 0
@@ -393,14 +507,96 @@ def main() -> int:
     for v in VARIANTS:
         plot(recs, results[v], preds[v], out / f"chooser_{v}.png")
     X = np.stack([vector(r, best) for r in recs])
-    ch = Chooser.fit(X, np.array([r[f"pinch_success_{best}"] for r in recs], float),
-                     np.array([r[f"hook_success_{best}"] for r in recs], float))
+    ch = Chooser.fit(X, np.array([[r[f"pinch_success_{best}"], r[f"hook_success_{best}"]] for r in recs], float))
     ch.save(out / "chooser.pt")
+    log(f"better ranking: {best}; wrote {out / 'chooser.pt'}, {out}/chooser_score.png, chooser_robust.png")
+    final = out / "chooser.pt"
+    if wb_f.exists():
+        final = compare_sets(recs, wb_f, out, log, results) or final
+    (out / "results.json").write_text(json.dumps(results, indent=1))
     if not args.smoke:
-        shutil.copy(out / "chooser.pt", ROOT / "data" / "models" / "chooser.pt")
-    log(f"better ranking: {best}; wrote {out / 'chooser.pt'}" + ("" if args.smoke else " and data/models/chooser.pt")
-        + f", {out}/chooser_score.png, chooser_robust.png")
+        shutil.copy(final, ROOT / "data" / "models" / "chooser.pt")
+        log(f"data/models/chooser.pt <- {final.name}")
     return 0
+
+
+def compare_sets(recs: list[dict], wb_f: Path, out: Path, log, results: dict) -> Path | None:
+    """The choosers over SETS on the same scenes, objects way B was not trained on; the best one
+    (the simplest within one point of the best, A first) trained on those scenes and saved."""
+    from scipy.stats import binomtest
+
+    train = set(json.loads((ROOT / "grasp2show" / "object_set_v2.json").read_text())["train"])
+    rs = [r for r in merge_wayb(recs, wb_f) if r["object"] not in train]
+    if len({r["object"] for r in rs}) < 5:
+        log(f"way B: {len(rs)} scenes on objects it did not see: too few to compare")
+        return None
+    log(f"== strategy sets, {len(rs)} scenes on {len({r['object'] for r in rs})} objects way B did not see in "
+        f"training (cross-validated by object)")
+    res, got = {}, {}
+    for k, ss in SETS.items():
+        res[k], got[k] = evaluate_set(rs, ss)
+        for g, x in res[k].items():
+            log(f"  {k} {'+'.join(ss):26s} {g:4s} ({x['scenes']:4d} scenes): learned {x['learned']:.0%}, oracle "
+                f"{x['oracle']:.0%}; always " + ", ".join(f"{s} {x['always_' + s]:.0%}" for s in ss)
+                + "; chose " + ", ".join(f"{s} {x['chose_' + s]:.0%}" for s in ss))
+        if k != "A":
+            w, lo = int(np.sum(got[k] > got["A"])), int(np.sum(got[k] < got["A"]))
+            res[k]["vs_A"] = {"won": w, "lost": lo, "p": float(binomtest(w, w + lo).pvalue) if w + lo else 1.0}
+            log(f"    vs A, scene by scene: won {w}, lost {lo} (p = {res[k]['vs_A']['p']:.3f})")
+    for v in WAYB_VARIANTS:
+        n = [r for r in rs if r[f"wayb_tries_{v}"]]
+        drops = {}
+        for r in rs:
+            why = r[f"wayb_reason_{v}"] or "ok"
+            drops[why.split(":")[0]] = drops.get(why.split(":")[0], 0) + 1
+        log(f"  way B {v}: a grasp ran in {len(n)} scenes; outcomes: " + ", ".join(
+            f"{k} {c}" for k, c in sorted(drops.items(), key=lambda t: -t[1])[:6]))
+    results["sets"] = res
+    best = max(res[k]["all"]["learned"] for k in SETS)
+    pick = next(k for k in SETS if res[k]["all"]["learned"] >= best - 0.01)
+    plot_sets(res, out / "chooser_sets.png")
+    ss = SETS[pick]
+    feats = features_for(ss)
+    ch = Chooser.fit(np.stack([vector(r, "robust", feats) for r in rs]),
+                     np.array([[r[SUCCESS[s]] for s in ss] for r in rs], float), strategies=ss, features=feats)
+    path = out / f"chooser_{pick}.pt"
+    ch.save(path)
+    log(f"kept set {pick} ({'+'.join(ss)}: the simplest within one point of the best, {best:.0%}); wrote {path}, "
+        f"{out / 'chooser_sets.png'}")
+    return path
+
+
+def plot_sets(res: dict, path: Path) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    col = {"pinch": "#4C78A8", "hook": "#E45756", "wayb": "#F58518", "wayb_checked": "#EECA3B",
+           "learned": "#54A24B", "oracle": "#9D9D9D"}
+    groups = [g for g in ("all", "real", "gen") if g in res["A"]]
+    fig, axs = plt.subplots(1, len(groups), figsize=(5.2 * len(groups), 4.4), sharey=True)
+    for ax, g in zip(np.atleast_1d(axs), groups):
+        x0 = 0
+        for k, ss in SETS.items():
+            bars = [(f"always {s}", res[k][g][f"always_{s}"], col[s]) for s in ss] + \
+                   [("learned", res[k][g]["learned"], col["learned"]), ("oracle", res[k][g]["oracle"], col["oracle"])]
+            for j, (lab, v, c) in enumerate(bars):
+                ax.bar(x0 + j, v * 100, 0.85, color=c, label=lab if k == "D" or (lab.endswith("wayb") and k == "B")
+                       else None)
+                ax.text(x0 + j, v * 100 + 1, f"{v * 100:.0f}", ha="center", fontsize=7)
+            ax.text(x0 + (len(bars) - 1) / 2, -9, k, ha="center", fontsize=10, weight="bold")
+            x0 += len(bars) + 1
+        ax.set_xticks([])
+        ax.set_ylim(-12, 100)
+        ax.set_title(f"{g}: {res['A'][g]['scenes']} scenes", fontsize=9)
+        ax.grid(axis="y", alpha=0.3)
+    np.atleast_1d(axs)[0].set_ylabel("episodes succeeded (%)")
+    np.atleast_1d(axs)[-1].legend(fontsize=7, frameon=False, loc="upper right")
+    fig.suptitle("Choosers over strategy sets (A pinch+hook, B way B+hook, C way B checked+hook, D all three); "
+                 "objects way B did not see", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
 
 
 if __name__ == "__main__":

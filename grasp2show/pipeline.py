@@ -47,6 +47,7 @@ from .chooser import (
     sample_conditions,
     scene_features,
     vector,
+    wayb_features,
 )
 from .config import CameraConfig, ObjectConfig, SceneConfig, random_camera
 
@@ -57,6 +58,9 @@ CHOOSER = ROOT / "data" / "models" / "chooser.pt"
 SCANNER_SCALE = 2.0              # 1280 x 960 (part 3's scanner; config.CameraConfig is 640 x 480)
 POSE_ERR_MM, POSE_ERR_DEG = 2.0, 1.5     # evaluation: where the object really is vs where the robot thinks
 MAX_ROBUST = 150                 # pinch grasps whose robustness is measured per object (others: 0.5)
+WAYB_MODEL = ROOT / "data" / "models" / "heatmap_net_v4.pt"     # way B, frozen
+WAYB_CLOUD_DIR = ROOT / "data" / "wayb_clouds"
+WAYB_K = 10                      # way B grasps per scene (the network's best, 1 cm apart per target)
 
 
 def crc(s: str) -> int:
@@ -228,6 +232,103 @@ def test_hooks(asset: str, cands: list[dict], out: Path, keep: int = 6) -> Path:
     return f
 
 
+# ---------------------------------------------------------------- way B: the network that proposes pinches
+
+def wayb_cloud(asset: str, n: int = 1024) -> np.ndarray:
+    """Way B's input for an object: (n, 7) surface points, normals, on-the-QR flag (as
+    scripts/archive/part1_grasp_choice/generate_dataset.object_cloud), cached."""
+    import trimesh
+
+    from .objects import object_from_config
+
+    f = WAYB_CLOUD_DIR / f"{asset}.npy"
+    if f.exists():
+        return np.load(f)
+    obj = object_from_config(ObjectConfig(asset=asset))
+    pts, fid = trimesh.sample.sample_surface_even(obj.mesh, n, seed=0)
+    if len(pts) < n:
+        extra, fid2 = trimesh.sample.sample_surface(obj.mesh, n - len(pts), seed=0)
+        pts, fid = np.vstack([pts, extra]), np.concatenate([fid, fid2])
+    T = obj.T_obj_qr
+    local = (pts - T[:3, 3]) @ T[:3, :3]
+    half = obj.qr.side / 2
+    on_qr = (np.abs(local[:, 0]) < 0.004) & (np.abs(local[:, 1]) <= half) & (np.abs(local[:, 2]) <= half)
+    feats = np.concatenate([pts, obj.mesh.face_normals[fid], on_qr[:, None]], 1).astype(np.float32)
+    WAYB_CLOUD_DIR.mkdir(parents=True, exist_ok=True)
+    np.save(f, feats)
+    return feats
+
+
+class WayB:
+    """The goal-conditioned heatmap network (way B, parts 1 and 3): for a scene, a grasp score and
+    a grasp at every point of the object's cloud for each of the 12 presentation targets."""
+
+    def __init__(self, model: Path = WAYB_MODEL):
+        import torch
+
+        from .learn.dense import HeatmapNet
+
+        torch.set_num_threads(1)
+        ck = torch.load(model, map_location="cpu", weights_only=False)
+        self.net = HeatmapNet(torch.zeros(1, 1024, 7))
+        self.net.load_state_dict({k: v for k, v in ck["state_dict"].items() if k != "clouds"}, strict=False)
+        self.net.eval()
+
+    def grasps(self, asset: str, cfg: SceneConfig, obj, k: int = WAYB_K, min_sep: float = 0.01):
+        """Up to k (T_obj_tcp, width, target index, score) for this scene: the highest-scoring
+        points, min_sep apart per target, whose open gripper does not hit the object. The network
+        is told the object's mass in this scene (it was trained at the scans' own masses)."""
+        import torch
+
+        from .gripper_sim import GripperSim
+        from .learn.dense import condition, grasp_from_prediction, split_outputs
+        from .scene import start_pose
+        from .task import show_pose
+
+        feats = wayb_cloud(asset)
+        self.net.clouds = torch.as_tensor(feats[None])
+        rolls = np.linspace(0, 2 * np.pi, 12, endpoint=False)
+        T0 = start_pose(cfg, obj)
+        cond = np.stack([condition(T0, show_pose(cfg, obj, r), cfg.camera.pos, obj.mass, obj.com) for r in rolls])
+        with torch.no_grad():
+            pr = {kk: v.numpy() for kk, v in split_outputs(self.net(torch.zeros(12, dtype=torch.long),
+                                                                    torch.as_tensor(cond))).items()}
+        q = 1 / (1 + np.exp(-np.clip(pr["logit"], -50, 50))) * pr["score"]
+        pts = feats[:, :3]
+        sim = GripperSim(cfg, obj)
+        out, used = [], []
+        for flat in np.argsort(-q, axis=None):
+            r, i = divmod(int(flat), q.shape[1])
+            if any(r == r2 and np.linalg.norm(pts[i] - pts[i2]) < min_sep for r2, i2 in used):
+                continue
+            used.append((r, i))
+            T = grasp_from_prediction(pts[i], pr["approach"][r, i], pr["closing"][r, i], pr["offset"][r, i])
+            w = float(np.clip(pr["width"][r, i], 0.0, 0.08))
+            if not sim.in_collision(T, w):
+                out.append((T, w, r, float(q[r, i])))
+            if len(out) == k or len(used) >= 4 * k:
+                break
+        return out
+
+
+def kinematic_choices(sc, order: list[tuple[int, int]]) -> list:
+    """(grasp, target) pairs in preference order -> choices reachable at the start and at the
+    target (the better twin): how way B has always been run (eval_way_b.py)."""
+    from .experiment import Choice
+
+    out = []
+    for i, j in order:
+        best, key = None, -np.inf
+        for tw in sc.reports[i].twins:
+            if tw.start_ok and j < len(tw.targets) and tw.targets[j].reach.ok:
+                m = min(tw.start.limit_margin, tw.targets[j].reach.limit_margin)
+                if m > key:
+                    best, key = tw.twin, m
+        if best is not None:
+            out.append(Choice(i, best, j, sc.reports[i].ok))
+    return out
+
+
 @dataclass
 class Assets:
     """One object's cached candidates for both strategies."""
@@ -259,12 +360,29 @@ class Checked:
     hooks: list[dict]           # those that hold at this scene's friction
     opts: list                  # hanging.HookOption for them
     features: dict = field(default_factory=dict)
+    wb: object = None           # experiment.Scenario of way B's grasps for this scene (None: no way B)
+    wb_q: np.ndarray | None = None      # their scores
+    wb_roll: np.ndarray | None = None   # the target each was proposed for
 
     def pinch_ranked(self, robust: bool = True) -> list:
         return rank_pinch(self.sc, self.assets.robust if robust else None)
 
     def hook_ranked(self, robust: bool = True) -> list:
         return rank_hooks(self.opts, self.hooks if robust else None)
+
+    def wayb_ranked(self, checked: bool = False, fallback: bool = True) -> list:
+        """Way B's choices: the network's order, reach checked only (as way B always ran), or
+        checked: every check at this friction and weight (lift, stability, visibility), the
+        network's score as one more margin (2q - 1), the largest smallest margin first; if none
+        passes, the network's order (fallback)."""
+        if self.wb is None:
+            return []
+        if checked:
+            out = rank_pinch(self.wb, extra=2 * self.wb_q - 1)
+            if out or not fallback:
+                return out
+        order = [(int(i), int(self.wb_roll[i])) for i in np.argsort(-self.wb_q)]
+        return kinematic_choices(self.wb, order)
 
     def chooser_inputs(self, robust: bool = True) -> dict:
         """features plus the robustness of each strategy's first candidate."""
@@ -273,8 +391,9 @@ class Checked:
                 "hook_r": float(self.hooks[hr[0].hook].get("robust", 0.5)) if hr else 0.0}
 
 
-def check(scene: Scene, assets: Assets) -> Checked:
-    """Both strategies' checks for one scene (no motion yet)."""
+def check(scene: Scene, assets: Assets, wayb: WayB | None = None) -> Checked:
+    """The strategies' checks for one scene (no motion yet): pinch and hook, and way B's grasps
+    if `wayb` is given."""
     from .experiment import Scenario
     from .gripper_sim import GripperSim
     from .hanging import hook_options
@@ -286,12 +405,49 @@ def check(scene: Scene, assets: Assets) -> Checked:
     opts = hook_options(sc.fc, GripperSim(sc.cfg, sc.obj), hooks, T_start=sc.ep.resting_pose()) if hooks else []
     feats = {**scene_features(scene.mu, sc.obj.mass, sc.obj.mesh.extents), **pinch_features(sc),
              **hook_features(hooks, opts)}
-    return Checked(scene, sc, assets, hooks, opts, feats)
+    ck = Checked(scene, sc, assets, hooks, opts, feats)
+    if wayb is not None:
+        add_wayb(ck, wayb, sc.cfg, sc.obj)
+    return ck
+
+
+def add_wayb(ck: Checked, wayb: WayB, cfg=None, obj=None) -> Checked:
+    """Way B's grasps for ck's scene, checked at its friction and weight (ck.wb, wb_q, wb_roll),
+    and their chooser inputs. cfg, obj: the scene's (built here if not given)."""
+    from .experiment import Scenario
+    from .objects import object_from_config
+
+    scene = ck.scene
+    if cfg is None:
+        extra = {"friction": (float(scene.mu), 0.01 * float(scene.mu), 0.0001)}
+        cfg = SceneConfig(obj=ObjectConfig(asset=scene.asset, start_yaw=np.radians(scene.yaw_deg),
+                                           start_xy=tuple(scene.start_xy), **extra), camera=scene.camera)
+        obj = object_from_config(cfg.obj)
+        if scene.mass_scale != 1.0:
+            obj = replace(obj, mass=obj.mass * scene.mass_scale, inertia=obj.inertia * scene.mass_scale)
+    g = wayb.grasps(scene.asset, cfg, obj)
+    if g:
+        ck.wb = Scenario(scene.asset, scene.yaw_deg, {"T_obj_tcp": np.stack([x[0] for x in g]),
+                                                      "width": np.array([x[1] for x in g]),
+                                                      "success": np.ones(len(g), bool)},
+                         start_xy=scene.start_xy, camera=scene.camera, mass_scale=scene.mass_scale, mu=scene.mu)
+        ck.wb.lift_margin = np.where(np.isfinite(ck.wb.lift_margin), ck.wb.lift_margin, -1.0)
+        ck.wb_q, ck.wb_roll = np.array([x[3] for x in g]), np.array([x[2] for x in g])
+    ck.features.update(wayb_features(ck.wb, ck.wayb_ranked(), ck.wayb_ranked(True, fallback=False), ck.wb_q))
+    return ck
 
 
 def execute_pinch(ck: Checked, choice, obj_offset=None, on_frame=None, fps: int = 30) -> tuple[bool | None, str]:
     """(success, why) for one pinch choice; success None: its motion could not be planned."""
     e = ck.sc._execute(choice, obj_offset=obj_offset, on_frame=on_frame, fps=fps)
+    if e.reason.startswith("plan"):
+        return None, e.reason
+    return bool(e.success), e.reason
+
+
+def execute_wayb(ck: Checked, choice, obj_offset=None, on_frame=None, fps: int = 30) -> tuple[bool | None, str]:
+    """(success, why) for one of way B's choices; None: its motion could not be planned."""
+    e = ck.wb._execute(choice, obj_offset=obj_offset, on_frame=on_frame, fps=fps)
     if e.reason.startswith("plan"):
         return None, e.reason
     return bool(e.success), e.reason
@@ -315,12 +471,14 @@ def execute_hook(ck: Checked, option, obj_offset=None, on_frame=None, fps: int =
 
 @dataclass
 class Plan:
-    method: str                 # "pinch" or "hook"
-    p_pinch: float              # the chooser's predicted success of each
-    p_hook: float
-    candidates: list            # the chosen strategy's ranked candidates (experiment.Choice / HookOption)
-    fallback: list              # the other strategy's
+    method: str                 # the chosen strategy: "pinch", "hook", "wayb" or "wayb_checked"
+    probs: dict                 # the chooser's predicted success of each strategy it knows
+    ranked: dict                # each strategy's ranked candidates (experiment.Choice / HookOption)
     checked: Checked
+
+    @property
+    def candidates(self) -> list:
+        return self.ranked[self.method]
 
 
 @dataclass
@@ -330,6 +488,22 @@ class Result:
     reason: str
     plan: Plan
     seconds: float
+
+
+def ranked_all(ck: Checked) -> dict:
+    """Every strategy's ranked candidates (the robust rankings for pinch and hook)."""
+    out = {"pinch": ck.pinch_ranked(), "hook": ck.hook_ranked()}
+    if ck.wb is not None:
+        out.update(wayb=ck.wayb_ranked(), wayb_checked=ck.wayb_ranked(True))
+    return out
+
+
+def execute(ck: Checked, strategy: str, c, obj_offset=None, on_frame=None) -> tuple[bool | None, str]:
+    if strategy == "hook":
+        return execute_hook(ck, c, obj_offset, on_frame=on_frame)
+    if strategy.startswith("wayb"):
+        return execute_wayb(ck, c, obj_offset, on_frame=on_frame)
+    return execute_pinch(ck, c, obj_offset, on_frame=on_frame)
 
 
 class Pipeline:
@@ -342,6 +516,8 @@ class Pipeline:
         tag = self.hook_net_path.stem.replace("hook_net_", "")
         self.hooks_dir = hook_dir(tag)
         self.chooser = Chooser.load(chooser) if Path(chooser).exists() else None
+        self.strategies = self.chooser.strategies if self.chooser else ("pinch", "hook")
+        self.wayb = WayB() if any(s.startswith("wayb") for s in self.strategies) else None
         self.device = device
         self._net = None
 
@@ -358,20 +534,21 @@ class Pipeline:
         return Assets.load(asset, self.hooks_dir)
 
     def plan(self, scene: Scene) -> Plan:
-        """Both strategies checked, the chooser's pick and its ranked candidates."""
-        ck = check(scene, self.prepare(scene.asset))
-        pinch, hook = ck.pinch_ranked(), ck.hook_ranked()
+        """The strategies checked, the chooser's pick and every strategy's ranked candidates."""
+        ck = check(scene, self.prepare(scene.asset), self.wayb)
+        ranked = ranked_all(ck)
+        names = [s for s in self.strategies if s in ranked]
         if self.chooser is not None:
-            p = self.chooser.predict(vector(ck.chooser_inputs(), "")[None])[0]
-            pp, ph = float(p[0]), float(p[1])
+            x = vector(ck.chooser_inputs(), "", self.chooser.features)[None]
+            probs = dict(zip(self.chooser.strategies, map(float, self.chooser.predict(x)[0])))
         else:                                          # no trained chooser: the rule (chooser.rule_choice)
             from .chooser import rule_choice
 
-            hook_first = rule_choice(ck.features) == "hook"
-            pp, ph = (0.0, 1.0) if hook_first else (1.0, 0.0)
-        use_hook = bool(hook) and (ph > pp + (self.chooser.margin if self.chooser else 0.0) or not pinch)
-        return Plan("hook" if use_hook else "pinch", pp, ph, hook if use_hook else pinch,
-                    pinch if use_hook else hook, ck)
+            probs = {"pinch": 0.0, "hook": 1.0} if rule_choice(ck.features) == "hook" else {"pinch": 1.0, "hook": 0.0}
+        usable = [s for s in names if ranked[s]] or names
+        best = max(usable, key=lambda s: probs.get(s, 0.0) - (self.chooser.margin if self.chooser and s != names[0]
+                                                               else 0.0))
+        return Plan(best, probs, ranked, ck)
 
     def run(self, scene: Scene, obj_offset=None, max_tries: int = 12, on_frame=None,
             plan: Plan | None = None) -> Result:
@@ -381,12 +558,10 @@ class Pipeline:
         t0 = time.time()
         pl = plan or self.plan(scene)
         why = "no candidate"
-        for method, cands in ((pl.method, pl.candidates), ("hook" if pl.method == "pinch" else "pinch", pl.fallback)):
-            for c in cands[:max_tries]:
-                if method == "pinch":
-                    ok, why = execute_pinch(pl.checked, c, obj_offset, on_frame=on_frame)
-                else:
-                    ok, why = execute_hook(pl.checked, c, obj_offset, on_frame=on_frame)
+        order = [pl.method] + sorted((s for s in pl.ranked if s != pl.method), key=lambda s: -pl.probs.get(s, 0.0))
+        for method in order:
+            for c in pl.ranked[method][:max_tries]:
+                ok, why = execute(pl.checked, method, c, obj_offset, on_frame=on_frame)
                 if ok is not None:
                     return Result(method, ok, why, pl, time.time() - t0)
         return Result(pl.method, False, why, pl, time.time() - t0)

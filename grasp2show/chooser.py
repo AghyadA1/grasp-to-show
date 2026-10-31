@@ -64,9 +64,18 @@ def sample_conditions(rng: np.random.Generator, mass0: float) -> tuple[float, fl
 PINCH_KEYS = ("pinch_any", "pinch_n_ok", "pinch_best", "pinch_lift", "pinch_stab", "pinch_vis", "pinch_n_lift_ok")
 HOOK_KEYS = ("hook_n", "hook_any", "hook_n_ok", "hook_best", "hook_pixels", "hook_angle", "hook_swing", "hook_tilt",
              "hook_pitch", "hook_one", "hook_prob")
+WAYB_KEYS = ("wayb_any", "wayb_q", "wayb_n_ok", "wayb_best", "wayb_lift")
 SCENE_KEYS = ("mu", "log_mass", "load", "ext_max", "ext_min")
 ROBUST_KEYS = ("pinch_r", "hook_r")       # robustness of the candidate each strategy would run
 FEATURES = SCENE_KEYS + PINCH_KEYS + HOOK_KEYS + ROBUST_KEYS
+STRATEGY_KEYS = {"pinch": PINCH_KEYS + ("pinch_r",), "hook": HOOK_KEYS + ("hook_r",), "wayb": WAYB_KEYS,
+                 "wayb_checked": WAYB_KEYS}
+
+
+def features_for(strategies) -> tuple:
+    """The chooser's inputs when it chooses among `strategies`: the scene's, and each strategy's
+    own checks (none of the strategies it does not have)."""
+    return tuple(dict.fromkeys(SCENE_KEYS + sum((STRATEGY_KEYS[s] for s in strategies), ())))
 
 
 def pinch_features(sc) -> dict:
@@ -161,9 +170,10 @@ def robust_part(r: float) -> float:
     return 2.0 * (r - 0.5)
 
 
-def rank_pinch(sc, robust: np.ndarray | None = None, k: int = 20) -> list:
+def rank_pinch(sc, robust: np.ndarray | None = None, k: int = 20, extra: np.ndarray | None = None) -> list:
     """The pinch's ranked choices (experiment.choose "aware": every check passes, the largest
-    smallest normalised margin first), with robust (per grasp, r) added as one more margin."""
+    smallest normalised margin first), with robust (per grasp, r) added as one more margin, and
+    extra (per grasp, already a margin: way B's 2q - 1) as another."""
     from .experiment import Choice
 
     scored = []
@@ -178,6 +188,8 @@ def rank_pinch(sc, robust: np.ndarray | None = None, k: int = 20) -> list:
                          t.stability_margin, (t.visibility.fraction - 0.9) / 0.1]
                 if robust is not None:
                     parts.append(robust_part(float(robust[i])))
+                if extra is not None:
+                    parts.append(float(extra[i]))
                 scored.append((min(parts), Choice(i, tw.twin, j, r.ok)))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [c for _, c in scored[:k]]
@@ -227,11 +239,24 @@ def scene_features(mu: float, mass: float, extents, finger_force: float = 20.0) 
             "ext_max": float(e[-1]) * 10, "ext_min": float(e[0]) * 10}
 
 
-def vector(rec: dict, variant: str = "robust") -> np.ndarray:
+def vector(rec: dict, variant: str = "robust", features: tuple = FEATURES) -> np.ndarray:
     """The chooser's inputs for one scene; the robustness features are those of the candidates
     the given ranking would run."""
     get = lambda k: rec[f"{k}_{variant}"] if k in ROBUST_KEYS and variant else rec[k]
-    return np.array([float(get(k)) for k in FEATURES], np.float32)
+    return np.array([float(get(k)) for k in features], np.float32)
+
+
+def wayb_features(wb, net_ranked: list, checked_ranked: list, q: np.ndarray) -> dict:
+    """Way B's candidates in this scene: any it can reach, the network's score of its first, how
+    many pass every check at this friction and weight, and the first checked one's smallest
+    normalised margin and lift margin. wb: the experiment.Scenario of way B's grasps."""
+    if wb is None:
+        return {"wayb_any": 0.0, "wayb_q": 0.0, "wayb_n_ok": 0.0, "wayb_best": -2.0, "wayb_lift": -2.0}
+    f = pinch_features(wb)
+    c = lambda x: float(np.clip(x, -2.0, 2.0))
+    return {"wayb_any": float(bool(net_ranked)), "wayb_q": float(q[net_ranked[0].grasp]) if net_ranked else 0.0,
+            "wayb_n_ok": f["pinch_n_ok"], "wayb_best": c(f["pinch_best"]) if checked_ranked else -2.0,
+            "wayb_lift": c(wb.lift_margin[checked_ranked[0].grasp]) if checked_ranked else -2.0}
 
 
 # ---------------------------------------------------------------- choosers
@@ -248,41 +273,46 @@ def rule_choice(rec: dict) -> str:
 
 @dataclass
 class Chooser:
-    """Two small networks (pinch, hook) predicting each strategy's success from FEATURES."""
+    """One small network predicting each strategy's success (sigmoid outputs, one per strategy)
+    from what the checks found (`features`); picks the most likely, the first strategy on ties."""
     mean: np.ndarray
     std: np.ndarray
     state: dict
-    margin: float = 0.0          # the hook must be predicted this much likelier to be chosen
+    margin: float = 0.0                      # another strategy must be this much likelier than the first
+    strategies: tuple = ("pinch", "hook")
+    features: tuple = FEATURES
 
-    @staticmethod
-    def net():
+    def net(self):
         import torch
         from torch import nn
 
         torch.manual_seed(0)
-        return nn.Sequential(nn.Linear(len(FEATURES), 32), nn.ReLU(), nn.Dropout(0.1), nn.Linear(32, 32), nn.ReLU(),
-                             nn.Linear(32, 2))
+        return nn.Sequential(nn.Linear(len(self.features), 32), nn.ReLU(), nn.Dropout(0.1), nn.Linear(32, 32),
+                             nn.ReLU(), nn.Linear(32, len(self.strategies)))
 
     @classmethod
-    def fit(cls, X: np.ndarray, y_pinch: np.ndarray, y_hook: np.ndarray, epochs: int = 400, wd: float = 1e-3,
-            margin: float = 0.0) -> Chooser:
+    def fit(cls, X: np.ndarray, Y: np.ndarray, epochs: int = 400, wd: float = 1e-3, margin: float = 0.0,
+            strategies: tuple = ("pinch", "hook"), features: tuple = FEATURES) -> Chooser:
+        """X (N, len(features)), Y (N, len(strategies)): did each strategy succeed."""
         import torch
 
         mean, std = X.mean(0), X.std(0) + 1e-6
-        net = cls.net()
+        ch = cls(mean, std, {}, margin, tuple(strategies), tuple(features))
+        net = ch.net()
         opt = torch.optim.Adam(net.parameters(), lr=3e-3, weight_decay=wd)
         x = torch.as_tensor((X - mean) / std, dtype=torch.float32)
-        y = torch.as_tensor(np.stack([y_pinch, y_hook], 1), dtype=torch.float32)
+        y = torch.as_tensor(np.asarray(Y, float), dtype=torch.float32)
         for _ in range(epochs):
             net.train()
             loss = torch.nn.functional.binary_cross_entropy_with_logits(net(x), y)
             opt.zero_grad()
             loss.backward()
             opt.step()
-        return cls(mean, std, {k: v.detach().clone() for k, v in net.state_dict().items()}, margin)
+        ch.state = {k: v.detach().clone() for k, v in net.state_dict().items()}
+        return ch
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """(N, 2) predicted success probabilities: pinch, hook."""
+        """(N, len(strategies)) predicted success probabilities."""
         import torch
 
         net = self.net()
@@ -292,20 +322,21 @@ class Chooser:
             return torch.sigmoid(net(torch.as_tensor((X - self.mean) / self.std, dtype=torch.float32))).numpy()
 
     def choose(self, X: np.ndarray) -> np.ndarray:
-        """(N,) "pinch" / "hook"."""
+        """(N,) the chosen strategy's name."""
         p = self.predict(X)
-        return np.where(p[:, 1] > p[:, 0] + self.margin, "hook", "pinch")
+        p[:, 1:] -= self.margin
+        return np.array(self.strategies)[p.argmax(1)]
 
     def save(self, path) -> None:
         import torch
 
         torch.save({"mean": self.mean, "std": self.std, "state": self.state, "margin": self.margin,
-                    "features": FEATURES}, path)
+                    "features": self.features, "strategies": self.strategies}, path)
 
     @classmethod
     def load(cls, path) -> Chooser:
         import torch
 
         z = torch.load(path, weights_only=False)
-        assert tuple(z["features"]) == FEATURES, "the chooser was trained on other features"
-        return cls(z["mean"], z["std"], z["state"], z["margin"])
+        return cls(z["mean"], z["std"], z["state"], z["margin"], tuple(z.get("strategies", ("pinch", "hook"))),
+                   tuple(z["features"]))

@@ -520,7 +520,9 @@ class Pipeline:
         self.hooks_dir = hook_dir(tag)
         self.chooser = Chooser.load(chooser) if Path(chooser).exists() else None
         self.strategies = self.chooser.strategies if self.chooser else ("pinch", "hook")
-        self.wayb = WayB() if any(s.startswith("wayb") for s in self.strategies) else None
+        wb_model = ROOT / self.chooser.meta["wayb_model"] if self.chooser and "wayb_model" in self.chooser.meta \
+            else WAYB_MODEL
+        self.wayb = WayB(wb_model) if any(s.startswith("wayb") for s in self.strategies) else None
         self.device = device
         self._net = None
 

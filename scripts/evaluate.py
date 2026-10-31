@@ -517,7 +517,7 @@ def main() -> int:
     log(f"better ranking: {best}; wrote {out / 'chooser.pt'}, {out}/chooser_score.png, chooser_robust.png")
     final = out / "chooser.pt"
     if wb_f.exists():
-        final = compare_sets(recs, wb_f, out, log, results) or final
+        final = compare_sets(recs, wb_f, out, log, results, args.wayb_model) or final
     (out / "results.json").write_text(json.dumps(results, indent=1))
     if not args.smoke:
         shutil.copy(final, ROOT / "data" / "models" / "chooser.pt")
@@ -525,7 +525,8 @@ def main() -> int:
     return 0
 
 
-def compare_sets(recs: list[dict], wb_f: Path, out: Path, log, results: dict) -> Path | None:
+def compare_sets(recs: list[dict], wb_f: Path, out: Path, log, results: dict, wayb_model: Path = WAYB_MODEL) \
+        -> Path | None:
     """The choosers over SETS on the same scenes, objects way B was not trained on; the best one
     (the simplest within one point of the best, A first) trained on those scenes and saved."""
     from scipy.stats import binomtest
@@ -572,6 +573,8 @@ def compare_sets(recs: list[dict], wb_f: Path, out: Path, log, results: dict) ->
     feats = features_for(ss)
     ch = Chooser.fit(np.stack([vector(r, "robust", feats) for r in rs]),
                      np.array([[r[SUCCESS[s]] for s in ss] for r in rs], float), strategies=ss, features=feats)
+    if any(s.startswith("wayb") for s in ss):
+        ch.meta["wayb_model"] = Path(wayb_model).resolve().relative_to(ROOT).as_posix()
     path = out / f"chooser_{pick}.pt"
     ch.save(path)
     log(f"kept set {pick} ({'+'.join(ss)}: the simplest within one point of the best, {best:.0%}); wrote {path}, "

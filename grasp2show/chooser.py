@@ -40,7 +40,7 @@ the oracle (whichever succeeded) bound it.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -281,6 +281,7 @@ class Chooser:
     margin: float = 0.0                      # another strategy must be this much likelier than the first
     strategies: tuple = ("pinch", "hook")
     features: tuple = FEATURES
+    meta: dict = field(default_factory=dict)  # e.g. wayb_model: the way B network its inputs came from
 
     def net(self):
         import torch
@@ -331,7 +332,7 @@ class Chooser:
         import torch
 
         torch.save({"mean": self.mean, "std": self.std, "state": self.state, "margin": self.margin,
-                    "features": self.features, "strategies": self.strategies}, path)
+                    "features": self.features, "strategies": self.strategies, "meta": self.meta}, path)
 
     @classmethod
     def load(cls, path) -> Chooser:
@@ -339,4 +340,4 @@ class Chooser:
 
         z = torch.load(path, weights_only=False)
         return cls(z["mean"], z["std"], z["state"], z["margin"], tuple(z.get("strategies", ("pinch", "hook"))),
-                   tuple(z["features"]))
+                   tuple(z["features"]), dict(z.get("meta", {})))

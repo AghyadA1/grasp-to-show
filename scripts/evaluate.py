@@ -379,7 +379,7 @@ def main() -> int:
                    help="hook network (default: learn.hooknet.DEFAULT_HOOK_NET; not imported here: the workers "
                         "would all load torch)")
     p.add_argument("--wayb-model", type=Path, default=WAYB_MODEL,
-                   help="way B's network for --stage wayb and fit (v4 -> wayb.jsonl, else wayb_<name>.jsonl)")
+                   help="way B's network for --stage wayb and fit (v4: wayb.jsonl, else wayb_<name>.jsonl)")
     p.add_argument("--smoke", action="store_true")
     args = p.parse_args()
     if args.smoke:
@@ -456,7 +456,7 @@ def main() -> int:
         finally:
             pool.close()
     recs = [json.loads(x) for x in rec_f.read_text().splitlines()] if rec_f.exists() else []
-    wb_f = out / ("wayb.jsonl" if args.wayb_model.name == WAYB_MODEL.name else f"wayb_{args.wayb_model.stem}.jsonl")
+    wb_f = out / ("wayb.jsonl" if args.wayb_model.stem == "heatmap_net_v4" else f"wayb_{args.wayb_model.stem}.jsonl")
     if args.stage == "wayb":
         done = {(d["object"], d["scene"]) for d in map(json.loads, wb_f.read_text().splitlines())} \
             if wb_f.exists() else set()

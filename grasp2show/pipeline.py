@@ -58,7 +58,7 @@ CHOOSER = ROOT / "data" / "models" / "chooser.pt"
 SCANNER_SCALE = 2.0              # 1280 x 960 (part 3's scanner; config.CameraConfig is 640 x 480)
 POSE_ERR_MM, POSE_ERR_DEG = 2.0, 1.5     # evaluation: where the object really is vs where the robot thinks
 MAX_ROBUST = 150                 # pinch grasps whose robustness is measured per object (others: 0.5)
-WAYB_MODEL = ROOT / "data" / "models" / "heatmap_net_v4.pt"     # way B, frozen
+WAYB_MODEL = ROOT / "data" / "models" / "heatmap_net_v5.pt"     # way B v5 (scripts/train_wayb.py); v4 before
 WAYB_CLOUD_DIR = ROOT / "data" / "wayb_clouds"
 WAYB_K = 10                      # way B grasps per scene (the network's best, 1 cm apart per target)
 

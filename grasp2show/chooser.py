@@ -68,8 +68,9 @@ WAYB_KEYS = ("wayb_any", "wayb_q", "wayb_n_ok", "wayb_best", "wayb_lift")
 SCENE_KEYS = ("mu", "log_mass", "load", "ext_max", "ext_min")
 ROBUST_KEYS = ("pinch_r", "hook_r")       # robustness of the candidate each strategy would run
 FEATURES = SCENE_KEYS + PINCH_KEYS + HOOK_KEYS + ROBUST_KEYS
+VERIFY_KEYS = ("wayb_sim_any", "wayb_sim_frac")   # way B's top grasps shake-tested at this friction and weight
 STRATEGY_KEYS = {"pinch": PINCH_KEYS + ("pinch_r",), "hook": HOOK_KEYS + ("hook_r",), "wayb": WAYB_KEYS,
-                 "wayb_checked": WAYB_KEYS}
+                 "wayb_checked": WAYB_KEYS, "wayb_verified": WAYB_KEYS + VERIFY_KEYS}
 
 
 def features_for(strategies) -> tuple:

@@ -60,7 +60,8 @@ POSE_ERR_MM, POSE_ERR_DEG = 2.0, 1.5     # evaluation: where the object really i
 MAX_ROBUST = 150                 # pinch grasps whose robustness is measured per object (others: 0.5)
 WAYB_MODEL = ROOT / "data" / "models" / "heatmap_net_v5.pt"     # way B v5 (scripts/train_wayb.py); v4 before
 WAYB_CLOUD_DIR = ROOT / "data" / "wayb_clouds"
-WAYB_K = 10                      # way B grasps per scene (the network's best, 1 cm apart per target)
+WAYB_K = 10
+VERIFY_K = 5          # way B grasps shake-tested at the scene's friction and weight (Checked.wayb_verified)                      # way B grasps per scene (the network's best, 1 cm apart per target)
 
 
 def crc(s: str) -> int:
@@ -368,6 +369,7 @@ class Checked:
     wb_q: np.ndarray | None = None      # their scores
     wb_roll: np.ndarray | None = None   # the target each was proposed for
     seconds: dict = field(default_factory=dict)   # time each strategy's checks took
+    _verified: list | None = None
 
     def pinch_ranked(self, robust: bool = True) -> list:
         return rank_pinch(self.sc, self.assets.robust if robust else None)
@@ -388,6 +390,33 @@ class Checked:
                 return out
         order = [(int(i), int(self.wb_roll[i])) for i in np.argsort(-self.wb_q)]
         return kinematic_choices(self.wb, order)
+
+    def wayb_verified(self, k: int = VERIFY_K) -> list:
+        """Way B's checked ranking with its first k grasps shake-tested in the floating-gripper
+        simulator at this scene's friction and weight (gripper_sim.shake_test: close, lift,
+        shake): those that hold first, in their order, then the rest. The static lift model is
+        optimistic where it matters (grasps it gives a margin under 0.6 hold half the time in full
+        episodes, most lost 0.3 s into the lift, as the table lets go: scripts/diagnose_drops.py).
+        Adds the chooser inputs wayb_sim_any, wayb_sim_frac. Cached."""
+        if self._verified is not None:
+            return self._verified
+        from .gripper_sim import GripperSim
+
+        ranked = self.wayb_ranked(True)
+        held, tested = {}, []
+        if ranked:
+            sim = GripperSim(self.wb.cfg, self.wb.obj)
+            sim.set_conditions(self.scene.mu, 1.0)            # the scene's obj already has its mass
+            for c in ranked:
+                if c.grasp in held:
+                    continue
+                held[c.grasp] = bool(sim.shake_test(self.wb.T[c.grasp], float(self.wb.W[c.grasp])).success)
+                tested.append(held[c.grasp])
+                if len(tested) == k:
+                    break
+        self._verified = [c for c in ranked if held.get(c.grasp)] + [c for c in ranked if not held.get(c.grasp)]
+        self.features.update(wayb_sim_any=float(any(tested)), wayb_sim_frac=float(np.mean(tested)) if tested else 0.0)
+        return self._verified
 
     def chooser_inputs(self, robust: bool = True) -> dict:
         """features plus the robustness of each strategy's first candidate."""
@@ -503,7 +532,7 @@ def ranked_all(ck: Checked) -> dict:
     """Every strategy's ranked candidates (the robust rankings for pinch and hook)."""
     out = {"pinch": ck.pinch_ranked(), "hook": ck.hook_ranked()}
     if ck.wb is not None:
-        out.update(wayb=ck.wayb_ranked(), wayb_checked=ck.wayb_ranked(True))
+        out.update(wayb=ck.wayb_ranked(), wayb_checked=ck.wayb_ranked(True), wayb_verified=ck.wayb_verified())
     return out
 
 
@@ -547,7 +576,7 @@ class Pipeline:
     def plan(self, scene: Scene) -> Plan:
         """The strategies checked, the chooser's pick and every strategy's ranked candidates."""
         ck = check(scene, self.prepare(scene.asset), self.wayb)
-        ranked = ranked_all(ck)
+        ranked = ranked_all(ck)          # (way B verified: adds its chooser inputs)
         names = [s for s in self.strategies if s in ranked]
         if self.chooser is not None:
             x = vector(ck.chooser_inputs(), "", self.chooser.features)[None]

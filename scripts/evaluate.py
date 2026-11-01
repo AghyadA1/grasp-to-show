@@ -60,11 +60,13 @@ from grasp2show.pipeline import GRASP_DIR, SCANNER_SCALE, WAYB_MODEL, crc, hook_
 RUNS = ROOT / "data" / "runs"
 TOP = 3              # candidates executed per strategy, ranking and scene (the first is the one the robot runs)
 VARIANTS = ("score", "robust")
-WAYB_VARIANTS = ("net", "checked")
+WAYB_VARIANTS = ("net", "checked", "verified")
 SUCCESS = {"pinch": "pinch_success_robust", "hook": "hook_success_robust", "wayb": "wayb_success_net",
-           "wayb_checked": "wayb_success_checked"}
-SETS = {"A": ("pinch", "hook"), "B": ("wayb", "hook"), "C": ("wayb_checked", "hook"),
-        "D": ("pinch", "wayb_checked", "hook")}
+           "wayb_checked": "wayb_success_checked", "wayb_verified": "wayb_success_verified"}
+# in order of preference when about as good (compare_sets keeps the first within a point of the
+# best): way B before the analytic pinch, whose checks take 2-3 x longer (scripts/diagnose_drops.py)
+SETS = {"E": ("wayb_verified", "hook"), "B": ("wayb", "hook"), "C": ("wayb_checked", "hook"),
+        "A": ("pinch", "hook"), "D": ("pinch", "wayb_checked", "hook")}
 
 
 # ---------------------------------------------------------------- objects
@@ -187,11 +189,13 @@ def wayb_episode(args) -> dict:
         _WAYB = (model, WayB(Path(model)))
     scene, off = sample_scene(name, k, scale)
     ck = add_wayb(Checked(scene, None, None, [], []), _WAYB[1])
+    ck.wayb_verified()                                    # its chooser inputs
     rec = {"object": name, "scene": k, **ck.features}
     done: dict = {}
     for v in WAYB_VARIANTS:
         tries, why = [], "no grasp"
-        for c in ck.wayb_ranked(v == "checked")[:20]:
+        ranked = ck.wayb_verified() if v == "verified" else ck.wayb_ranked(v == "checked")
+        for c in ranked[:20]:
             key = (c.grasp, c.twin, c.roll_idx)
             if key not in done:
                 done[key] = execute_wayb(ck, c, off)
@@ -539,8 +543,10 @@ def compare_sets(recs: list[dict], wb_f: Path, out: Path, log, results: dict, wa
     log(f"== strategy sets, {len(rs)} scenes on {len({r['object'] for r in rs})} objects way B did not see in "
         f"training (cross-validated by object)")
     res, got = {}, {}
-    for k, ss in SETS.items():
+    sets = {k: ss for k, ss in SETS.items() if all(SUCCESS[s] in rs[0] for s in ss)}   # older runs: no verified
+    for k, ss in sets.items():
         res[k], got[k] = evaluate_set(rs, ss)
+    for k, ss in sets.items():
         for g, x in res[k].items():
             log(f"  {k} {'+'.join(ss):26s} {g:4s} ({x['scenes']:4d} scenes): learned {x['learned']:.0%}, oracle "
                 f"{x['oracle']:.0%}; always " + ", ".join(f"{s} {x['always_' + s]:.0%}" for s in ss)
@@ -549,7 +555,7 @@ def compare_sets(recs: list[dict], wb_f: Path, out: Path, log, results: dict, wa
             w, lo = int(np.sum(got[k] > got["A"])), int(np.sum(got[k] < got["A"]))
             res[k]["vs_A"] = {"won": w, "lost": lo, "p": float(binomtest(w, w + lo).pvalue) if w + lo else 1.0}
             log(f"    vs A, scene by scene: won {w}, lost {lo} (p = {res[k]['vs_A']['p']:.3f})")
-    for v in WAYB_VARIANTS:
+    for v in [v for v in WAYB_VARIANTS if f"wayb_tries_{v}" in rs[0]]:
         n = [r for r in rs if r[f"wayb_tries_{v}"]]
         drops = {}
         for r in rs:
@@ -561,13 +567,13 @@ def compare_sets(recs: list[dict], wb_f: Path, out: Path, log, results: dict, wa
     if v4_f != wb_f and v4_f.exists():                  # this network against v4, scene by scene
         old = {(d["object"], d["scene"]): d for d in map(json.loads, v4_f.read_text().splitlines())}
         both = [(r, old[(r["object"], r["scene"])]) for r in rs if (r["object"], r["scene"]) in old]
-        for v in WAYB_VARIANTS:
+        for v in [v for v in WAYB_VARIANTS if f"wayb_success_{v}" in both[0][1]]:
             a_, b_ = (np.array([x[f"wayb_success_{v}"] for x in col]) for col in zip(*both))
             log(f"  way B {v}: this network {a_.mean():.0%} vs v4 {b_.mean():.0%} on {len(both)} scenes "
                 f"(won {int(np.sum(a_ > b_))}, lost {int(np.sum(a_ < b_))})")
     results["sets"] = res
-    best = max(res[k]["all"]["learned"] for k in SETS)
-    pick = next(k for k in SETS if res[k]["all"]["learned"] >= best - 0.01)
+    best = max(res[k]["all"]["learned"] for k in sets)
+    pick = next(k for k in sets if res[k]["all"]["learned"] >= best - 0.01)
     plot_sets(res, out / "chooser_sets.png")
     ss = SETS[pick]
     feats = features_for(ss)
@@ -589,17 +595,18 @@ def plot_sets(res: dict, path: Path) -> None:
     import matplotlib.pyplot as plt
 
     col = {"pinch": "#4C78A8", "hook": "#E45756", "wayb": "#F58518", "wayb_checked": "#EECA3B",
-           "learned": "#54A24B", "oracle": "#9D9D9D"}
+           "wayb_verified": "#B279A2", "learned": "#54A24B", "oracle": "#9D9D9D"}
     groups = [g for g in ("all", "real", "gen") if g in res["A"]]
     fig, axs = plt.subplots(1, len(groups), figsize=(5.2 * len(groups), 4.4), sharey=True)
     for ax, g in zip(np.atleast_1d(axs), groups):
         x0 = 0
-        for k, ss in SETS.items():
+        seen = set()
+        for k, ss in ((k, SETS[k]) for k in res):
             bars = [(f"always {s}", res[k][g][f"always_{s}"], col[s]) for s in ss] + \
                    [("learned", res[k][g]["learned"], col["learned"]), ("oracle", res[k][g]["oracle"], col["oracle"])]
             for j, (lab, v, c) in enumerate(bars):
-                ax.bar(x0 + j, v * 100, 0.85, color=c, label=lab if k == "D" or (lab.endswith("wayb") and k == "B")
-                       else None)
+                ax.bar(x0 + j, v * 100, 0.85, color=c, label=None if lab in seen else lab)
+                seen.add(lab)
                 ax.text(x0 + j, v * 100 + 1, f"{v * 100:.0f}", ha="center", fontsize=7)
             ax.text(x0 + (len(bars) - 1) / 2, -9, k, ha="center", fontsize=10, weight="bold")
             x0 += len(bars) + 1
@@ -609,8 +616,8 @@ def plot_sets(res: dict, path: Path) -> None:
         ax.grid(axis="y", alpha=0.3)
     np.atleast_1d(axs)[0].set_ylabel("episodes succeeded (%)")
     np.atleast_1d(axs)[-1].legend(fontsize=7, frameon=False, loc="upper right")
-    fig.suptitle("Choosers over strategy sets (A pinch+hook, B way B+hook, C way B checked+hook, D all three); "
-                 "objects way B did not see", fontsize=9)
+    fig.suptitle("Choosers over strategy sets (A pinch+hook, B way B+hook, C way B checked+hook, D all three, "
+                 "E way B shake-verified+hook); objects way B did not see", fontsize=9)
     fig.tight_layout()
     fig.savefig(path, dpi=120)
 

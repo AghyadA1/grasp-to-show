@@ -573,6 +573,8 @@ class PickAndShow:
             follow(np.repeat(np.asarray(q)[None], max(int(T / dt), 1), axis=0), width)
 
         seg = {name: T for name, _, T in self.SEGMENTS}
+        if "lift_T" in paths:                          # the carry network's lift duration (carry.carry_paths)
+            seg["lift"] = float(paths["lift_T"])
         # Large joint-space moves get more time: peak joint speed ~ 1.875 * dq / T <= ~1.1 rad/s.
         for name in ("approach", "transit"):
             if name not in paths:
@@ -599,7 +601,7 @@ class PickAndShow:
         T_tcp_obj_ref = inv_T(site_pose(d, "tcp")) @ body_pose(m, d, self.obj.name)
         if "transport" in paths:      # one optimised trajectory (grasp2show/transport_opt.py), sampled every dt
             traj = np.asarray(paths["transport"])
-            if speed != 1.0:
+            if speed != 1.0 and not paths.get("transport_timed"):
                 t_src = np.arange(1, len(traj) + 1) * dt
                 t_new = np.arange(1, max(round(len(traj) / speed), 1) + 1) * dt * speed
                 traj = np.column_stack([np.interp(t_new, t_src, traj[:, j]) for j in range(traj.shape[1])])

@@ -476,23 +476,39 @@ def add_wayb(ck: Checked, wayb: WayB, cfg=None, obj=None) -> Checked:
     return ck
 
 
-def execute_pinch(ck: Checked, choice, obj_offset=None, on_frame=None, fps: int = 30) -> tuple[bool | None, str]:
+def execute_pinch(ck: Checked, choice, obj_offset=None, on_frame=None, fps: int = 30,
+                  carry_net=None) -> tuple[bool | None, str]:
     """(success, why) for one pinch choice; success None: its motion could not be planned."""
-    e = ck.sc._execute(choice, obj_offset=obj_offset, on_frame=on_frame, fps=fps)
+    e = ck.sc._execute(choice, obj_offset=obj_offset, on_frame=on_frame, fps=fps,
+                       carry=carry_fn(carry_net, "pinch", ck.scene.mu))
     if e.reason.startswith("plan"):
         return None, e.reason
     return bool(e.success), e.reason
 
 
-def execute_wayb(ck: Checked, choice, obj_offset=None, on_frame=None, fps: int = 30) -> tuple[bool | None, str]:
-    """(success, why) for one of way B's choices; None: its motion could not be planned."""
-    e = ck.wb._execute(choice, obj_offset=obj_offset, on_frame=on_frame, fps=fps)
+def carry_fn(net, kind: str, mu: float):
+    """A paths transformer for Scenario._execute: the carry network's carry (None: the planner's)."""
+    if net is None:
+        return None
+    from .carry import carry_paths
+
+    dt = SceneConfig().timestep
+    return lambda paths, T, w, T_tcp_obj, obj: carry_paths(net, kind, paths, T, w, T_tcp_obj, mu, obj, dt)
+
+
+def execute_wayb(ck: Checked, choice, obj_offset=None, on_frame=None, fps: int = 30,
+                 carry_net=None) -> tuple[bool | None, str]:
+    """(success, why) for one of way B's choices; None: its motion could not be planned.
+    carry_net: carry with the carry network (learn/carry_net.py) instead of the planner."""
+    e = ck.wb._execute(choice, obj_offset=obj_offset, on_frame=on_frame, fps=fps,
+                       carry=carry_fn(carry_net, "pinch", ck.scene.mu))
     if e.reason.startswith("plan"):
         return None, e.reason
     return bool(e.success), e.reason
 
 
-def execute_hook(ck: Checked, option, obj_offset=None, on_frame=None, fps: int = 30) -> tuple[bool | None, str]:
+def execute_hook(ck: Checked, option, obj_offset=None, on_frame=None, fps: int = 30,
+                 carry_net=None) -> tuple[bool | None, str]:
     """(success, why) for one hook option; success None: its motion could not be planned."""
     from .hanging import HOOK_SPEED, plan_hook
     from .task import Grasp
@@ -500,6 +516,11 @@ def execute_hook(ck: Checked, option, obj_offset=None, on_frame=None, fps: int =
     paths, why = plan_hook(ck.sc.ep, ck.sc.fc, option)
     if paths is None:
         return None, f"plan: {why}"
+    if carry_net is not None:
+        from .carry import carry_paths
+
+        paths = carry_paths(carry_net, "hook", paths, option.T_obj_tcp, option.width, option.hang.T_tcp_obj,
+                            ck.scene.mu, ck.sc.obj, ck.sc.ep.model.opt.timestep)
     res = ck.sc.ep.execute(Grasp(f"hook{option.hook}", option.T_obj_tcp, option.width, "hook"), paths,
                            speed=HOOK_SPEED, mu=ck.scene.mu, obj_offset=obj_offset, on_frame=on_frame, fps=fps)
     return bool(res.success), res.reason(hook=True)
@@ -536,18 +557,24 @@ def ranked_all(ck: Checked) -> dict:
     return out
 
 
-def execute(ck: Checked, strategy: str, c, obj_offset=None, on_frame=None) -> tuple[bool | None, str]:
+def execute(ck: Checked, strategy: str, c, obj_offset=None, on_frame=None, carry_net=None) -> tuple[bool | None, str]:
     if strategy == "hook":
-        return execute_hook(ck, c, obj_offset, on_frame=on_frame)
+        return execute_hook(ck, c, obj_offset, on_frame=on_frame, carry_net=carry_net)
     if strategy.startswith("wayb"):
-        return execute_wayb(ck, c, obj_offset, on_frame=on_frame)
-    return execute_pinch(ck, c, obj_offset, on_frame=on_frame)
+        return execute_wayb(ck, c, obj_offset, on_frame=on_frame, carry_net=carry_net)
+    return execute_pinch(ck, c, obj_offset, on_frame=on_frame, carry_net=carry_net)
 
 
 class Pipeline:
     """The trained parts: the hook network (finds hooks on a new object) and the chooser."""
 
-    def __init__(self, chooser: Path = CHOOSER, hook_net: Path | None = None, device: str = "cpu"):
+    def __init__(self, chooser: Path = CHOOSER, hook_net: Path | None = None, device: str = "cpu",
+                 carry_net: Path | None = None):
+        """carry_net: carry with the carry network (data/models/carry_net.pt, scripts/train_carry.py)
+        instead of the planner's lift and transit."""
+        from .learn.carry_net import load_carry_net
+
+        self.carry_net = load_carry_net(carry_net) if carry_net is not None else None
         from .learn.hooknet import DEFAULT_HOOK_NET
 
         self.hook_net_path = Path(hook_net) if hook_net is not None else DEFAULT_HOOK_NET
@@ -601,7 +628,7 @@ class Pipeline:
         order = [pl.method] + sorted((s for s in pl.ranked if s != pl.method), key=lambda s: -pl.probs.get(s, 0.0))
         for method in order:
             for c in pl.ranked[method][:max_tries]:
-                ok, why = execute(pl.checked, method, c, obj_offset, on_frame=on_frame)
+                ok, why = execute(pl.checked, method, c, obj_offset, on_frame=on_frame, carry_net=self.carry_net)
                 if ok is not None:
                     return Result(method, ok, why, pl, time.time() - t0)
         return Result(pl.method, False, why, pl, time.time() - t0)

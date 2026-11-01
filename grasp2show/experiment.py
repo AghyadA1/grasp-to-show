@@ -34,6 +34,7 @@ from .objects import ObjectModel, object_from_config
 from .scene import build_scene
 from .stability import StabilityParams, finger_contacts, utilisation_shake
 from .task import Grasp, show_pose
+from .transforms import inv_T
 
 POLICIES = ("stability_only", "aware", "aware_no_vis", "aware_no_stab", "aware_single", "aware_leximin")
 LIMIT_SCALE = 0.5   # rad: a joint-limit margin of 0.5 rad counts as "fully comfortable"
@@ -179,7 +180,7 @@ class Scenario:
         return EpisodeRecord(**{**asdict(rec), **base})
 
     def _execute(self, c: Choice, obj_offset: tuple[float, float, float] | None = None, on_frame=None,
-                 fps: int = 30) -> EpisodeRecord:
+                 fps: int = 30, carry=None) -> EpisodeRecord:
         """Plan and run one choice; obj_offset: unknown error in the object's start pose (see
         PickAndShow.execute); on_frame(data): called fps times per simulated second (videos)."""
         tw = self.reports[c.grasp].twins[c.twin]
@@ -194,6 +195,8 @@ class Scenario:
                                            checker=self.fc, width=float(self.W[c.grasp]))
         if paths is None:
             return EpisodeRecord(**common, success=False, reason=f"plan: {why}")
+        if carry is not None:                  # paths -> paths with a learned carry (carry.carry_paths)
+            paths = carry(paths, T_obj_tcp, float(self.W[c.grasp]), inv_T(T_obj_tcp), self.obj)
         r = self.ep.execute(Grasp(f"g{c.grasp}", T_obj_tcp, float(self.W[c.grasp])), paths, obj_offset=obj_offset,
                             mu=self.mu, on_frame=on_frame, fps=fps)
         reason = r.reason(self.ep.slip_tol_mm, self.ep.slip_tol_deg)

@@ -72,7 +72,7 @@ from grasp2show.pipeline import Pipeline, Scene
 
 pipe = Pipeline()
 result = pipe.run(Scene.sample("ACE_Coffee_Mug_Kristen_16_oz_cup", k=1))
-print(result.method, result.success)        # e.g. "hook True"
+print(result.method, result.success)        # the strategy that ran (a pinch or a hook) and whether the code was read
 ```
 
 ## Try it

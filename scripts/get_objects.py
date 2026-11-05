@@ -2,7 +2,8 @@
 
 Usage:
   python scripts/get_objects.py            # all objects in grasp2show/object_set.json
-  python scripts/get_objects.py --only 3   # just the first 3 (quick start)
+  python scripts/get_objects.py --only 3   # just the first 3
+  python scripts/get_objects.py --names ACE_Coffee_Mug_Kristen_16_oz_cup   # just this one
   python scripts/get_objects.py --set object_set_more.json   # way B v5's extra training objects
 Files come from raw.githubusercontent.com (kevinzakka/mujoco_scanned_objects; Google
 Scanned Objects assets, CC-BY 4.0). Each object is ~1-3 MB.
@@ -59,9 +60,10 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--only", type=int, default=None, help="download only the first N objects")
     p.add_argument("--set", default=None, help="another object set file, e.g. object_set_more.json")
+    p.add_argument("--names", nargs="*", default=None, help="just these objects")
     args = p.parse_args()
     oset = load_object_set() if args.set is None else json.loads((ROOT / "grasp2show" / args.set).read_text())
-    names = oset["objects"][: args.only]
+    names = args.names or oset["objects"][: args.only]
     print(f"downloading {len(names)} objects to {scanned_objects_dir()}")
     with ThreadPoolExecutor(max_workers=6) as ex:
         for i, msg in enumerate(ex.map(download_object, names), 1):

@@ -258,7 +258,7 @@ hole finder's rules, so pockets and J-shaped hooks can be found too.
 *The mug at 8 × its weight (2 kg), same scene. Left: way B's pinch. Right: the hook, carried
 with the fingers raised, shown hanging; insets: the scanner's view at the end.*
 
-### Self-training: the simulator teaches the hook network (running)
+### Self-training: the simulator teaches the hook network
 
 The first hook network learned the hole finder's hooks, so it learned the hole finder's blind
 spots too: a closed pocket with a lip, a J-hook, a knob's cap, a basket's bail wider than its
@@ -285,7 +285,16 @@ every label is a lift test (`grasp2show/hookteach.py`, `scripts/self_train_hooks
   hit rate, coverage of the teacher's distinct hooks, precision, and hooks found that the
   teacher missed (`media/self_train_hooks.png`).
 
-### Hook or pinch: the chooser (running)
+**Result** (the network used now, `data/models/hook_net_table.pt`: judged by the robot's real lift
+from the table, round 3 of 4; `scripts/self_train_hooks.py --judge table`). Hit: one of the network's
+top proposals lifts the object in simulation.
+
+| held out | objects | point AUC | hit |
+|---|---|---|---|
+| generated shapes | 191 | 0.96 | 90 % |
+| real scans with a handle | 7 | 0.91 | 6 of 7 |
+
+### Hook or pinch: the chooser
 
 A pinch holds by friction (two fingers at 20 N carry about 4 mu kg when centred, less with
 torque or motion); a hook carries the weight as a normal force on the finger, nearly

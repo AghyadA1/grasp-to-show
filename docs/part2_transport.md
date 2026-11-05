@@ -139,6 +139,21 @@ simulation (the ±5 mm leverage margin and the axial cap leave room); its one fa
 with 3 mm slip. Every failure of the slowed-down straight motion is a heavy object slipping in the
 hand (up to 47 cm): moving differently matters exactly where the grasp is the limit.
 
+### The network and the default planner
+
+The planner every episode used before (`episode.PickAndShow.plan_analytic`: a joint-space move
+timed by its largest joint step, then a straight line to the scanner) against the network's raw
+motion, same grasp, same start and end, full simulation, on the 100 unseen-object problems
+(`scripts/archive/part2_transport/demo_net_vs_planner.py --pick`). In the 82 where both read the
+code, the network's carry takes **0.48× the planner's (median; quartiles 0.42–0.55)**, and it has
+no stop on the way, where the planner stops once between its two segments.
+
+![planner vs network](../media/net_vs_planner_00021_Nestle_Nips_Hard_Can.gif)
+
+A typical case (0.53×, near the median): a 0.16 kg box at friction 0.26, 4.8 s → 2.6 s, both read
+the code with 2–3 mm of slip. Below the scene: the hand's speed; the planner's move-stop-move
+against the network's one motion.
+
 ### The network and the optimiser, case by case
 
 Same grasp, same start and end; each video shows how each path is made (the optimiser's search:

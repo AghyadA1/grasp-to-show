@@ -7,7 +7,13 @@ __pycache__/
 third_party/
 assets/qr_*.png
 media/*.mp4
-data/
+data/*
+!data/models/
+data/models/*
+!data/models/chooser.pt
+!data/models/heatmap_net_v5.pt
+!data/models/hook_net_table.pt
+!data/models/transport_net_ss_mass.pt
 MUJOCO_LOG.TXT
 cpp/build/
 media/heatmap_*
